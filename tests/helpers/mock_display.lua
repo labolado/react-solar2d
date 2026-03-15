@@ -141,12 +141,24 @@ function M.newImageRect(parent, filename, w, h)
     return img
 end
 
-function M.newContainer(parent, w, h)
+function M.newContainer(parentOrW, wOrH, hOrNil)
     local c = newDisplayObject("container")
-    c.width, c.height = w, h
-    if parent then parent:insert(c) end
+    if type(parentOrW) == "number" then
+        -- display.newContainer(w, h)
+        c.width, c.height = parentOrW, wOrH
+    else
+        -- display.newContainer(parent, w, h)
+        c.width, c.height = wOrH, hOrNil
+        if parentOrW then parentOrW:insert(c) end
+    end
+    c.anchorChildren = true
     return c
 end
+
+-- currentStage mock (for setFocus)
+M.currentStage = {
+    setFocus = function(self, obj) end
+}
 
 function M.resetIdCounter()
     nextId = 0

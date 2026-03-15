@@ -231,6 +231,79 @@ function M.createInstance(elementType, props)
         wireEvents(group, props)
         return group
 
+    elseif elementType == "ScrollView" then
+        local w = style.width or (display.contentWidth or 320)
+        local h = style.height or (display.contentHeight or 480)
+        local horizontal = props.horizontal or false
+
+        -- Outer: clipping container
+        local clipContainer = display.newContainer(w, h)
+        clipContainer.anchorX, clipContainer.anchorY = 0, 0
+        clipContainer.anchorChildren = false
+
+        -- Inner: scrollable content group
+        local contentGroup = display.newGroup()
+        clipContainer:insert(contentGroup)
+        -- Container coordinate origin is at center, offset to top-left
+        contentGroup.x = -w / 2
+        contentGroup.y = -h / 2
+
+        clipContainer._contentGroup = contentGroup
+        clipContainer._scrollW = w
+        clipContainer._scrollH = h
+        clipContainer._horizontal = horizontal
+        clipContainer._scrollY = 0
+        clipContainer._scrollX = 0
+        clipContainer._contentH = 0
+        clipContainer._contentW = 0
+
+        -- Touch-based scrolling
+        local startY, startX, startScrollY, startScrollX
+        clipContainer:addEventListener("touch", function(event)
+            if event.phase == "began" then
+                if display.currentStage and display.currentStage.setFocus then
+                    display.currentStage:setFocus(clipContainer)
+                end
+                startY = event.y
+                startX = event.x
+                startScrollY = clipContainer._scrollY
+                startScrollX = clipContainer._scrollX
+            elseif event.phase == "moved" then
+                if horizontal then
+                    local dx = event.x - startX
+                    local newScrollX = startScrollX + dx
+                    local maxScroll = math.max(0, clipContainer._contentW - w)
+                    newScrollX = math.max(-maxScroll, math.min(0, newScrollX))
+                    clipContainer._scrollX = newScrollX
+                    contentGroup.x = -w / 2 + newScrollX
+                else
+                    local dy = event.y - startY
+                    local newScrollY = startScrollY + dy
+                    local maxScroll = math.max(0, clipContainer._contentH - h)
+                    newScrollY = math.max(-maxScroll, math.min(0, newScrollY))
+                    clipContainer._scrollY = newScrollY
+                    contentGroup.y = -h / 2 + newScrollY
+                end
+                if props.onScroll then
+                    props.onScroll({
+                        contentOffset = {
+                            x = -clipContainer._scrollX,
+                            y = -clipContainer._scrollY,
+                        }
+                    })
+                end
+            elseif event.phase == "ended" or event.phase == "cancelled" then
+                if display.currentStage and display.currentStage.setFocus then
+                    display.currentStage:setFocus(nil)
+                end
+            end
+            return true
+        end)
+
+        applyCommonStyle(clipContainer, style)
+        wireEvents(clipContainer, props)
+        return clipContainer
+
     elseif elementType == "Image" then
         local group = display.newGroup()
         group.anchorX, group.anchorY = 0, 0
