@@ -1,0 +1,8 @@
+-- build.settings for Yoga plugin integration test
+settings = {
+    orientation = {
+        default = "portrait",
+        supported = { "portrait" },
+    },
+    plugins = {},
+}
