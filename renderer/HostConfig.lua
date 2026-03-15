@@ -304,6 +304,87 @@ function M.createInstance(elementType, props)
         wireEvents(clipContainer, props)
         return clipContainer
 
+    elseif elementType == "TextInput" then
+        local group = display.newGroup()
+        group.anchorX, group.anchorY = 0, 0
+
+        local w = style.width or 200
+        local h = style.height or 40
+
+        -- Background box
+        local bg
+        if style.borderRadius and style.borderRadius > 0 then
+            bg = display.newRoundedRect(group, 0, 0, w, h, style.borderRadius)
+        else
+            bg = display.newRect(group, 0, 0, w, h)
+        end
+        bg.anchorX, bg.anchorY = 0, 0
+        local bgColor = parseColor(style.backgroundColor or "#FFFFFF")
+        bg:setFillColor(bgColor[1], bgColor[2], bgColor[3], bgColor[4])
+        if style.borderWidth then
+            bg.strokeWidth = style.borderWidth
+            local bc = parseColor(style.borderColor or "#CCCCCC")
+            bg:setStrokeColor(bc[1], bc[2], bc[3], bc[4])
+        end
+
+        -- Native text field (if available in Solar2D)
+        local field
+        if native and native.newTextField then
+            local multiline = props.multiline or false
+            if multiline then
+                field = native.newTextBox(w / 2, h / 2, w - 8, h - 8)
+            else
+                field = native.newTextField(w / 2, h / 2, w - 8, h - 8)
+            end
+            if field then
+                field.font = native.systemFont
+                field.size = style.fontSize or 14
+                if props.placeholder then field.placeholder = props.placeholder end
+                if props.value then field.text = props.value end
+                if style.color then
+                    local c = parseColor(style.color)
+                    if field.setTextColor then
+                        field:setTextColor(c[1], c[2], c[3], c[4])
+                    end
+                end
+                field:addEventListener("userInput", function(event)
+                    if event.phase == "editing" or event.phase == "ended" then
+                        if props.onChangeText then
+                            props.onChangeText(field.text)
+                        end
+                    end
+                    if event.phase == "submitted" then
+                        if props.onSubmitEditing then
+                            props.onSubmitEditing({ nativeEvent = { text = field.text } })
+                        end
+                        if native.setKeyboardFocus then
+                            native.setKeyboardFocus(nil)
+                        end
+                    end
+                end)
+                group:insert(field)
+            end
+        else
+            -- Fallback: placeholder text for mock/non-native environments
+            local placeholder = display.newText({
+                parent = group,
+                text = props.placeholder or "",
+                x = 8, y = h / 2,
+                fontSize = style.fontSize or 14,
+            })
+            placeholder.anchorX, placeholder.anchorY = 0, 0.5
+            local c = parseColor("#999999")
+            placeholder:setFillColor(c[1], c[2], c[3], c[4])
+            group._placeholder = placeholder
+        end
+
+        group._bg = bg
+        group._inputField = field
+        group._isTextInput = true
+        applyCommonStyle(group, style)
+        wireEvents(group, props)
+        return group
+
     elseif elementType == "Image" then
         local group = display.newGroup()
         group.anchorX, group.anchorY = 0, 0
