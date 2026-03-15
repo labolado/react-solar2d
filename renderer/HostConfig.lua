@@ -220,12 +220,13 @@ function M.createInstance(elementType, props)
         })
         textObj.anchorX, textObj.anchorY = 0, 0
 
-        if style.color then
-            local c = parseColor(style.color)
-            textObj:setFillColor(c[1], c[2], c[3], c[4])
-        end
+        -- Default text color to black (RN default), unlike Solar2D's white default
+        local c = parseColor(style.color or "#000000")
+        textObj:setFillColor(c[1], c[2], c[3], c[4])
 
         group._textObj = textObj
+        group._font = font
+        group._fontSize = style.fontSize or 14
         group._lineHeight = style.lineHeight
         applyCommonStyle(group, style)
         wireEvents(group, props)
@@ -236,17 +237,17 @@ function M.createInstance(elementType, props)
         local h = style.height or (display.contentHeight or 480)
         local horizontal = props.horizontal or false
 
-        -- Outer: clipping container
+        -- Use Container for clipping
         local clipContainer = display.newContainer(w, h)
         clipContainer.anchorX, clipContainer.anchorY = 0, 0
         clipContainer.anchorChildren = false
 
-        -- Inner: scrollable content group
+        -- Content group: offset to map top-left origin inside Container
         local contentGroup = display.newGroup()
         clipContainer:insert(contentGroup)
-        -- Container coordinate origin is at center, offset to top-left
         contentGroup.x = -w / 2
         contentGroup.y = -h / 2
+        clipContainer._isContainer = true
 
         clipContainer._contentGroup = contentGroup
         clipContainer._scrollW = w
@@ -276,6 +277,7 @@ function M.createInstance(elementType, props)
                 startScrollX = clipContainer._scrollX
                 clipContainer._pullingToRefresh = false
             elseif event.phase == "moved" then
+                if not startY then return true end
                 if horizontal then
                     local dx = event.x - startX
                     local newScrollX = startScrollX + dx
@@ -315,6 +317,7 @@ function M.createInstance(elementType, props)
                 if display.currentStage and display.currentStage.setFocus then
                     display.currentStage:setFocus(nil)
                 end
+                if not startY then return true end
 
                 -- Pull-to-refresh: trigger callback and snap back
                 if not horizontal and clipContainer._pullingToRefresh and props.onRefresh then
@@ -457,6 +460,7 @@ function M.createTextInstance(text)
         fontSize = 14,
     })
     textObj.anchorX, textObj.anchorY = 0, 0
+    textObj:setFillColor(0, 0, 0) -- Default to black
     group._textObj = textObj
     return group
 end
@@ -578,5 +582,7 @@ function M.updateTextInstance(instance, oldText, newText)
         instance._textObj.text = tostring(newText)
     end
 end
+
+M._parseColor = parseColor
 
 return M

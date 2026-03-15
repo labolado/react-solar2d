@@ -26,6 +26,7 @@ RN.render = ReactSolar2D.render
 RN.unmount = ReactSolar2D.unmount
 RN.flushUpdates = ReactSolar2D.flushUpdates
 RN.startAutoFlush = ReactSolar2D.startAutoFlush
+RN.getSafeAreaInsets = ReactSolar2D.getSafeAreaInsets
 
 -- Style
 RN.StyleSheet = StyleSheet

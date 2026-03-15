@@ -126,7 +126,10 @@ function M.create(hostConfig)
             if not fiber.stateNode then
                 fiber.stateNode = hostConfig.createInstance(fiber.type, fiber.props)
             end
-            reconcileChildren(fiber, fiber.props.children)
+            -- Text elements are leaf nodes: content handled via props.children in createInstance
+            if fiber.type ~= "Text" then
+                reconcileChildren(fiber, fiber.props.children)
+            end
         elseif fiber.tag == "text" then
             if not fiber.stateNode then
                 fiber.stateNode = hostConfig.createTextInstance(fiber.props.text)

@@ -10,6 +10,8 @@ local useMemo = React.useMemo
 
 local W = display.contentWidth
 local H = display.contentHeight
+local SCALE = W / 1536  -- adaptive scaling: 1.0 on iPad, ~0.62 on iPhone
+local function s(v) return math.floor(v * SCALE + 0.5) end
 
 -- ============================================================
 -- 数据层：模拟 API 和大数据集
@@ -18,12 +20,12 @@ local H = display.contentHeight
 local CATEGORIES = { "全部", "推荐", "技术", "教育", "设计", "科学", "生活" }
 
 local CATEGORY_COLORS = {
-    ["推荐"] = { bg = "#FFF8E1", text = "#FF8F00", icon = "⭐" },
-    ["技术"] = { bg = "#E3F2FD", text = "#1565C0", icon = "💻" },
-    ["教育"] = { bg = "#E8F5E9", text = "#2E7D32", icon = "📚" },
-    ["设计"] = { bg = "#FCE4EC", text = "#AD1457", icon = "🎨" },
-    ["科学"] = { bg = "#EDE7F6", text = "#4527A0", icon = "🔬" },
-    ["生活"] = { bg = "#FFF3E0", text = "#E65100", icon = "☕" },
+    ["推荐"] = { bg = "#FFF8E1", text = "#FF8F00", icon = "*" },
+    ["技术"] = { bg = "#E3F2FD", text = "#1565C0", icon = "T" },
+    ["教育"] = { bg = "#E8F5E9", text = "#2E7D32", icon = "E" },
+    ["设计"] = { bg = "#FCE4EC", text = "#AD1457", icon = "D" },
+    ["科学"] = { bg = "#EDE7F6", text = "#4527A0", icon = "S" },
+    ["生活"] = { bg = "#FFF3E0", text = "#E65100", icon = "L" },
 }
 
 -- 生成大量新闻数据 (模拟后端返回)
@@ -147,49 +149,49 @@ end
 local function SkeletonCard(props)
     return createElement("View", {
         style = {
-            marginHorizontal = 32,
-            marginBottom = 20,
-            padding = 28,
+            marginHorizontal = s(32),
+            marginBottom = s(20),
+            padding = s(28),
             backgroundColor = "#FFFFFF",
-            borderRadius = 16,
+            borderRadius = s(16),
         },
     },
         -- Title skeleton
         createElement("View", {
             style = {
-                height = 28,
+                height = s(28),
                 width = W * 0.7,
                 backgroundColor = "#F0F0F0",
-                borderRadius = 6,
-                marginBottom = 12,
+                borderRadius = s(6),
+                marginBottom = s(12),
             },
         }),
         -- Second line
         createElement("View", {
             style = {
-                height = 28,
+                height = s(28),
                 width = W * 0.5,
                 backgroundColor = "#F0F0F0",
-                borderRadius = 6,
-                marginBottom = 20,
+                borderRadius = s(6),
+                marginBottom = s(20),
             },
         }),
         -- Summary skeleton
         createElement("View", {
             style = {
-                height = 20,
+                height = s(20),
                 width = W * 0.85,
                 backgroundColor = "#F5F5F5",
-                borderRadius = 4,
-                marginBottom = 8,
+                borderRadius = s(4),
+                marginBottom = s(8),
             },
         }),
         createElement("View", {
             style = {
-                height = 20,
+                height = s(20),
                 width = W * 0.6,
                 backgroundColor = "#F5F5F5",
-                borderRadius = 4,
+                borderRadius = s(4),
             },
         })
     )
@@ -202,7 +204,7 @@ local function LoadingScreen()
         skeletons[#skeletons + 1] = createElement(SkeletonCard, { key = "sk_" .. i })
     end
     return createElement("View", {
-        style = { flex = 1, paddingTop = 20 },
+        style = { flex = 1, paddingTop = s(20) },
     }, unpack(skeletons))
 end
 
@@ -214,11 +216,11 @@ local function CategoryTabs(props)
         tabs[#tabs + 1] = createElement("View", {
             key = "cat_" .. i,
             style = {
-                paddingHorizontal = 28,
-                paddingVertical = 14,
-                borderRadius = 24,
+                paddingHorizontal = s(28),
+                paddingVertical = s(14),
+                borderRadius = s(24),
                 backgroundColor = isActive and "#1976D2" or "transparent",
-                marginRight = 8,
+                marginRight = s(8),
             },
             onPress = function()
                 props.onSelect(cat)
@@ -226,7 +228,7 @@ local function CategoryTabs(props)
         },
             createElement("Text", {
                 style = {
-                    fontSize = 28,
+                    fontSize = s(28),
                     color = isActive and "#FFFFFF" or "#666666",
                     fontWeight = isActive and "bold" or "normal",
                 },
@@ -236,7 +238,7 @@ local function CategoryTabs(props)
 
     return createElement("ScrollView", {
         style = {
-            height = 64,
+            height = s(64),
             width = W,
         },
         horizontal = true,
@@ -245,8 +247,8 @@ local function CategoryTabs(props)
             style = {
                 flexDirection = "row",
                 alignItems = "center",
-                paddingHorizontal = 24,
-                height = 64,
+                paddingHorizontal = s(24),
+                height = s(64),
             },
         }, unpack(tabs))
     )
@@ -255,13 +257,13 @@ end
 -- 特色新闻卡片（大图）
 local function FeaturedCard(props)
     local item = props.item
-    local catInfo = CATEGORY_COLORS[item.category] or { bg = "#F5F5F5", text = "#666", icon = "📄" }
+    local catInfo = CATEGORY_COLORS[item.category] or { bg = "#F5F5F5", text = "#666", icon = "N" }
 
     return createElement("View", {
         style = {
-            marginHorizontal = 32,
-            marginBottom = 24,
-            borderRadius = 24,
+            marginHorizontal = s(32),
+            marginBottom = s(24),
+            borderRadius = s(24),
             backgroundColor = "#FFFFFF",
             overflow = "hidden",
         },
@@ -270,11 +272,11 @@ local function FeaturedCard(props)
         -- 大图区域（用颜色块模拟）
         createElement("View", {
             style = {
-                width = W - 64,
-                height = 360,
+                width = W - s(64),
+                height = s(360),
                 backgroundColor = item.imageColor,
                 justifyContent = "flex-end",
-                padding = 24,
+                padding = s(24),
             },
         },
             -- 半透明遮罩
@@ -282,14 +284,14 @@ local function FeaturedCard(props)
                 style = {
                     position = "absolute",
                     bottom = 0, left = 0,
-                    width = W - 64, height = 180,
-                    backgroundColor = "rgba(0,0,0,100)",
+                    width = W - s(64), height = s(180),
+                    backgroundColor = "rgba(0,0,0,0.4)",
                 },
             }),
             -- 图片上的标题
             createElement("Text", {
                 style = {
-                    fontSize = 38,
+                    fontSize = s(38),
                     color = "#FFFFFF",
                     fontWeight = "bold",
                     zIndex = 10,
@@ -299,7 +301,7 @@ local function FeaturedCard(props)
         -- 底部信息
         createElement("View", {
             style = {
-                padding = 24,
+                padding = s(24),
                 flexDirection = "row",
                 justifyContent = "space-between",
                 alignItems = "center",
@@ -314,29 +316,29 @@ local function FeaturedCard(props)
                 createElement("View", {
                     style = {
                         backgroundColor = catInfo.bg,
-                        borderRadius = 8,
-                        paddingHorizontal = 14,
-                        paddingVertical = 4,
-                        marginRight = 12,
+                        borderRadius = s(8),
+                        paddingHorizontal = s(14),
+                        paddingVertical = s(4),
+                        marginRight = s(12),
                     },
                 },
                     createElement("Text", {
-                        style = { fontSize = 22, color = catInfo.text, fontWeight = "bold" },
+                        style = { fontSize = s(22), color = catInfo.text, fontWeight = "bold" },
                     }, catInfo.icon .. " " .. item.category)
                 ),
                 createElement("Text", {
-                    style = { fontSize = 22, color = "#BDBDBD" },
+                    style = { fontSize = s(22), color = "#BDBDBD" },
                 }, item.time)
             ),
             createElement("View", {
-                style = { flexDirection = "row", alignItems = "center", gap = 16 },
+                style = { flexDirection = "row", alignItems = "center", gap = s(16) },
             },
                 createElement("Text", {
-                    style = { fontSize = 22, color = "#BDBDBD" },
-                }, "👁 " .. formatCount(item.readCount)),
+                    style = { fontSize = s(22), color = "#BDBDBD" },
+                }, "R: " .. formatCount(item.readCount)),
                 createElement("Text", {
-                    style = { fontSize = 22, color = "#BDBDBD" },
-                }, "💬 " .. formatCount(item.commentCount))
+                    style = { fontSize = s(22), color = "#BDBDBD" },
+                }, "C: " .. formatCount(item.commentCount))
             )
         )
     )
@@ -345,16 +347,16 @@ end
 -- 普通新闻卡片（缩略图）
 local function NewsCard(props)
     local item = props.item
-    local catInfo = CATEGORY_COLORS[item.category] or { bg = "#F5F5F5", text = "#666", icon = "📄" }
+    local catInfo = CATEGORY_COLORS[item.category] or { bg = "#F5F5F5", text = "#666", icon = "N" }
     local isRead = item.read
 
     return createElement("View", {
         style = {
-            marginHorizontal = 32,
-            marginBottom = 16,
-            padding = 24,
+            marginHorizontal = s(32),
+            marginBottom = s(16),
+            padding = s(24),
             backgroundColor = "#FFFFFF",
-            borderRadius = 16,
+            borderRadius = s(16),
             flexDirection = "row",
         },
         onPress = props.onPress,
@@ -363,17 +365,17 @@ local function NewsCard(props)
         createElement("View", {
             style = {
                 flex = 1,
-                marginRight = 16,
+                marginRight = s(16),
                 justifyContent = "space-between",
             },
         },
             -- 标题
             createElement("Text", {
                 style = {
-                    fontSize = 32,
+                    fontSize = s(32),
                     color = isRead and "#999999" or "#212121",
                     fontWeight = "bold",
-                    marginBottom = 8,
+                    marginBottom = s(8),
                 },
             }, item.title),
             -- 底部元信息
@@ -381,35 +383,35 @@ local function NewsCard(props)
                 style = {
                     flexDirection = "row",
                     alignItems = "center",
-                    gap = 12,
+                    gap = s(12),
                 },
             },
                 createElement("View", {
                     style = {
                         backgroundColor = catInfo.bg,
-                        borderRadius = 6,
-                        paddingHorizontal = 10,
-                        paddingVertical = 3,
+                        borderRadius = s(6),
+                        paddingHorizontal = s(10),
+                        paddingVertical = s(3),
                     },
                 },
                     createElement("Text", {
-                        style = { fontSize = 20, color = catInfo.text },
+                        style = { fontSize = s(20), color = catInfo.text },
                     }, item.category)
                 ),
                 createElement("Text", {
-                    style = { fontSize = 20, color = "#BDBDBD" },
+                    style = { fontSize = s(20), color = "#BDBDBD" },
                 }, item.time),
                 createElement("Text", {
-                    style = { fontSize = 20, color = "#BDBDBD" },
+                    style = { fontSize = s(20), color = "#BDBDBD" },
                 }, formatCount(item.readCount) .. " 阅读")
             )
         ),
         -- 缩略图（颜色块模拟）
         createElement("View", {
             style = {
-                width = 160,
-                height = 120,
-                borderRadius = 12,
+                width = s(160),
+                height = s(120),
+                borderRadius = s(12),
                 backgroundColor = item.imageColor,
             },
         })
@@ -420,7 +422,7 @@ end
 local function ArticleDetail(props)
     local item = props.article
     if not item then return nil end
-    local catInfo = CATEGORY_COLORS[item.category] or { bg = "#F5F5F5", text = "#666", icon = "📄" }
+    local catInfo = CATEGORY_COLORS[item.category] or { bg = "#F5F5F5", text = "#666", icon = "N" }
 
     -- 生成模拟正文段落
     local paragraphs = {
@@ -440,13 +442,13 @@ local function ArticleDetail(props)
         style = {
             flexDirection = "row",
             alignItems = "center",
-            paddingHorizontal = 32,
-            paddingVertical = 20,
+            paddingHorizontal = s(32),
+            paddingVertical = s(20),
         },
         onPress = props.onBack,
     },
         createElement("Text", {
-            style = { fontSize = 32, color = "#1976D2" },
+            style = { fontSize = s(32), color = "#1976D2" },
         }, "← 返回")
     )
 
@@ -455,7 +457,7 @@ local function ArticleDetail(props)
         key = "hero_img",
         style = {
             width = W,
-            height = 480,
+            height = s(480),
             backgroundColor = item.imageColor,
         },
     })
@@ -464,8 +466,8 @@ local function ArticleDetail(props)
     contentChildren[#contentChildren + 1] = createElement("View", {
         key = "title_area",
         style = {
-            padding = 32,
-            paddingBottom = 16,
+            padding = s(32),
+            paddingBottom = s(16),
         },
     },
         -- 类别 + 时间
@@ -473,56 +475,56 @@ local function ArticleDetail(props)
             style = {
                 flexDirection = "row",
                 alignItems = "center",
-                marginBottom = 16,
-                gap = 12,
+                marginBottom = s(16),
+                gap = s(12),
             },
         },
             createElement("View", {
                 style = {
                     backgroundColor = catInfo.bg,
-                    borderRadius = 10,
-                    paddingHorizontal = 16,
-                    paddingVertical = 6,
+                    borderRadius = s(10),
+                    paddingHorizontal = s(16),
+                    paddingVertical = s(6),
                 },
             },
                 createElement("Text", {
-                    style = { fontSize = 24, color = catInfo.text, fontWeight = "bold" },
+                    style = { fontSize = s(24), color = catInfo.text, fontWeight = "bold" },
                 }, catInfo.icon .. " " .. item.category)
             ),
             createElement("Text", {
-                style = { fontSize = 24, color = "#BDBDBD" },
+                style = { fontSize = s(24), color = "#BDBDBD" },
             }, item.time)
         ),
         -- 标题
         createElement("Text", {
             style = {
-                fontSize = 44,
+                fontSize = s(44),
                 color = "#212121",
                 fontWeight = "bold",
-                lineHeight = 60,
+                lineHeight = s(60),
             },
         }, item.title),
         -- 统计
         createElement("View", {
             style = {
                 flexDirection = "row",
-                marginTop = 16,
-                gap = 24,
+                marginTop = s(16),
+                gap = s(24),
             },
         },
             createElement("Text", {
-                style = { fontSize = 24, color = "#9E9E9E" },
-            }, "👁 " .. formatCount(item.readCount) .. " 阅读"),
+                style = { fontSize = s(24), color = "#9E9E9E" },
+            }, "R: " .. formatCount(item.readCount) .. " 阅读"),
             createElement("Text", {
-                style = { fontSize = 24, color = "#9E9E9E" },
-            }, "💬 " .. formatCount(item.commentCount) .. " 评论")
+                style = { fontSize = s(24), color = "#9E9E9E" },
+            }, "C: " .. formatCount(item.commentCount) .. " 评论")
         ),
         -- 分割线
         createElement("View", {
             style = {
                 height = 1,
                 backgroundColor = "#EEEEEE",
-                marginTop = 24,
+                marginTop = s(24),
             },
         })
     )
@@ -532,15 +534,15 @@ local function ArticleDetail(props)
         contentChildren[#contentChildren + 1] = createElement("View", {
             key = "para_" .. i,
             style = {
-                paddingHorizontal = 32,
-                marginBottom = 24,
+                paddingHorizontal = s(32),
+                marginBottom = s(24),
             },
         },
             createElement("Text", {
                 style = {
-                    fontSize = 32,
+                    fontSize = s(32),
                     color = "#424242",
-                    lineHeight = 52,
+                    lineHeight = s(52),
                 },
             }, "　　" .. para)
         )
@@ -549,7 +551,7 @@ local function ArticleDetail(props)
     -- 底部间距
     contentChildren[#contentChildren + 1] = createElement("View", {
         key = "bottom_spacer",
-        style = { height = 100 },
+        style = { height = s(100) },
     })
 
     return createElement("View", {
@@ -572,13 +574,13 @@ local function RefreshIndicator(props)
     if not props.visible then return nil end
     return createElement("View", {
         style = {
-            height = 60,
+            height = s(60),
             justifyContent = "center",
             alignItems = "center",
         },
     },
         createElement("Text", {
-            style = { fontSize = 24, color = "#999999" },
+            style = { fontSize = s(24), color = "#999999" },
         }, props.refreshing and "正在刷新..." or "下拉刷新")
     )
 end
@@ -588,14 +590,14 @@ local function LoadMoreIndicator(props)
     if not props.visible then return nil end
     return createElement("View", {
         style = {
-            height = 80,
+            height = s(80),
             justifyContent = "center",
             alignItems = "center",
-            paddingVertical = 20,
+            paddingVertical = s(20),
         },
     },
         createElement("Text", {
-            style = { fontSize = 24, color = "#BDBDBD" },
+            style = { fontSize = s(24), color = "#BDBDBD" },
         }, props.loading and "加载中..." or (props.hasMore and "上拉加载更多" or "— 没有更多了 —"))
     )
 end
@@ -604,27 +606,27 @@ end
 local function NavBar(props)
     return createElement("View", {
         style = {
-            height = 130,
+            height = s(130),
             backgroundColor = "#1976D2",
             flexDirection = "row",
             justifyContent = "space-between",
             alignItems = "flex-end",
-            paddingHorizontal = 32,
-            paddingBottom = 16,
+            paddingHorizontal = s(32),
+            paddingBottom = s(16),
         },
     },
         createElement("Text", {
             style = {
-                fontSize = 48,
+                fontSize = s(48),
                 color = "#FFFFFF",
                 fontWeight = "bold",
             },
         }, "新闻"),
         createElement("View", {
-            style = { flexDirection = "row", gap = 20, alignItems = "center" },
+            style = { flexDirection = "row", gap = s(20), alignItems = "center" },
         },
             createElement("Text", {
-                style = { fontSize = 24, color = "rgba(255,255,255,180)" },
+                style = { fontSize = s(24), color = "rgba(255,255,255,0.7)" },
             }, tostring(props.totalCount) .. " 篇文章")
         )
     )
@@ -727,7 +729,7 @@ local function NewsApp()
     -- 间距
     listChildren[#listChildren + 1] = createElement("View", {
         key = "top_spacer",
-        style = { height = 16 },
+        style = { height = s(16) },
     })
 
     -- 文章卡片
@@ -758,7 +760,7 @@ local function NewsApp()
     -- 底部安全区
     listChildren[#listChildren + 1] = createElement("View", {
         key = "bottom_safe",
-        style = { height = 40 },
+        style = { height = s(40) },
     })
 
     return createElement("View", {
@@ -792,7 +794,7 @@ local function NewsApp()
             style = {
                 flex = 1,
                 width = W,
-                height = H - 200,
+                height = H - s(200),
             },
             onRefresh = handleRefresh,
             refreshing = isRefreshing,
