@@ -1,8 +1,8 @@
 -- config.lua for Yoga plugin integration test
 application = {
     content = {
-        width = 320,
-        height = 480,
-        scale = "letterbox",
+        width = 768,
+        height = 1024,
+        scale = "zoomStretch",
     },
 }
