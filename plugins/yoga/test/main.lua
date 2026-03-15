@@ -1,8 +1,7 @@
 -- plugins/yoga/test/main.lua
--- Open this file in Corona Simulator to test the plugin in-engine.
--- Prerequisite: copy plugin_yoga.so to the same directory or set package.cpath.
+-- Yoga C plugin integration test for Solar2D Simulator.
+-- Plugin must be installed at ~/Library/Application Support/Corona/Simulator/Plugins/plugin_yoga.dylib
 
--- Load Yoga plugin (installed in ~/Library/Application Support/Corona/Simulator/Plugins/)
 local yoga = require("plugin_yoga")
 
 -- Build a simple layout: header + content + footer
@@ -11,13 +10,13 @@ root:setWidth(display.contentWidth)
 root:setHeight(display.contentHeight)
 
 local header = yoga.newNode()
-header:setHeight(60)
+header:setHeight(200)
 
 local content = yoga.newNode()
 content:setFlexGrow(1)
 
 local footer = yoga.newNode()
-footer:setHeight(40)
+footer:setHeight(120)
 
 root:insertChild(header, 0)
 root:insertChild(content, 1)
@@ -31,7 +30,7 @@ local colors = {
     { 0.9, 0.9, 0.9 },  -- content: light gray
     { 0.2, 0.8, 0.4 },  -- footer: green
 }
-local labels = { "Header (60px)", "Content (flex:1)", "Footer (40px)" }
+local labels = { "Header (200px)", "Content (flex:1)", "Footer (120px)" }
 
 for i = 0, 2 do
     local node = root:getChild(i)
@@ -45,7 +44,7 @@ for i = 0, 2 do
         text = labels[i + 1],
         x = l + w/2,
         y = t + h/2,
-        fontSize = 16,
+        fontSize = 64,
     })
     text:setFillColor(0, 0, 0)
 end
@@ -54,8 +53,8 @@ end
 local info = display.newText({
     text = string.format("Yoga v3.2.1 | %dx%d", display.contentWidth, display.contentHeight),
     x = display.contentCenterX,
-    y = display.contentHeight - 15,
-    fontSize = 12,
+    y = display.contentHeight - 40,
+    fontSize = 48,
 })
 info:setFillColor(1, 1, 1)
 
