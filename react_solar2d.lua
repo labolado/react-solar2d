@@ -1,9 +1,10 @@
--- init.lua (react-solar2d root)
+-- react_solar2d.lua (root module)
 local React = require("react")
 local ReactSolar2D = require("renderer")
 local StyleSheet = require("style.StyleSheet")
 local processColor = require("style.processColor")
 local Components = require("components")
+local Animated = require("animated")
 
 local RN = {}
 
@@ -28,12 +29,22 @@ RN.startAutoFlush = ReactSolar2D.startAutoFlush
 
 -- Style
 RN.StyleSheet = StyleSheet
+RN.processColor = processColor
 
--- Components (also available as direct exports, RN-style)
+-- Animated
+RN.Animated = Animated
+
+-- Components
 RN.View = Components.View
 RN.Text = Components.Text
 RN.Image = Components.Image
 RN.Button = Components.Button
 RN.TouchableOpacity = Components.TouchableOpacity
+RN.ScrollView = Components.ScrollView
+RN.FlatList = Components.FlatList
+RN.TextInput = Components.TextInput
+RN.Modal = Components.Modal
+RN.Switch = Components.Switch
+RN.Pressable = Components.Pressable
 
 return RN
