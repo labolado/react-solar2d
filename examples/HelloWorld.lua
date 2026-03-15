@@ -6,7 +6,7 @@ local function HelloWorld()
     return createElement("View", {
         style = {
             flex = 1,
-            backgroundColor = "#F5F5F5",
+            backgroundColor = "#E8F5E9",
             justifyContent = "center",
             alignItems = "center",
             width = display.contentWidth,
@@ -15,19 +15,26 @@ local function HelloWorld()
     },
         createElement("Text", {
             style = {
-                fontSize = 32,
-                color = "#333333",
-                fontWeight = "bold",
+                fontSize = 80,
+                color = "#1B5E20",
             },
         }, "Hello, React-Solar2D!"),
 
         createElement("Text", {
             style = {
-                fontSize = 18,
-                color = "#666666",
-                marginTop = 12,
+                fontSize = 48,
+                color = "#388E3C",
+                marginTop = 30,
             },
-        }, "React Native API on Solar2D")
+        }, "React Native API on Solar2D"),
+
+        createElement("Text", {
+            style = {
+                fontSize = 36,
+                color = "#666666",
+                marginTop = 60,
+            },
+        }, "Yoga C + Reconciler + Hooks")
     )
 end
 

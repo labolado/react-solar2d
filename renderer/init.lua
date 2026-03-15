@@ -18,7 +18,6 @@ local function buildLayoutTree(fiber)
 
     local style = (fiber.props and fiber.props.style) or {}
     local node = Layout.newNode(style)
-    node._fiber = fiber
 
     local child = fiber.child
     local childIndex = 0

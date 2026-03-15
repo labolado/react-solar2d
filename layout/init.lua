@@ -2,8 +2,9 @@
 -- High-level Yoga wrapper for react-solar2d
 -- Translates RN-style style tables into Yoga C API calls
 
-local ok, yoga = pcall(require, "plugin.yoga")
+local ok, yoga = pcall(require, "plugin_yoga")
 if not ok then
+    -- Fallback: try LuaJIT standalone .so (for testing outside Solar2D)
     package.cpath = "./plugins/yoga/build/?.so;" .. package.cpath
     yoga = require("plugin_yoga")
 end
