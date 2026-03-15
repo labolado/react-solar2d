@@ -55,14 +55,30 @@ else()
     )
 endif()
 
-target_link_libraries(plugin_yoga PRIVATE yogacore ${LUA_LIBRARIES})
 set_target_properties(plugin_yoga PROPERTIES LINKER_LANGUAGE CXX)
 
-# macOS: produce .so (Lua convention, not .dylib)
-if(APPLE)
-    set_target_properties(plugin_yoga PROPERTIES
-        PREFIX ""
-        SUFFIX ".so"
-        OUTPUT_NAME "plugin_yoga"
-    )
+option(SOLAR2D_PLUGIN "Build for Solar2D Simulator (no Lua linkage, .dylib)" OFF)
+
+if(SOLAR2D_PLUGIN)
+    # Solar2D mode: Lua symbols provided by host at runtime
+    target_link_libraries(plugin_yoga PRIVATE yogacore)
+    if(APPLE)
+        set_target_properties(plugin_yoga PROPERTIES
+            PREFIX ""
+            SUFFIX ".dylib"
+            OUTPUT_NAME "plugin_yoga"
+            # Allow undefined Lua symbols — resolved by Corona Simulator at load time
+            LINK_FLAGS "-undefined dynamic_lookup"
+        )
+    endif()
+else()
+    # Standalone mode: link LuaJIT for testing outside Solar2D
+    target_link_libraries(plugin_yoga PRIVATE yogacore ${LUA_LIBRARIES})
+    if(APPLE)
+        set_target_properties(plugin_yoga PROPERTIES
+            PREFIX ""
+            SUFFIX ".so"
+            OUTPUT_NAME "plugin_yoga"
+        )
+    endif()
 endif()

@@ -2,12 +2,8 @@
 -- Open this file in Corona Simulator to test the plugin in-engine.
 -- Prerequisite: copy plugin_yoga.so to the same directory or set package.cpath.
 
--- Try loading as Solar2D plugin first, fall back to direct cpath
-local ok, yoga = pcall(require, "plugin.yoga")
-if not ok then
-    package.cpath = "./?.so;" .. package.cpath
-    yoga = require("plugin_yoga")
-end
+-- Load Yoga plugin (installed in ~/Library/Application Support/Corona/Simulator/Plugins/)
+local yoga = require("plugin_yoga")
 
 -- Build a simple layout: header + content + footer
 local root = yoga.newNode()
