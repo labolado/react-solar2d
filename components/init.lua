@@ -11,4 +11,5 @@ return {
     Modal = require("components.Modal"),
     Switch = require("components.Switch"),
     Pressable = require("components.Pressable"),
+    ActivityIndicator = require("components.ActivityIndicator"),
 }

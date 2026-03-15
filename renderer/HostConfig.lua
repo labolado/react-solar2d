@@ -257,6 +257,12 @@ function M.createInstance(elementType, props)
         clipContainer._contentH = 0
         clipContainer._contentW = 0
 
+        -- Pull-to-refresh settings
+        local refreshThreshold = 100
+        local refreshOffset = 60
+        clipContainer._refreshing = props.refreshing or false
+        clipContainer._pullingToRefresh = false
+
         -- Touch-based scrolling
         local startY, startX, startScrollY, startScrollX
         clipContainer:addEventListener("touch", function(event)
@@ -268,6 +274,7 @@ function M.createInstance(elementType, props)
                 startX = event.x
                 startScrollY = clipContainer._scrollY
                 startScrollX = clipContainer._scrollX
+                clipContainer._pullingToRefresh = false
             elseif event.phase == "moved" then
                 if horizontal then
                     local dx = event.x - startX
@@ -279,10 +286,22 @@ function M.createInstance(elementType, props)
                 else
                     local dy = event.y - startY
                     local newScrollY = startScrollY + dy
-                    local maxScroll = math.max(0, clipContainer._contentH - h)
-                    newScrollY = math.max(-maxScroll, math.min(0, newScrollY))
-                    clipContainer._scrollY = newScrollY
-                    contentGroup.y = -h / 2 + newScrollY
+
+                    -- Pull-to-refresh: allow overscroll past top when onRefresh is set
+                    if props.onRefresh and newScrollY > 0 then
+                        -- Apply rubber-band resistance (overscroll is dampened)
+                        local overscroll = newScrollY
+                        local dampened = overscroll * 0.4
+                        clipContainer._scrollY = dampened
+                        contentGroup.y = -h / 2 + dampened
+                        clipContainer._pullingToRefresh = dampened >= refreshThreshold * 0.4
+                    else
+                        local maxScroll = math.max(0, clipContainer._contentH - h)
+                        newScrollY = math.max(-maxScroll, math.min(0, newScrollY))
+                        clipContainer._scrollY = newScrollY
+                        contentGroup.y = -h / 2 + newScrollY
+                        clipContainer._pullingToRefresh = false
+                    end
                 end
                 if props.onScroll then
                     props.onScroll({
@@ -296,6 +315,20 @@ function M.createInstance(elementType, props)
                 if display.currentStage and display.currentStage.setFocus then
                     display.currentStage:setFocus(nil)
                 end
+
+                -- Pull-to-refresh: trigger callback and snap back
+                if not horizontal and clipContainer._pullingToRefresh and props.onRefresh then
+                    clipContainer._refreshing = true
+                    -- Snap to refreshing offset position
+                    clipContainer._scrollY = refreshOffset
+                    contentGroup.y = -h / 2 + refreshOffset
+                    props.onRefresh()
+                elseif not horizontal and clipContainer._scrollY > 0 then
+                    -- Snap back to top (overscrolled but below threshold)
+                    clipContainer._scrollY = 0
+                    contentGroup.y = -h / 2
+                end
+                clipContainer._pullingToRefresh = false
             end
             return true
         end)
@@ -506,6 +539,21 @@ function M.updateInstance(instance, oldProps, newProps)
         end
 
         instance._lineHeight = newStyle.lineHeight
+    end
+
+    -- ScrollView: handle refreshing prop change
+    if instance._contentGroup and instance._refreshing ~= nil then
+        local wasRefreshing = oldProps.refreshing
+        local nowRefreshing = newProps.refreshing
+        if wasRefreshing and not nowRefreshing then
+            -- Refreshing ended: snap back to top
+            instance._refreshing = false
+            instance._scrollY = 0
+            local halfH = (instance._scrollH or 0) / 2
+            instance._contentGroup.y = -halfH
+        elseif nowRefreshing then
+            instance._refreshing = true
+        end
     end
 
     -- Common style updates

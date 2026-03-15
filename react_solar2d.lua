@@ -46,5 +46,6 @@ RN.TextInput = Components.TextInput
 RN.Modal = Components.Modal
 RN.Switch = Components.Switch
 RN.Pressable = Components.Pressable
+RN.ActivityIndicator = Components.ActivityIndicator
 
 return RN
