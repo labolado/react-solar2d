@@ -258,6 +258,10 @@ function M.create(hostConfig)
         end
     end
 
+    function reconciler._getRootFiber()
+        return rootFiber
+    end
+
     return reconciler
 end
 
