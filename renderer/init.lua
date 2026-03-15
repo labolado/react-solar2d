@@ -19,6 +19,17 @@ local function buildLayoutTree(fiber)
     local style = (fiber.props and fiber.props.style) or {}
     local node = Layout.newNode(style)
 
+    -- Text elements: measure display object and feed intrinsic dimensions to Yoga
+    if fiber.type == "Text" and fiber.stateNode and fiber.stateNode._textObj then
+        local textObj = fiber.stateNode._textObj
+        if not style.width then
+            node:setWidth(textObj.width)
+        end
+        if not style.height then
+            node:setHeight(textObj.height)
+        end
+    end
+
     local child = fiber.child
     local childIndex = 0
     while child do
@@ -116,9 +127,9 @@ end
 
 function ReactSolar2D.flushUpdates()
     if reconcilerInstance then
-        reconcilerInstance.flushUpdates()
-        -- Re-run layout after state updates
-        if layoutOk then
+        local didUpdate = reconcilerInstance.flushUpdates()
+        -- Re-run layout only when state actually changed
+        if didUpdate and layoutOk then
             local rootFiber = reconcilerInstance._getRootFiber()
             if rootFiber and rootFiber.stateNode then
                 local width = display.contentWidth

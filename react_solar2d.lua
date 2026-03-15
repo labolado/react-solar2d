@@ -24,6 +24,7 @@ RN.Fragment = React.Fragment
 RN.render = ReactSolar2D.render
 RN.unmount = ReactSolar2D.unmount
 RN.flushUpdates = ReactSolar2D.flushUpdates
+RN.startAutoFlush = ReactSolar2D.startAutoFlush
 
 -- Style
 RN.StyleSheet = StyleSheet

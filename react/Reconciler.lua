@@ -232,7 +232,7 @@ function M.create(hostConfig)
     end
 
     function reconciler.flushUpdates()
-        if #pendingUpdateFibers == 0 then return end
+        if #pendingUpdateFibers == 0 then return false end
         pendingUpdateFibers = {}
 
         local element = rootFiber.props.children
@@ -246,6 +246,7 @@ function M.create(hostConfig)
         walkFiber(rootFiber)
         commitWork(rootFiber)
         flushEffects()
+        return true
     end
 
     function reconciler.unmount(container)

@@ -17,7 +17,7 @@ local function Counter()
     },
         createElement("Text", {
             style = {
-                fontSize = 48,
+                fontSize = 144,
                 color = "#2196F3",
                 fontWeight = "bold",
             },
@@ -26,41 +26,41 @@ local function Counter()
         createElement("View", {
             style = {
                 flexDirection = "row",
-                marginTop = 24,
-                gap = 16,
+                marginTop = 60,
+                gap = 40,
             },
         },
             createElement("View", {
                 style = {
                     backgroundColor = "#4CAF50",
-                    borderRadius = 8,
-                    padding = 16,
-                    paddingLeft = 24,
-                    paddingRight = 24,
+                    borderRadius = 20,
+                    padding = 40,
+                    paddingLeft = 80,
+                    paddingRight = 80,
                 },
                 onPress = function()
                     setCount(function(c) return c + 1 end)
                 end,
             },
                 createElement("Text", {
-                    style = { color = "#FFFFFF", fontSize = 20 },
+                    style = { color = "#FFFFFF", fontSize = 64 },
                 }, "+1")
             ),
 
             createElement("View", {
                 style = {
                     backgroundColor = "#F44336",
-                    borderRadius = 8,
-                    padding = 16,
-                    paddingLeft = 24,
-                    paddingRight = 24,
+                    borderRadius = 20,
+                    padding = 40,
+                    paddingLeft = 80,
+                    paddingRight = 80,
                 },
                 onPress = function()
                     setCount(0)
                 end,
             },
                 createElement("Text", {
-                    style = { color = "#FFFFFF", fontSize = 20 },
+                    style = { color = "#FFFFFF", fontSize = 64 },
                 }, "Reset")
             )
         )
