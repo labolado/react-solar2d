@@ -763,6 +763,8 @@ local function NewsApp()
         style = { height = s(40) },
     })
 
+    local headerH = s(130) + s(64)
+
     return createElement("View", {
         style = {
             flex = 1,
@@ -770,7 +772,25 @@ local function NewsApp()
             backgroundColor = "#F5F5F5",
         },
     },
-        -- 导航栏
+        -- 文章列表（先渲染，在底层）
+        createElement("View", {
+            style = {
+                position = "absolute",
+                top = headerH, left = 0,
+                width = W,
+                height = H - headerH,
+            },
+        },
+            createElement("ScrollView", {
+                style = {
+                    width = W,
+                    height = H - headerH,
+                },
+                onRefresh = handleRefresh,
+                refreshing = isRefreshing,
+            }, unpack(listChildren))
+        ),
+        -- 导航栏（后渲染，在上层覆盖滚动内容）
         createElement(NavBar, { totalCount = #filteredArticles }),
         -- 分类标签栏
         createElement("View", {
@@ -789,16 +809,6 @@ local function NewsApp()
                 end,
             })
         ),
-        -- 文章列表
-        createElement("ScrollView", {
-            style = {
-                flex = 1,
-                width = W,
-                height = H - s(200),
-            },
-            onRefresh = handleRefresh,
-            refreshing = isRefreshing,
-        }, unpack(listChildren)),
         -- 文章详情（覆盖层）
         selectedArticle and createElement(ArticleDetail, {
             article = selectedArticle,

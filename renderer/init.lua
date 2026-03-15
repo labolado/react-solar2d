@@ -74,36 +74,8 @@ local function applyLayout(yogaNode, fiber)
             fiber.stateNode._bg.path.width = w
             fiber.stateNode._bg.path.height = h
         end
-        -- Text wrapping: if Yoga computed a width, rebuild text with that width
-        if fiber.type == "Text" and fiber.stateNode._textObj and w > 0 then
-            local ok, err = pcall(function()
-                local textObj = fiber.stateNode._textObj
-                local style = (fiber.props and fiber.props.style) or {}
-                if not style.width and textObj.width > w + 1 then
-                    local oldText = textObj.text
-                    local parent = fiber.stateNode
-                    local font = fiber.stateNode._font or native.systemFont
-                    local fontSize = fiber.stateNode._fontSize or 14
-                    local align = style.textAlign or "left"
-                    textObj:removeSelf()
-                    local newTextObj = display.newText({
-                        parent = parent,
-                        text = oldText,
-                        x = 0, y = 0,
-                        font = font,
-                        fontSize = fontSize,
-                        width = w,
-                        height = 0,
-                        align = align,
-                    })
-                    newTextObj.anchorX, newTextObj.anchorY = 0, 0
-                    local c = HostConfig._parseColor(style.color or "#000000")
-                    newTextObj:setFillColor(c[1], c[2], c[3], c[4])
-                    fiber.stateNode._textObj = newTextObj
-                end
-            end)
-            if not ok then print("[TextWrap Error] " .. tostring(err)) end
-        end
+        -- Text wrapping: disabled temporarily for debugging
+        -- TODO: re-enable after fixing text disappearing issue
     end
 
     -- Walk children: match Yoga children with fiber children (skip function component fibers)
@@ -162,15 +134,8 @@ local function runLayoutPass(rootFiber, width, height)
         layoutRoot:freeRecursive()
     end
 
-    -- Pass 2: text was rewrapped in applyLayout, rebuild with correct heights
-    local layoutRoot2 = buildLayoutTree(rootFiber)
-    if layoutRoot2 then
-        layoutRoot2:setWidth(width)
-        layoutRoot2:setHeight(height)
-        layoutRoot2:calculateLayout()
-        applyLayout(layoutRoot2, rootFiber)
-        layoutRoot2:freeRecursive()
-    end
+    -- Pass 2 disabled: text wrapping temporarily off
+    -- TODO: re-enable two-pass layout when text wrapping is fixed
 end
 
 function ReactSolar2D.render(element, container, options)

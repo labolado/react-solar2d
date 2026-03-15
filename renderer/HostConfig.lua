@@ -237,17 +237,12 @@ function M.createInstance(elementType, props)
         local h = style.height or (display.contentHeight or 480)
         local horizontal = props.horizontal or false
 
-        -- Use Container for clipping
-        local clipContainer = display.newContainer(w, h)
+        -- Use Group (Container clipping disabled for debugging)
+        local clipContainer = display.newGroup()
         clipContainer.anchorX, clipContainer.anchorY = 0, 0
-        clipContainer.anchorChildren = false
 
-        -- Content group: offset to map top-left origin inside Container
         local contentGroup = display.newGroup()
         clipContainer:insert(contentGroup)
-        contentGroup.x = -w / 2
-        contentGroup.y = -h / 2
-        clipContainer._isContainer = true
 
         clipContainer._contentGroup = contentGroup
         clipContainer._scrollW = w
@@ -284,7 +279,7 @@ function M.createInstance(elementType, props)
                     local maxScroll = math.max(0, clipContainer._contentW - w)
                     newScrollX = math.max(-maxScroll, math.min(0, newScrollX))
                     clipContainer._scrollX = newScrollX
-                    contentGroup.x = -w / 2 + newScrollX
+                    contentGroup.x = newScrollX
                 else
                     local dy = event.y - startY
                     local newScrollY = startScrollY + dy
@@ -295,13 +290,13 @@ function M.createInstance(elementType, props)
                         local overscroll = newScrollY
                         local dampened = overscroll * 0.4
                         clipContainer._scrollY = dampened
-                        contentGroup.y = -h / 2 + dampened
+                        contentGroup.y = dampened
                         clipContainer._pullingToRefresh = dampened >= refreshThreshold * 0.4
                     else
                         local maxScroll = math.max(0, clipContainer._contentH - h)
                         newScrollY = math.max(-maxScroll, math.min(0, newScrollY))
                         clipContainer._scrollY = newScrollY
-                        contentGroup.y = -h / 2 + newScrollY
+                        contentGroup.y = newScrollY
                         clipContainer._pullingToRefresh = false
                     end
                 end
@@ -324,12 +319,12 @@ function M.createInstance(elementType, props)
                     clipContainer._refreshing = true
                     -- Snap to refreshing offset position
                     clipContainer._scrollY = refreshOffset
-                    contentGroup.y = -h / 2 + refreshOffset
+                    contentGroup.y = refreshOffset
                     props.onRefresh()
                 elseif not horizontal and clipContainer._scrollY > 0 then
                     -- Snap back to top (overscrolled but below threshold)
                     clipContainer._scrollY = 0
-                    contentGroup.y = -h / 2
+                    contentGroup.y = 0
                 end
                 clipContainer._pullingToRefresh = false
             end
@@ -553,8 +548,7 @@ function M.updateInstance(instance, oldProps, newProps)
             -- Refreshing ended: snap back to top
             instance._refreshing = false
             instance._scrollY = 0
-            local halfH = (instance._scrollH or 0) / 2
-            instance._contentGroup.y = -halfH
+            instance._contentGroup.y = 0
         elseif nowRefreshing then
             instance._refreshing = true
         end
