@@ -14,12 +14,89 @@ local function parseColor(color)
         return {r, g, b, a}
     end
 
+    -- rgba(r, g, b, a) format
+    local r, g, b, a = color:match("rgba?%(%s*(%d+)%s*,%s*(%d+)%s*,%s*(%d+)%s*,?%s*([%d%.]*)")
+    if r then
+        return {tonumber(r)/255, tonumber(g)/255, tonumber(b)/255, tonumber(a ~= "" and a or "1")}
+    end
+
     local named = {
         red = {1, 0, 0, 1}, green = {0, 0.5, 0, 1}, blue = {0, 0, 1, 1},
         white = {1, 1, 1, 1}, black = {0, 0, 0, 1}, transparent = {0, 0, 0, 0},
         gray = {0.5, 0.5, 0.5, 1}, yellow = {1, 1, 0, 1}, orange = {1, 0.65, 0, 1},
     }
     return named[color:lower()] or {1, 1, 1, 1}
+end
+
+-- Resolve font from style properties
+local function resolveFont(style)
+    if style.fontFamily then
+        if style.fontWeight == "bold" then
+            return style.fontFamily .. "-Bold"
+        end
+        return style.fontFamily
+    end
+    if style.fontWeight == "bold" then
+        return native and native.systemFontBold or "systemFontBold"
+    end
+    return native and native.systemFont or "systemFont"
+end
+
+-- Apply RN transform array to Solar2D display object
+local function applyTransform(instance, transforms)
+    if not transforms then
+        instance.rotation = 0
+        instance.xScale = 1
+        instance.yScale = 1
+        return
+    end
+    for _, t in ipairs(transforms) do
+        for key, value in pairs(t) do
+            if key == "rotate" then
+                local deg = tostring(value):match("^(.-)deg$")
+                if deg then
+                    instance.rotation = tonumber(deg) or 0
+                else
+                    local rad = tostring(value):match("^(.-)rad$")
+                    if rad then
+                        instance.rotation = (tonumber(rad) or 0) * 180 / math.pi
+                    end
+                end
+            elseif key == "scale" then
+                instance.xScale = value
+                instance.yScale = value
+            elseif key == "scaleX" then
+                instance.xScale = value
+            elseif key == "scaleY" then
+                instance.yScale = value
+            elseif key == "translateX" then
+                instance._translateX = value
+            elseif key == "translateY" then
+                instance._translateY = value
+            end
+        end
+    end
+end
+
+-- Create per-side border line
+local function addBorderSide(group, side, width, color, viewW, viewH)
+    if not width or width <= 0 then return nil end
+    local c = parseColor(color or "#000000")
+    local line
+    if side == "bottom" then
+        line = display.newRect(group, 0, viewH - width, viewW, width)
+    elseif side == "top" then
+        line = display.newRect(group, 0, 0, viewW, width)
+    elseif side == "left" then
+        line = display.newRect(group, 0, 0, width, viewH)
+    elseif side == "right" then
+        line = display.newRect(group, viewW - width, 0, width, viewH)
+    end
+    if line then
+        line.anchorX, line.anchorY = 0, 0
+        line:setFillColor(c[1], c[2], c[3], c[4])
+    end
+    return line
 end
 
 local function wireEvents(instance, props)
@@ -61,6 +138,14 @@ local function wireEvents(instance, props)
     end
 end
 
+-- Apply common style properties to any instance
+local function applyCommonStyle(instance, style)
+    if style.opacity then instance.alpha = style.opacity end
+    if style.display == "none" then instance.isVisible = false end
+    if style.zIndex then instance._zIndex = style.zIndex end
+    if style.transform then applyTransform(instance, style.transform) end
+end
+
 function M.createInstance(elementType, props)
     local style = props.style or {}
 
@@ -69,6 +154,7 @@ function M.createInstance(elementType, props)
         group.anchorX, group.anchorY = 0, 0
         group.anchorChildren = true
 
+        -- Background rect (full border or backgroundColor)
         if style.backgroundColor or style.borderWidth or style.borderColor then
             local bg
             if style.borderRadius and style.borderRadius > 0 then
@@ -96,9 +182,23 @@ function M.createInstance(elementType, props)
             group._bg = bg
         end
 
-        if style.opacity then group.alpha = style.opacity end
-        if style.display == "none" then group.isVisible = false end
+        -- Per-side borders
+        local viewW = style.width or 0
+        local viewH = style.height or 0
+        if style.borderBottomWidth then
+            group._borderBottom = addBorderSide(group, "bottom", style.borderBottomWidth, style.borderBottomColor, viewW, viewH)
+        end
+        if style.borderTopWidth then
+            group._borderTop = addBorderSide(group, "top", style.borderTopWidth, style.borderTopColor, viewW, viewH)
+        end
+        if style.borderLeftWidth then
+            group._borderLeft = addBorderSide(group, "left", style.borderLeftWidth, style.borderLeftColor, viewW, viewH)
+        end
+        if style.borderRightWidth then
+            group._borderRight = addBorderSide(group, "right", style.borderRightWidth, style.borderRightColor, viewW, viewH)
+        end
 
+        applyCommonStyle(group, style)
         wireEvents(group, props)
         return group
 
@@ -107,12 +207,16 @@ function M.createInstance(elementType, props)
         group.anchorX, group.anchorY = 0, 0
 
         local text = tostring(props.children or "")
+        local font = resolveFont(style)
         local textObj = display.newText({
             parent = group,
             text = text,
             x = 0, y = 0,
+            font = font,
             fontSize = style.fontSize or 14,
             width = style.width,
+            height = 0,
+            align = style.textAlign or "left",
         })
         textObj.anchorX, textObj.anchorY = 0, 0
 
@@ -122,6 +226,8 @@ function M.createInstance(elementType, props)
         end
 
         group._textObj = textObj
+        group._lineHeight = style.lineHeight
+        applyCommonStyle(group, style)
         wireEvents(group, props)
         return group
 
@@ -133,6 +239,7 @@ function M.createInstance(elementType, props)
         local filename = (type(source) == "table") and source.uri or source or ""
         local w = style.width or 100
         local h = style.height or 100
+        local resizeMode = props.resizeMode or style.resizeMode or "cover"
 
         local img = display.newImageRect(group, filename, w, h)
         if img then
@@ -140,12 +247,16 @@ function M.createInstance(elementType, props)
         end
 
         group._imageObj = img
+        group._resizeMode = resizeMode
+        applyCommonStyle(group, style)
         wireEvents(group, props)
         return group
     end
 
+    -- Unknown element type — create as generic group
     local group = display.newGroup()
     group.anchorX, group.anchorY = 0, 0
+    applyCommonStyle(group, style)
     wireEvents(group, props)
     return group
 end
@@ -164,7 +275,12 @@ function M.createTextInstance(text)
 end
 
 function M.appendChild(parent, child)
-    parent:insert(child)
+    if parent._contentGroup then
+        -- ScrollView: insert into content group
+        parent._contentGroup:insert(child)
+    else
+        parent:insert(child)
+    end
 end
 
 function M.removeChild(parent, child)
@@ -172,19 +288,21 @@ function M.removeChild(parent, child)
 end
 
 function M.insertBefore(parent, child, beforeChild)
-    for i = 1, parent.numChildren do
-        if parent[i] == beforeChild then
-            parent:insert(i, child)
+    local target = parent._contentGroup or parent
+    for i = 1, target.numChildren do
+        if target[i] == beforeChild then
+            target:insert(i, child)
             return
         end
     end
-    parent:insert(child)
+    target:insert(child)
 end
 
 function M.updateInstance(instance, oldProps, newProps)
     local oldStyle = oldProps.style or {}
     local newStyle = newProps.style or {}
 
+    -- Background rect updates
     if instance._bg then
         if newStyle.backgroundColor then
             local c = parseColor(newStyle.backgroundColor)
@@ -194,6 +312,7 @@ function M.updateInstance(instance, oldProps, newProps)
         if newStyle.height then instance._bg.path.height = newStyle.height end
     end
 
+    -- Text updates
     if instance._textObj then
         local newText = newProps.children
         local textType = type(newText)
@@ -207,13 +326,48 @@ function M.updateInstance(instance, oldProps, newProps)
         if newStyle.fontSize then
             instance._textObj.size = newStyle.fontSize
         end
+
+        -- Font or alignment change requires recreating text object
+        local oldFont = resolveFont(oldStyle)
+        local newFont = resolveFont(newStyle)
+        if oldFont ~= newFont or (oldStyle.textAlign ~= newStyle.textAlign) then
+            local oldTextObj = instance._textObj
+            local newTextObj = display.newText({
+                parent = instance,
+                text = oldTextObj.text,
+                x = oldTextObj.x, y = oldTextObj.y,
+                font = newFont,
+                fontSize = newStyle.fontSize or oldTextObj.size,
+                width = newStyle.width or oldTextObj.width,
+                height = 0,
+                align = newStyle.textAlign or "left",
+            })
+            newTextObj.anchorX, newTextObj.anchorY = 0, 0
+            if newStyle.color then
+                local c = parseColor(newStyle.color)
+                newTextObj:setFillColor(c[1], c[2], c[3], c[4])
+            end
+            oldTextObj:removeSelf()
+            instance._textObj = newTextObj
+        end
+
+        instance._lineHeight = newStyle.lineHeight
     end
 
+    -- Common style updates
     if newStyle.opacity then instance.alpha = newStyle.opacity end
     if newStyle.display == "none" then
         instance.isVisible = false
     elseif oldStyle.display == "none" and newStyle.display ~= "none" then
         instance.isVisible = true
+    end
+    if newStyle.zIndex then instance._zIndex = newStyle.zIndex end
+
+    -- Transform updates
+    if newStyle.transform then
+        applyTransform(instance, newStyle.transform)
+    elseif oldStyle.transform and not newStyle.transform then
+        applyTransform(instance, nil) -- reset
     end
 end
 

@@ -120,6 +120,8 @@ function M.newText(options)
     t.y = options.y or 0
     t.width = options.width or 100
     t.height = options.height or 20
+    t._font = options.font or "systemFont"
+    t._align = options.align or "left"
     if options.parent then options.parent:insert(t) end
     return t
 end
