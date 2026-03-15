@@ -8,7 +8,7 @@ local RN = require("react_solar2d")
 local React = require("react")
 
 -- Pick which demo to run: "hello" | "counter" | "news" | "quiz" | "tetris"
-local demo = "news"
+local demo = "news" -- "hello" | "counter" | "news" | "quiz" | "tetris"
 
 local container = display.newGroup()
 
