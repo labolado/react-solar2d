@@ -153,12 +153,27 @@ local function wireEvents(instance, props)
     if props._touchFeedback == "opacity" then
         local activeOpacity = props._activeOpacity or 0.2
         local target = instance._bg or instance._textObj or instance
+        if target == instance then
+            instance.isHitTestable = true
+        end
         target:addEventListener("touch", function(event)
             if event.phase == "began" then
                 instance._origAlpha = instance.alpha
+                instance._origScaleX = instance.xScale
+                instance._origScaleY = instance.yScale
                 instance.alpha = activeOpacity
+                instance.xScale = (instance._origScaleX or 1) * 0.95
+                instance.yScale = (instance._origScaleY or 1) * 0.95
             elseif event.phase == "ended" or event.phase == "cancelled" then
-                instance.alpha = instance._origAlpha or 1
+                -- Slight delay so feedback is visible even on quick taps
+                local inst = instance
+                timer.performWithDelay(50, function()
+                    if inst and inst.removeSelf then
+                        inst.alpha = inst._origAlpha or 1
+                        inst.xScale = inst._origScaleX or 1
+                        inst.yScale = inst._origScaleY or 1
+                    end
+                end)
             end
             return false -- don't consume; let tap (onPress) fire
         end)

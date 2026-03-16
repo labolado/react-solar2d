@@ -128,6 +128,7 @@ local function KitchenSinkApp()
             paddingBottom = 8,
             borderBottomWidth = 1,
             borderColor = T.border,
+            zIndex = 100,
         },
     }, catButtons)
 

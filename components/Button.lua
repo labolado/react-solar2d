@@ -11,7 +11,7 @@ local function Button(props)
         },
         onPress = props.onPress,
         _touchFeedback = "opacity",
-        _activeOpacity = 0.6,
+        _activeOpacity = 0.4,
     },
         React.createElement("Text", {
             style = {
