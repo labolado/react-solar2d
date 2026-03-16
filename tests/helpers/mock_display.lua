@@ -112,6 +112,16 @@ function M.newRoundedRect(parent, x, y, w, h, cornerRadius)
     return r
 end
 
+function M.newCircle(parent, x, y, radius)
+    local c = newDisplayObject("circle")
+    c.x, c.y = x, y
+    c.width, c.height = radius * 2, radius * 2
+    c._radius = radius
+    c.path = { width = radius * 2, height = radius * 2 }
+    if parent then parent:insert(c) end
+    return c
+end
+
 function M.newText(options)
     local t = newDisplayObject("text")
     t.text = options.text or ""
