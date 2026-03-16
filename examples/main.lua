@@ -35,10 +35,11 @@ end
 local NewsApp = require("examples.NewsApp")
 local QuizApp = require("examples.QuizApp")
 local TetrisApp = require("examples.TetrisApp")
+local KitchenSinkApp = require("examples.KitchenSinkApp")
 
 -- Route: read .route file to jump directly to a specific demo
 -- Usage: echo "quiz" > examples/.route   then launch simulator
-local ROUTE_MAP = { news = "News", quiz = "Quiz", tetris = "Game" }
+local ROUTE_MAP = { news = "News", quiz = "Quiz", tetris = "Game", sink = "Showcase" }
 local initialRoute = "News"
 local routePath = system.pathForFile(".route", system.ResourceDirectory)
 if routePath then
@@ -82,6 +83,11 @@ local function App()
                 name = "Game",
                 component = TetrisApp,
                 options = { tabBarLabel = "游戏", tabBarIcon = "T" },
+            }),
+            ce(Tab.Screen, {
+                name = "Showcase",
+                component = KitchenSinkApp,
+                options = { tabBarLabel = "展示", tabBarIcon = "K" },
             })
         )
     )
