@@ -100,7 +100,7 @@ local function KitchenSinkApp()
                 paddingVertical = 6,
                 marginRight = 4,
                 borderRadius = T.radiusSmall,
-                backgroundColor = isActive and T.accent or "transparent",
+                backgroundColor = isActive and T.accent or T.surface,
             },
             onPress = function()
                 setActiveCategory(i)

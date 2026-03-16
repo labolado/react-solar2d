@@ -10,6 +10,8 @@ local function Button(props)
             alignItems = "center",
         },
         onPress = props.onPress,
+        _touchFeedback = "opacity",
+        _activeOpacity = 0.6,
     },
         React.createElement("Text", {
             style = {
