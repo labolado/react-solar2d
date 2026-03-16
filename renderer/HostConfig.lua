@@ -51,6 +51,14 @@ local function resolveFont(style)
     return native and native.systemFont or "systemFont"
 end
 
+-- Resolve AnimatedValue to plain number (or pass through plain values)
+local function resolveValue(v)
+    if type(v) == "table" and v.getValue then
+        return v:getValue()
+    end
+    return v
+end
+
 -- Apply RN transform array to Solar2D display object
 local function applyTransform(instance, transforms)
     if not transforms then
@@ -60,7 +68,8 @@ local function applyTransform(instance, transforms)
         return
     end
     for _, t in ipairs(transforms) do
-        for key, value in pairs(t) do
+        for key, rawValue in pairs(t) do
+            local value = resolveValue(rawValue)
             if key == "rotate" then
                 local deg = tostring(value):match("^(.-)deg$")
                 if deg then
@@ -156,16 +165,85 @@ local function wireEvents(instance, props)
     end
 end
 
--- Apply common style properties to any instance
+-- Apply common style properties to any instance (resolves AnimatedValue objects)
 local function applyCommonStyle(instance, style)
-    if style.opacity then instance.alpha = style.opacity end
+    if style.opacity ~= nil then instance.alpha = resolveValue(style.opacity) end
+    if style.translateX ~= nil then
+        instance._translateX = resolveValue(style.translateX)
+    end
+    if style.translateY ~= nil then
+        instance._translateY = resolveValue(style.translateY)
+    end
+    if style.scaleX ~= nil then instance.xScale = resolveValue(style.scaleX) end
+    if style.scaleY ~= nil then instance.yScale = resolveValue(style.scaleY) end
+    if style.rotation ~= nil then instance.rotation = resolveValue(style.rotation) end
     if style.display == "none" then instance.isVisible = false end
     if style.zIndex then instance._zIndex = style.zIndex end
     if style.transform then applyTransform(instance, style.transform) end
 end
 
+-- Subscribe AnimatedValue listeners that directly update display object properties
+local function subscribeAnimatedValues(instance, style)
+    local subs = {}
+    local function sub(animVal, updater)
+        local id = animVal:addListener(function(event)
+            updater(event.value)
+        end)
+        subs[#subs + 1] = { value = animVal, id = id }
+    end
+
+    if type(style.opacity) == "table" and style.opacity.getValue then
+        sub(style.opacity, function(v) instance.alpha = v end)
+    end
+    if type(style.translateX) == "table" and style.translateX.getValue then
+        sub(style.translateX, function(v)
+            instance._translateX = v
+            instance.x = (instance._layoutX or 0) + v
+        end)
+    end
+    if type(style.translateY) == "table" and style.translateY.getValue then
+        sub(style.translateY, function(v)
+            instance._translateY = v
+            instance.y = (instance._layoutY or 0) + v
+        end)
+    end
+    if type(style.scaleX) == "table" and style.scaleX.getValue then
+        sub(style.scaleX, function(v) instance.xScale = v end)
+    end
+    if type(style.scaleY) == "table" and style.scaleY.getValue then
+        sub(style.scaleY, function(v) instance.yScale = v end)
+    end
+    if type(style.rotation) == "table" and style.rotation.getValue then
+        sub(style.rotation, function(v) instance.rotation = v end)
+    end
+
+    if #subs > 0 then
+        instance._animSubscriptions = subs
+    end
+end
+
+-- Unsubscribe all animated value listeners from an instance
+local function unsubscribeAnimatedValues(instance)
+    if instance._animSubscriptions then
+        for _, s in ipairs(instance._animSubscriptions) do
+            s.value:removeListener(s.id)
+        end
+        instance._animSubscriptions = nil
+    end
+end
+
 function M.createInstance(elementType, props)
     local style = props.style or {}
+
+    -- Normalize Animated.* types to their base type
+    local isAnimated = false
+    if elementType == "Animated.View" then
+        elementType = "View"; isAnimated = true
+    elseif elementType == "Animated.Text" then
+        elementType = "Text"; isAnimated = true
+    elseif elementType == "Animated.Image" then
+        elementType = "Image"; isAnimated = true
+    end
 
     if elementType == "View" then
         local group = display.newGroup()
@@ -236,6 +314,7 @@ function M.createInstance(elementType, props)
 
         applyCommonStyle(group, style)
         wireEvents(group, props)
+        if isAnimated then subscribeAnimatedValues(group, style) end
         return group
 
     elseif elementType == "Text" then
@@ -266,6 +345,7 @@ function M.createInstance(elementType, props)
         group._lineHeight = style.lineHeight
         applyCommonStyle(group, style)
         wireEvents(group, props)
+        if isAnimated then subscribeAnimatedValues(group, style) end
         return group
 
     elseif elementType == "ScrollView" then
@@ -413,6 +493,7 @@ function M.createInstance(elementType, props)
         group._resizeMode = resizeMode
         applyCommonStyle(group, style)
         wireEvents(group, props)
+        if isAnimated then subscribeAnimatedValues(group, style) end
         return group
     end
 
@@ -465,6 +546,7 @@ end
 
 function M.removeChild(parent, child)
     if parent._invalidateContentSize then parent._invalidateContentSize() end
+    unsubscribeAnimatedValues(child)
     child:removeSelf()
 end
 
@@ -558,8 +640,19 @@ function M.updateInstance(instance, oldProps, newProps)
         end
     end
 
-    -- Common style updates
-    if newStyle.opacity then instance.alpha = newStyle.opacity end
+    -- Common style updates (resolve AnimatedValues)
+    if newStyle.opacity ~= nil then instance.alpha = resolveValue(newStyle.opacity) end
+    if newStyle.translateX ~= nil then
+        instance._translateX = resolveValue(newStyle.translateX)
+        instance.x = (instance._layoutX or 0) + instance._translateX
+    end
+    if newStyle.translateY ~= nil then
+        instance._translateY = resolveValue(newStyle.translateY)
+        instance.y = (instance._layoutY or 0) + instance._translateY
+    end
+    if newStyle.scaleX ~= nil then instance.xScale = resolveValue(newStyle.scaleX) end
+    if newStyle.scaleY ~= nil then instance.yScale = resolveValue(newStyle.scaleY) end
+    if newStyle.rotation ~= nil then instance.rotation = resolveValue(newStyle.rotation) end
     if newStyle.display == "none" then
         instance.isVisible = false
     elseif oldStyle.display == "none" and newStyle.display ~= "none" then
@@ -572,6 +665,12 @@ function M.updateInstance(instance, oldProps, newProps)
         applyTransform(instance, newStyle.transform)
     elseif oldStyle.transform and not newStyle.transform then
         applyTransform(instance, nil) -- reset
+    end
+
+    -- Re-subscribe animated values if they changed
+    if instance._animSubscriptions then
+        unsubscribeAnimatedValues(instance)
+        subscribeAnimatedValues(instance, newStyle)
     end
 end
 

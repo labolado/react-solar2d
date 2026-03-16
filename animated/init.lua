@@ -53,6 +53,7 @@ function Animated.timing(value, config)
     local duration = config.duration or 300
     local easingFn = config.easing
     local delay = config.delay or 0
+    anim._value = value  -- expose for loop reset
 
     function anim.start(callback)
         if transition and transition.to then
@@ -104,6 +105,7 @@ end
 -- Animated.sequence — run animations in order
 function Animated.sequence(animations)
     local anim = {}
+    anim._children = animations  -- expose for loop reset
     function anim.start(callback)
         local index = 1
         local function next()
@@ -129,6 +131,7 @@ end
 -- Animated.parallel — run animations simultaneously
 function Animated.parallel(animations)
     local anim = {}
+    anim._children = animations  -- expose for loop reset
     function anim.start(callback)
         local remaining = #animations
         if remaining == 0 then
@@ -152,6 +155,22 @@ function Animated.parallel(animations)
     return anim
 end
 
+-- Collect all AnimatedValues from an animation tree (timing, sequence, parallel)
+local function collectValues(animation)
+    local vals = {}
+    if animation._value then
+        vals[#vals + 1] = animation._value
+    end
+    if animation._children then
+        for _, child in ipairs(animation._children) do
+            for _, v in ipairs(collectValues(child)) do
+                vals[#vals + 1] = v
+            end
+        end
+    end
+    return vals
+end
+
 -- Animated.loop — repeat an animation
 function Animated.loop(animation, config)
     local iterations = (config and config.iterations) or -1 -- -1 = infinite
@@ -161,8 +180,20 @@ function Animated.loop(animation, config)
 
     function anim.start(callback)
         stopped = false
+        count = 0
+        -- Snapshot initial values on first start
+        local values = collectValues(animation)
+        local initials = {}
+        for i, v in ipairs(values) do
+            initials[i] = v:getValue()
+        end
+
         local function runOnce()
             if stopped then return end
+            -- Reset all values to initial state before each iteration
+            for i, v in ipairs(values) do
+                v:setValue(initials[i])
+            end
             animation.start(function()
                 count = count + 1
                 if iterations > 0 and count >= iterations then

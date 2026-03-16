@@ -129,6 +129,37 @@ T.describe("Animated.loop", function()
         T.expect(type(anim.start)).toBe("function")
         T.expect(type(anim.stop)).toBe("function")
     end)
+
+    T.it("resets value before each iteration (no stack overflow)", function()
+        local val = Animated.Value(0)
+        local finished = false
+        -- Without reset, 0→360 then 360→360 would instant-complete and recurse infinitely
+        local anim = Animated.loop(
+            Animated.timing(val, { toValue = 360 }),
+            { iterations = 3 }
+        )
+        anim.start(function(r) finished = r.finished end)
+        -- Without transition API, timing jumps instantly, loop runs 3x synchronously
+        T.expect(finished).toBe(true)
+        T.expect(val:getValue()).toBe(360)
+    end)
+
+    T.it("resets sequence values in loop", function()
+        local a = Animated.Value(0)
+        local b = Animated.Value(10)
+        local finished = false
+        local anim = Animated.loop(
+            Animated.sequence({
+                Animated.timing(a, { toValue = 100 }),
+                Animated.timing(b, { toValue = 50 }),
+            }),
+            { iterations = 2 }
+        )
+        anim.start(function(r) finished = r.finished end)
+        T.expect(finished).toBe(true)
+        T.expect(a:getValue()).toBe(100)
+        T.expect(b:getValue()).toBe(50)
+    end)
 end)
 
 T.describe("Animated component markers", function()

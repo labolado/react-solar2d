@@ -67,8 +67,11 @@ local function applyLayout(yogaNode, fiber)
 
     if fiber.stateNode then
         local l, t, w, h = yogaNode:getLayout()
-        fiber.stateNode.x = l
-        fiber.stateNode.y = t
+        -- Store layout position separately so translateX/Y can offset from it
+        fiber.stateNode._layoutX = l
+        fiber.stateNode._layoutY = t
+        fiber.stateNode.x = l + (fiber.stateNode._translateX or 0)
+        fiber.stateNode.y = t + (fiber.stateNode._translateY or 0)
         -- Update size for bg rect if present (guard against removed objects)
         if fiber.stateNode._bg and fiber.stateNode._bg.removeSelf and fiber.stateNode._bg.path then
             fiber.stateNode._bg.path.width = w

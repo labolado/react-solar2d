@@ -15,27 +15,30 @@ local function ReactInSolar2DDemo()
 
     useEffect(function()
         -- Create the scene group that holds everything
+        -- Offset down to avoid covering the category bar and back button
         local sceneGroup = display.newGroup()
         groupRef.current = sceneGroup
+        local yOffset = 160 -- below category bar + back button + demo back button
+        sceneGroup.y = yOffset
 
-        -- Section 1: Native Solar2D objects (top)
+        -- Section 1: Native Solar2D objects (top, relative to yOffset)
         local headerText = display.newText({
             parent = sceneGroup, text = "Native Solar2D Header",
-            x = display.contentCenterX, y = 40,
+            x = display.contentCenterX, y = 30,
             fontSize = 16,
         })
         headerText:setFillColor(1, 0.4, 0) -- orange
 
-        local circle = display.newCircle(sceneGroup, 80, 90, 20)
+        local circle = display.newCircle(sceneGroup, 80, 70, 20)
         circle:setFillColor(1, 0.3, 0.3) -- tomato
 
-        local rect = display.newRect(sceneGroup, 180, 90, 60, 30)
+        local rect = display.newRect(sceneGroup, 180, 70, 60, 30)
         rect:setFillColor(1, 0.84, 0) -- gold
 
         -- Section 2: React subtree rendered into a sub-group
         local reactGroup = display.newGroup()
         sceneGroup:insert(reactGroup)
-        reactGroup.y = 130
+        reactGroup.y = 100
 
         -- Counter component rendered via RN.render
         local function CounterCard()
@@ -64,10 +67,10 @@ local function ReactInSolar2DDemo()
 
         rendererRef.current = RN.render(ce(CounterCard), reactGroup, { width = 300, height = 200 })
 
-        -- Section 3: Native footer
+        -- Section 3: Native footer (relative to sceneGroup)
         local footerText = display.newText({
             parent = sceneGroup, text = "Native Solar2D Footer",
-            x = display.contentCenterX, y = 370,
+            x = display.contentCenterX, y = 320,
             fontSize = 14,
         })
         footerText:setFillColor(1, 0.4, 0) -- orange
@@ -83,8 +86,19 @@ local function ReactInSolar2DDemo()
         end
     end, {})
 
-    -- This component itself renders nothing via React — everything is in the useEffect
-    return ce("View", { style = { flex = 1, backgroundColor = T.bg } })
+    -- Render a back button within the React tree so user can always exit,
+    -- even though the native display objects may overlay parts of the screen.
+    local navigation = props and props.navigation
+    return ce("View", { style = { flex = 1, backgroundColor = T.bg } },
+        navigation and navigation.goBack and ce(RN.Pressable, {
+            style = {
+                padding = 12, backgroundColor = "#161B22",
+                borderBottomWidth = 1, borderColor = T.border,
+                zIndex = 999,
+            },
+            onPress = navigation.goBack,
+        }, ce("Text", { style = { fontSize = 14, color = T.accent } }, "← Back to list")) or nil
+    )
 end
 
 -- 2. Solar2DInReactDemo

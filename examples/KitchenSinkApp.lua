@@ -33,6 +33,9 @@ local CATEGORIES = {
     { key = "Lists",     label = "列表", screens = safeRequire("examples.kitchen_sink.ListsScreens") },
     { key = "Nav",       label = "导航", screens = safeRequire("examples.kitchen_sink.NavigationScreens") },
     { key = "Animation", label = "动画", screens = safeRequire("examples.kitchen_sink.AnimationScreens") },
+    { key = "Overlay",   label = "弹层", screens = safeRequire("examples.kitchen_sink.OverlayScreens") },
+    { key = "Layout",    label = "布局", screens = safeRequire("examples.kitchen_sink.LayoutScreens") },
+    { key = "Advanced",  label = "高级", screens = safeRequire("examples.kitchen_sink.AdvancedScreens") },
     { key = "Interop",   label = "互操", screens = safeRequire("examples.kitchen_sink.InteropScreens") },
 }
 
@@ -118,6 +121,7 @@ local function KitchenSinkApp()
     local categoryBar = ce("View", {
         style = {
             flexDirection = "row",
+            flexWrap = "wrap",
             backgroundColor = T.surface,
             paddingHorizontal = T.pad,
             paddingTop = SAFE_TOP + 8,
@@ -146,7 +150,8 @@ local function KitchenSinkApp()
         }, "← " .. activeDemo.name))
 
         content = ce("View", { style = { flex = 1, backgroundColor = T.bg } },
-            backBtn,
+            -- Back button on top with zIndex so native display objects can't block it
+            ce("View", { style = { zIndex = 100 } }, backBtn),
             ce(activeDemo.component, {
                 navigation = { goBack = function() setActiveDemo(nil) end },
                 route = { name = activeDemo.name, params = {} },
