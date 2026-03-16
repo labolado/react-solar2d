@@ -74,8 +74,31 @@ local function applyLayout(yogaNode, fiber)
             fiber.stateNode._bg.path.width = w
             fiber.stateNode._bg.path.height = h
         end
-        -- Text wrapping: disabled temporarily for debugging
-        -- TODO: re-enable after fixing text disappearing issue
+        -- Text wrapping: if Yoga computed a width, rebuild text with that width
+        if fiber.type == "Text" and fiber.stateNode._textObj then
+            local textObj = fiber.stateNode._textObj
+            local textStyle = (fiber.props and fiber.props.style) or {}
+            if not textStyle.width and w > 0 and textObj.width > w + 1 then
+                local parent = fiber.stateNode
+                local newTextObj = display.newText({
+                    parent = parent,
+                    text = textObj.text,
+                    x = 0, y = 0,
+                    font = fiber.stateNode._font or native.systemFont,
+                    fontSize = fiber.stateNode._fontSize or 14,
+                    width = w,
+                    height = 0,
+                    align = textStyle.textAlign or "left",
+                })
+                newTextObj.anchorX, newTextObj.anchorY = 0, 0
+                local tc = HostConfig._parseColor and HostConfig._parseColor(textStyle.color or "#000000")
+                    or {0, 0, 0, 1}
+                newTextObj:setFillColor(tc[1], tc[2], tc[3], tc[4])
+                textObj:removeSelf()
+                fiber.stateNode._textObj = newTextObj
+                fiber.stateNode._textWrapped = true
+            end
+        end
     end
 
     -- Walk children: match Yoga children with fiber children (skip function component fibers)
@@ -134,8 +157,29 @@ local function runLayoutPass(rootFiber, width, height)
         layoutRoot:freeRecursive()
     end
 
-    -- Pass 2 disabled: text wrapping temporarily off
-    -- TODO: re-enable two-pass layout when text wrapping is fixed
+    -- Pass 2: re-layout with wrapped text heights (only if any text was wrapped)
+    local needsPass2 = false
+    local function checkWrapped(f)
+        if not f then return end
+        if f.stateNode and f.stateNode._textWrapped then
+            needsPass2 = true
+            f.stateNode._textWrapped = nil
+        end
+        checkWrapped(f.child)
+        checkWrapped(f.sibling)
+    end
+    checkWrapped(rootFiber)
+
+    if needsPass2 then
+        local layoutRoot2 = buildLayoutTree(rootFiber)
+        if layoutRoot2 then
+            layoutRoot2:setWidth(width)
+            layoutRoot2:setHeight(height)
+            layoutRoot2:calculateLayout()
+            applyLayout(layoutRoot2, rootFiber)
+            layoutRoot2:freeRecursive()
+        end
+    end
 end
 
 function ReactSolar2D.render(element, container, options)
