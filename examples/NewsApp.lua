@@ -423,7 +423,50 @@ local function DetailPage(props)
         )
     )
 
-    -- URL
+    -- Stats row
+    local statItems = {}
+    statItems[#statItems + 1] = createElement("View", {
+        key = "st1",
+        style = {
+            flex = 1, alignItems = "center", padding = s(16),
+            backgroundColor = "#FFFFFF", borderRadius = s(12),
+            marginRight = s(8), borderWidth = 1, borderColor = "#EAEAEF",
+        },
+    },
+        createElement("Text", { style = { fontSize = s(32), color = sc, fontWeight = "bold" } },
+            tostring(item.score or 0)),
+        createElement("Text", { style = { fontSize = s(16), color = "#AAAAAA" } }, "Points")
+    )
+    statItems[#statItems + 1] = createElement("View", {
+        key = "st2",
+        style = {
+            flex = 1, alignItems = "center", padding = s(16),
+            backgroundColor = "#FFFFFF", borderRadius = s(12),
+            marginRight = s(8), borderWidth = 1, borderColor = "#EAEAEF",
+        },
+    },
+        createElement("Text", { style = { fontSize = s(32), color = "#2979FF", fontWeight = "bold" } },
+            tostring(item.descendants or 0)),
+        createElement("Text", { style = { fontSize = s(16), color = "#AAAAAA" } }, "Comments")
+    )
+    statItems[#statItems + 1] = createElement("View", {
+        key = "st3",
+        style = {
+            flex = 1, alignItems = "center", padding = s(16),
+            backgroundColor = "#FFFFFF", borderRadius = s(12),
+            borderWidth = 1, borderColor = "#EAEAEF",
+        },
+    },
+        createElement("Text", { style = { fontSize = s(32), color = "#00C853", fontWeight = "bold" } },
+            timeAgo(item.time)),
+        createElement("Text", { style = { fontSize = s(16), color = "#AAAAAA" } }, "Posted")
+    )
+    detailItems[#detailItems + 1] = createElement("View", {
+        key = "dstats",
+        style = { flexDirection = "row", marginHorizontal = s(16), marginBottom = s(12) },
+    }, unpack(statItems))
+
+    -- URL card
     if item.url then
         detailItems[#detailItems + 1] = createElement("View", {
             key = "durl",
@@ -442,7 +485,7 @@ local function DetailPage(props)
         )
     end
 
-    -- Body
+    -- Body text
     if bodyText then
         detailItems[#detailItems + 1] = createElement("View", {
             key = "dbody",
@@ -453,10 +496,45 @@ local function DetailPage(props)
             },
         },
             createElement("Text", {
+                style = { fontSize = s(16), color = "#AAAAAA", marginBottom = s(8) },
+            }, "CONTENT"),
+            createElement("Text", {
                 style = { fontSize = s(22), color = "#333333" },
             }, bodyText)
         )
     end
+
+    -- Author card
+    detailItems[#detailItems + 1] = createElement("View", {
+        key = "dauthor",
+        style = {
+            marginHorizontal = s(16), marginBottom = s(12),
+            padding = s(20), backgroundColor = "#FFFFFF",
+            borderRadius = s(14), borderWidth = 1, borderColor = "#EAEAEF",
+            flexDirection = "row", alignItems = "center",
+        },
+    },
+        createElement("View", {
+            style = {
+                width = s(44), height = s(44), borderRadius = s(22),
+                backgroundColor = "#1A1A2E", justifyContent = "center", alignItems = "center",
+                marginRight = s(14),
+            },
+        },
+            createElement("Text", {
+                style = { fontSize = s(22), color = "#FF6600", fontWeight = "bold" },
+            }, string.upper(string.sub(item.by or "?", 1, 1)))
+        ),
+        createElement("View", { style = { flex = 1 } },
+            createElement("Text", {
+                style = { fontSize = s(22), color = "#333333", fontWeight = "bold" },
+            }, item.by or "Anonymous"),
+            createElement("Text", {
+                style = { fontSize = s(16), color = "#AAAAAA" },
+            }, "Posted " .. timeAgo(item.time) .. " ago")
+        )
+    )
+
     detailItems[#detailItems + 1] = createElement("View", { key = "dpad", style = { height = s(80) } })
 
     local topBarH = s(56) + SAFE_TOP
