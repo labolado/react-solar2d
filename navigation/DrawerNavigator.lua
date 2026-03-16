@@ -4,6 +4,7 @@ local React = require("react")
 local ce = React.createElement
 local useState = React.useState
 local useMemo = React.useMemo
+local useRef = React.useRef
 local NavState = require("navigation.NavigationState")
 
 local function createDrawerNavigator()
@@ -35,6 +36,8 @@ local function createDrawerNavigator()
             or NavState.createState("drawer", routeConfigs, initialRouteName)
 
         local state, setState = useState(initState)
+        local stateRef = useRef(initState)
+        stateRef.current = state
         local drawerOpen, setDrawerOpen = useState(false)
 
         local drawerWidth = props.drawerWidth or 280
@@ -45,7 +48,7 @@ local function createDrawerNavigator()
             local nav = {}
             function nav.navigate(name, params)
                 setState(function(prev)
-                    return NavState.switchTab(prev, name) -- drawer uses same switch logic
+                    return NavState.navigate(prev, name, params)
                 end)
                 setDrawerOpen(false)
             end
@@ -62,7 +65,7 @@ local function createDrawerNavigator()
                 setDrawerOpen(function(prev) return not prev end)
             end
             function nav.isFocused() return true end
-            nav._getState = function() return state end
+            nav._getState = function() return stateRef.current end
             return nav
         end, {})
 

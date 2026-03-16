@@ -89,7 +89,17 @@ function M.setParams(state, newParams)
 end
 
 function M.navigate(state, name, params)
-    if state.type == "tab" then return M.switchTab(state, name) end
+    if state.type == "tab" or state.type == "drawer" then
+        local next = M.switchTab(state, name)
+        if params and next ~= state then
+            local routes = {}
+            for i = 1, #next.routes do routes[i] = next.routes[i] end
+            local r = routes[next.index]
+            routes[next.index] = { name = r.name, key = r.key, params = params, state = r.state }
+            return { type = next.type, index = next.index, routes = routes }
+        end
+        return next
+    end
     for i, route in ipairs(state.routes) do
         if route.name == name then
             local routes = {}

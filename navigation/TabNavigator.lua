@@ -5,6 +5,7 @@ local React = require("react")
 local ce = React.createElement
 local useState = React.useState
 local useMemo = React.useMemo
+local useRef = React.useRef
 local NavState = require("navigation.NavigationState")
 
 local function createBottomTabNavigator()
@@ -36,18 +37,20 @@ local function createBottomTabNavigator()
             or NavState.createState("tab", routeConfigs, initialRouteName)
 
         local state, setState = useState(initState)
+        local stateRef = useRef(initState)
+        stateRef.current = state
         local tabBarOptions = props.tabBarOptions or {}
 
         local navigation = useMemo(function()
             local nav = {}
             function nav.navigate(name, params)
                 setState(function(prev)
-                    return NavState.switchTab(prev, name)
+                    return NavState.navigate(prev, name, params)
                 end)
             end
             function nav.goBack() end -- no-op for tabs
             function nav.isFocused() return true end
-            nav._getState = function() return state end
+            nav._getState = function() return stateRef.current end
             return nav
         end, {})
 
