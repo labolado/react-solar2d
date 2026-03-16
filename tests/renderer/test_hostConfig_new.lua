@@ -12,12 +12,12 @@ timer = { performWithDelay = function() return {} end, cancel = function() end }
 local HostConfig = require("renderer.HostConfig")
 
 T.describe("View: circle for perfect round shapes", function()
-    T.it("uses circle when borderRadius >= width/2 and width == height", function()
+    T.it("uses roundedRect when borderRadius >= width/2 and width == height", function()
         local inst = HostConfig.createInstance("View", {
             style = { width = 100, height = 100, borderRadius = 50, backgroundColor = "#FF0000" }
         })
         T.expect(inst._bg).toBeTruthy()
-        T.expect(inst._bg._type).toBe("circle")
+        T.expect(inst._bg._type).toBe("roundedRect")
     end)
 
     T.it("uses roundedRect when borderRadius < width/2", function()

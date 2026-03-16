@@ -178,16 +178,18 @@ function M.createInstance(elementType, props)
             local vw = style.width or 0
             local vh = style.height or 0
             local br = style.borderRadius or 0
-            -- Use circle for perfect round shapes (avoids jagged edges on roundedRect)
-            if br > 0 and vw > 0 and vh > 0 and vw == vh and br >= vw / 2 then
-                local radius = vw / 2
-                bg = display.newCircle(group, 0, 0, radius)
+            -- Perfect circle: use roundedRect (same as before, reliable positioning)
+            local isCircle = br > 0 and vw > 0 and vh > 0 and vw == vh and br >= vw / 2
+            if isCircle then
+                bg = display.newRoundedRect(group, 0, 0, vw, vh, br)
+                bg.anchorX, bg.anchorY = 0, 0
             elseif br > 0 then
                 bg = display.newRoundedRect(group, 0, 0, vw, vh, br)
+                bg.anchorX, bg.anchorY = 0, 0
             else
                 bg = display.newRect(group, 0, 0, vw, vh)
+                bg.anchorX, bg.anchorY = 0, 0
             end
-            bg.anchorX, bg.anchorY = 0, 0
 
             if style.backgroundColor then
                 local c = parseColor(style.backgroundColor)
@@ -669,6 +671,13 @@ function M.updateInstance(instance, oldProps, newProps)
         if newStyle.backgroundColor then
             local c = parseColor(newStyle.backgroundColor)
             instance._bg:setFillColor(c[1], c[2], c[3], c[4])
+        end
+        if newStyle.borderColor then
+            local c = parseColor(newStyle.borderColor)
+            instance._bg:setStrokeColor(c[1], c[2], c[3], c[4])
+        end
+        if newStyle.borderWidth then
+            instance._bg.strokeWidth = newStyle.borderWidth
         end
         if newStyle.width then instance._bg.path.width = newStyle.width end
         if newStyle.height then instance._bg.path.height = newStyle.height end
