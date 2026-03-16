@@ -49,4 +49,13 @@ RN.Switch = Components.Switch
 RN.Pressable = Components.Pressable
 RN.ActivityIndicator = Components.ActivityIndicator
 
+-- Navigation
+local Navigation = require("navigation")
+RN.NavigationContainer = Navigation.NavigationContainer
+RN.createStackNavigator = Navigation.createStackNavigator
+RN.createBottomTabNavigator = Navigation.createBottomTabNavigator
+RN.createDrawerNavigator = Navigation.createDrawerNavigator
+RN.Header = Navigation.Header
+RN.NavigationTestUtils = Navigation.NavigationTestUtils
+
 return RN
