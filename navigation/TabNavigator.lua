@@ -102,31 +102,48 @@ local function createBottomTabNavigator()
                     flex = 1,
                     alignItems = "center",
                     justifyContent = "center",
-                    height = 50,
+                    height = 56,
                 },
             },
-                ce("Text", { style = { color = tint, fontSize = 12 } }, icon),
+                ce("Text", { style = { color = tint, fontSize = tabBarOptions.iconSize or 16 } }, icon),
                 (tabBarOptions.showLabel ~= false)
-                    and ce("Text", { style = { color = tint, fontSize = 10 } }, label)
+                    and ce("Text", { style = { color = tint, fontSize = tabBarOptions.labelSize or 12 } }, label)
                     or nil
             )
         end
 
+        local TAB_BAR_H = tabBarOptions.height or 56
         local tabBarBg = tabBarOptions.backgroundColor or "#FFFFFF"
+        local contentW = display and display.contentWidth or 320
+        local contentH = display and display.contentHeight or 480
         local tabBar = ce("View", {
             key = "__tabbar",
             style = {
+                position = "absolute",
+                bottom = 0, left = 0,
                 flexDirection = "row",
-                height = 50,
+                height = TAB_BAR_H,
                 backgroundColor = tabBarBg,
-                width = display and display.contentWidth or 320,
+                width = contentW,
             },
         }, tabItems)
 
-        -- Layout: screens + tab bar at bottom
-        screenElements[#screenElements + 1] = tabBar
+        -- Layout: content area above tab bar + tab bar pinned at bottom
+        local contentArea = ce("View", {
+            key = "__content",
+            style = {
+                position = "absolute",
+                top = 0, left = 0,
+                width = contentW,
+                height = contentH - TAB_BAR_H,
+                overflow = "hidden",
+            },
+        }, screenElements)
 
-        return ce("View", { style = { flex = 1 } }, screenElements)
+        return ce("View", { style = { width = contentW, height = contentH } },
+            contentArea,
+            tabBar
+        )
     end
 
     local function Screen(props) return nil end

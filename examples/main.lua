@@ -35,7 +35,13 @@ end
 local NewsApp = require("examples.NewsApp")
 local QuizApp = require("examples.QuizApp")
 local TetrisApp = require("examples.TetrisApp")
-local KitchenSinkApp = require("examples.KitchenSinkApp")
+local ok_ks, KitchenSinkApp = pcall(require, "examples.KitchenSinkApp")
+if not ok_ks then
+    print("[main] ERROR loading KitchenSinkApp: " .. tostring(KitchenSinkApp))
+    KitchenSinkApp = function() return ce("View", { style = { flex = 1 } },
+        ce("Text", { style = { fontSize = 16, color = "#FF0000" } }, "KitchenSink failed to load"))
+    end
+end
 
 -- Route: read .route file to jump directly to a specific demo
 -- Usage: echo "quiz" > examples/.route   then launch simulator
@@ -67,6 +73,8 @@ local function App()
                 activeTintColor = "#FF6600",
                 inactiveTintColor = "#666688",
                 backgroundColor = "#151530",
+                iconSize = 18,
+                labelSize = 13,
             },
         },
             ce(Tab.Screen, {
