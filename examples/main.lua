@@ -38,7 +38,7 @@ local TetrisApp = require("examples.TetrisApp")
 
 -- Demo registry
 local DEMOS = {
-    { key = "news",   name = "Tech News",   desc = "Live HN Reader",   color = "#FF6600", icon = "N" },
+    { key = "news",   name = "热点资讯",   desc = "百度热搜 + V2EX",   color = "#E74C3C", icon = "热" },
     { key = "quiz",   name = "Quiz Game",   desc = "Knowledge Quiz",   color = "#2979FF", icon = "Q" },
     { key = "tetris", name = "Tetris",      desc = "Classic Block Game", color = "#00C853", icon = "T" },
 }

@@ -111,22 +111,30 @@ end
 local function wireEvents(instance, props)
     if props.onPress then
         instance._onPress = props.onPress
-        instance:addEventListener("tap", function(event)
+        -- Use 'tap' event on the actual display object (_bg rect or _textObj).
+        -- 'tap' is independent of 'touch' events, so it doesn't interfere with
+        -- ScrollView scrolling (which uses touch+setFocus). Solar2D automatically
+        -- suppresses tap when the finger moves significantly (scroll gesture).
+        local target = instance._bg or instance._textObj or instance
+        if target == instance then
+            instance.isHitTestable = true
+        end
+        target:addEventListener("tap", function(event)
             props.onPress(event)
             return true
         end)
     end
     if props.onLongPress then
         instance._onLongPress = props.onLongPress
+        local target = instance._bg or instance._textObj or instance
+        if target == instance then instance.isHitTestable = true end
         local longPressTimer = nil
-        instance:addEventListener("touch", function(event)
+        target:addEventListener("touch", function(event)
             if event.phase == "began" then
-                display.currentStage:setFocus(instance)
                 longPressTimer = timer.performWithDelay(500, function()
                     props.onLongPress(event)
                 end)
             elseif event.phase == "ended" or event.phase == "cancelled" then
-                display.currentStage:setFocus(nil)
                 if longPressTimer then timer.cancel(longPressTimer); longPressTimer = nil end
             end
             return true
@@ -135,7 +143,8 @@ local function wireEvents(instance, props)
 
     if props._touchFeedback == "opacity" then
         local activeOpacity = props._activeOpacity or 0.2
-        instance:addEventListener("touch", function(event)
+        local target = instance._bg or instance._textObj or instance
+        target:addEventListener("touch", function(event)
             if event.phase == "began" then
                 instance._origAlpha = instance.alpha
                 instance.alpha = activeOpacity
@@ -166,10 +175,17 @@ function M.createInstance(elementType, props)
         -- Background rect (full border or backgroundColor)
         if style.backgroundColor or style.borderWidth or style.borderColor then
             local bg
-            if style.borderRadius and style.borderRadius > 0 then
-                bg = display.newRoundedRect(group, 0, 0, style.width or 0, style.height or 0, style.borderRadius)
+            local vw = style.width or 0
+            local vh = style.height or 0
+            local br = style.borderRadius or 0
+            -- Use circle for perfect round shapes (avoids jagged edges on roundedRect)
+            if br > 0 and vw > 0 and vh > 0 and vw == vh and br >= vw / 2 then
+                local radius = vw / 2
+                bg = display.newCircle(group, 0, 0, radius)
+            elseif br > 0 then
+                bg = display.newRoundedRect(group, 0, 0, vw, vh, br)
             else
-                bg = display.newRect(group, 0, 0, style.width or 0, style.height or 0)
+                bg = display.newRect(group, 0, 0, vw, vh)
             end
             bg.anchorX, bg.anchorY = 0, 0
 
@@ -205,6 +221,15 @@ function M.createInstance(elementType, props)
         end
         if style.borderRightWidth then
             group._borderRight = addBorderSide(group, "right", style.borderRightWidth, style.borderRightColor, viewW, viewH)
+        end
+
+        -- Store layout info for manual centering (without Yoga layout engine)
+        if style.justifyContent or style.alignItems then
+            group._centerChildren = true
+            group._viewW = style.width or 0
+            group._viewH = style.height or 0
+            group._alignItems = style.alignItems
+            group._justifyContent = style.justifyContent
         end
 
         applyCommonStyle(group, style)
@@ -246,12 +271,17 @@ function M.createInstance(elementType, props)
         local h = style.height or (display.contentHeight or 480)
         local horizontal = props.horizontal or false
 
-        -- Use Group (Container clipping disabled for debugging)
         local clipContainer = display.newGroup()
         clipContainer.anchorX, clipContainer.anchorY = 0, 0
 
         local contentGroup = display.newGroup()
         clipContainer:insert(contentGroup)
+
+        -- Touch overlay ON TOP of content. Uses touch listener directly (no setFocus).
+        local touchOverlay = display.newRect(clipContainer, 0, 0, w, h)
+        touchOverlay.anchorX, touchOverlay.anchorY = 0, 0
+        touchOverlay:setFillColor(0, 0, 0, 0.001)
+        touchOverlay.isHitTestable = true
 
         clipContainer._contentGroup = contentGroup
         clipContainer._scrollW = w
@@ -262,86 +292,167 @@ function M.createInstance(elementType, props)
         clipContainer._contentH = 0
         clipContainer._contentW = 0
 
-        -- Pull-to-refresh settings
-        local refreshThreshold = 100
-        local refreshOffset = 60
+        local refreshThreshold = 80
+        local refreshOffset = 50
         clipContainer._refreshing = props.refreshing or false
         clipContainer._pullingToRefresh = false
 
-        -- Touch-based scrolling
-        local startY, startX, startScrollY, startScrollX
-        clipContainer:addEventListener("touch", function(event)
-            if event.phase == "began" then
-                if display.currentStage and display.currentStage.setFocus then
-                    display.currentStage:setFocus(clipContainer)
+        local function recalcContentSize()
+            local maxH, maxW = 0, 0
+            for i = 1, contentGroup.numChildren do
+                local c = contentGroup[i]
+                if c then
+                    local bot = (c.y or 0) + (c.contentHeight or c.height or 0)
+                    local rt  = (c.x or 0) + (c.contentWidth or c.width or 0)
+                    if bot > maxH then maxH = bot end
+                    if rt > maxW then maxW = rt end
                 end
+            end
+            if maxH > 0 then clipContainer._contentH = maxH end
+            if maxW > 0 then clipContainer._contentW = maxW end
+        end
+
+        local startY, startX, startScrollY, startScrollX
+        local isDragging = false
+        local DRAG_THRESHOLD = 5
+
+        -- Touch listener on the overlay rect — NO setFocus needed.
+        -- The overlay covers the full ScrollView area, so moved/ended events
+        -- fire as long as finger stays within bounds (which it should for scrolling).
+        touchOverlay:addEventListener("touch", function(event)
+            if event.phase == "began" then
+                recalcContentSize()
                 startY = event.y
                 startX = event.x
                 startScrollY = clipContainer._scrollY
                 startScrollX = clipContainer._scrollX
+                isDragging = false
                 clipContainer._pullingToRefresh = false
+                return true
+
             elseif event.phase == "moved" then
                 if not startY then return true end
-                if horizontal then
-                    local dx = event.x - startX
-                    local newScrollX = startScrollX + dx
+                local dy = math.abs(event.y - startY)
+                local dx = math.abs(event.x - startX)
+                if not isDragging and ((horizontal and dx > DRAG_THRESHOLD) or (not horizontal and dy > DRAG_THRESHOLD)) then
+                    isDragging = true
+                end
+                if isDragging then
+                    if horizontal then
+                        local ddx = event.x - startX
+                        local newScrollX = startScrollX + ddx
+                        local maxScroll = math.max(0, clipContainer._contentW - w)
+                        if newScrollX > 0 then
+                            newScrollX = newScrollX * 0.4
+                        elseif newScrollX < -maxScroll then
+                            newScrollX = -maxScroll + (newScrollX + maxScroll) * 0.4
+                        end
+                        clipContainer._scrollX = newScrollX
+                        contentGroup.x = newScrollX
+                    else
+                        local ddy = event.y - startY
+                        local newScrollY = startScrollY + ddy
+                        local maxScroll = math.max(0, clipContainer._contentH - h)
+                        if newScrollY > 0 then
+                            clipContainer._scrollY = newScrollY * 0.4
+                            contentGroup.y = clipContainer._scrollY
+                            if props.onRefresh then
+                                clipContainer._pullingToRefresh = clipContainer._scrollY >= refreshThreshold * 0.4
+                            end
+                        elseif newScrollY < -maxScroll then
+                            clipContainer._scrollY = -maxScroll + (newScrollY + maxScroll) * 0.4
+                            contentGroup.y = clipContainer._scrollY
+                            clipContainer._pullingToRefresh = false
+                        else
+                            clipContainer._scrollY = newScrollY
+                            contentGroup.y = newScrollY
+                            clipContainer._pullingToRefresh = false
+                        end
+                    end
+                end
+                return true
+
+            elseif event.phase == "ended" or event.phase == "cancelled" then
+                if not isDragging and startX then
+                    -- Tap: find pressable child
+                    local ex, ey = startX, startY
+                    local function findPressable(grp)
+                        if not grp or not grp.numChildren then return nil end
+                        for i = grp.numChildren, 1, -1 do
+                            local child = grp[i]
+                            if child and child.isVisible ~= false then
+                                local cb = child.contentBounds
+                                if cb and ex >= cb.xMin and ex <= cb.xMax
+                                   and ey >= cb.yMin and ey <= cb.yMax then
+                                    if child._onPress then return child end
+                                    local found = findPressable(child)
+                                    if found then return found end
+                                end
+                            end
+                        end
+                        return nil
+                    end
+                    local pressable = findPressable(contentGroup)
+                    if pressable then pressable._onPress(event) end
+                end
+
+                -- Snap back from overscroll
+                if not horizontal then
+                    local maxScroll = math.max(0, clipContainer._contentH - h)
+                    if clipContainer._pullingToRefresh and props.onRefresh then
+                        clipContainer._refreshing = true
+                        clipContainer._scrollY = refreshOffset
+                        contentGroup.y = refreshOffset
+                        props.onRefresh()
+                    elseif clipContainer._scrollY > 0 then
+                        clipContainer._scrollY = 0
+                        contentGroup.y = 0
+                    elseif clipContainer._scrollY < -maxScroll then
+                        clipContainer._scrollY = -maxScroll
+                        contentGroup.y = -maxScroll
+                    end
+                else
                     local maxScroll = math.max(0, clipContainer._contentW - w)
-                    newScrollX = math.max(-maxScroll, math.min(0, newScrollX))
+                    if clipContainer._scrollX > 0 then
+                        clipContainer._scrollX = 0
+                        contentGroup.x = 0
+                    elseif clipContainer._scrollX < -maxScroll then
+                        clipContainer._scrollX = -maxScroll
+                        contentGroup.x = -maxScroll
+                    end
+                end
+                clipContainer._pullingToRefresh = false
+                isDragging = false
+                return true
+            end
+            return false
+        end)
+
+        -- Mouse scroll wheel support (Mac trackpad two-finger scroll)
+        touchOverlay:addEventListener("mouse", function(event)
+            if event.type == "scroll" then
+                recalcContentSize()
+                local scrollSpeed = 20
+                if horizontal then
+                    local maxScroll = math.max(0, clipContainer._contentW - w)
+                    local newScrollX = clipContainer._scrollX - event.scrollX * scrollSpeed
+                    if newScrollX > 0 then newScrollX = 0 end
+                    if newScrollX < -maxScroll then newScrollX = -maxScroll end
                     clipContainer._scrollX = newScrollX
                     contentGroup.x = newScrollX
                 else
-                    local dy = event.y - startY
-                    local newScrollY = startScrollY + dy
-
-                    -- Pull-to-refresh: allow overscroll past top when onRefresh is set
-                    if props.onRefresh and newScrollY > 0 then
-                        -- Apply rubber-band resistance (overscroll is dampened)
-                        local overscroll = newScrollY
-                        local dampened = overscroll * 0.4
-                        clipContainer._scrollY = dampened
-                        contentGroup.y = dampened
-                        clipContainer._pullingToRefresh = dampened >= refreshThreshold * 0.4
-                    else
-                        local maxScroll = math.max(0, clipContainer._contentH - h)
-                        newScrollY = math.max(-maxScroll, math.min(0, newScrollY))
-                        clipContainer._scrollY = newScrollY
-                        contentGroup.y = newScrollY
-                        clipContainer._pullingToRefresh = false
-                    end
+                    local maxScroll = math.max(0, clipContainer._contentH - h)
+                    local newScrollY = clipContainer._scrollY + event.scrollY * scrollSpeed
+                    if newScrollY > 0 then newScrollY = 0 end
+                    if newScrollY < -maxScroll then newScrollY = -maxScroll end
+                    clipContainer._scrollY = newScrollY
+                    contentGroup.y = newScrollY
                 end
-                if props.onScroll then
-                    props.onScroll({
-                        contentOffset = {
-                            x = -clipContainer._scrollX,
-                            y = -clipContainer._scrollY,
-                        }
-                    })
-                end
-            elseif event.phase == "ended" or event.phase == "cancelled" then
-                if display.currentStage and display.currentStage.setFocus then
-                    display.currentStage:setFocus(nil)
-                end
-                if not startY then return true end
-
-                -- Pull-to-refresh: trigger callback and snap back
-                if not horizontal and clipContainer._pullingToRefresh and props.onRefresh then
-                    clipContainer._refreshing = true
-                    -- Snap to refreshing offset position
-                    clipContainer._scrollY = refreshOffset
-                    contentGroup.y = refreshOffset
-                    props.onRefresh()
-                elseif not horizontal and clipContainer._scrollY > 0 then
-                    -- Snap back to top (overscrolled but below threshold)
-                    clipContainer._scrollY = 0
-                    contentGroup.y = 0
-                end
-                clipContainer._pullingToRefresh = false
             end
             return true
         end)
 
         applyCommonStyle(clipContainer, style)
-        wireEvents(clipContainer, props)
         return clipContainer
 
     elseif elementType == "TextInput" then
@@ -430,17 +541,58 @@ function M.createInstance(elementType, props)
         group.anchorX, group.anchorY = 0, 0
 
         local source = props.source
-        local filename = (type(source) == "table") and source.uri or source or ""
+        local uri = (type(source) == "table") and source.uri or source or ""
         local w = style.width or 100
         local h = style.height or 100
         local resizeMode = props.resizeMode or style.resizeMode or "cover"
 
-        local img = display.newImageRect(group, filename, w, h)
-        if img then
-            img.anchorX, img.anchorY = 0, 0
+        if uri:match("^https?://") then
+            -- Remote image: placeholder + async download
+            local bg = display.newRect(group, 0, 0, w, h)
+            bg.anchorX, bg.anchorY = 0, 0
+            bg:setFillColor(0.93, 0.93, 0.95)
+            if style.borderRadius and style.borderRadius > 0 then
+                -- Use rounded rect instead
+                bg:removeSelf()
+                bg = display.newRoundedRect(group, 0, 0, w, h, style.borderRadius)
+                bg.anchorX, bg.anchorY = 0, 0
+                bg:setFillColor(0.93, 0.93, 0.95)
+            end
+            group._bg = bg
+
+            local fname = "rimg_" .. tostring(math.random(100000, 999999)) .. ".jpg"
+            network.download(uri, "GET", function(event)
+                if event.isError then return end
+                if event.phase == "ended" then
+                    if not group or group.removeSelf == nil then return end
+                    -- Load at natural size, then scale to fit (contain mode)
+                    local img = display.newImage(group, fname, system.TemporaryDirectory)
+                    if img then
+                        local natW, natH = img.width, img.height
+                        if natW > 0 and natH > 0 then
+                            local sc = math.min(w / natW, h / natH)
+                            img.width = natW * sc
+                            img.height = natH * sc
+                        else
+                            img.width = w
+                            img.height = h
+                        end
+                        img.anchorX, img.anchorY = 0, 0
+                        img.x, img.y = 0, 0
+                        if bg and bg.removeSelf then bg:removeSelf() end
+                        group._imageObj = img
+                    end
+                end
+            end, {}, fname, system.TemporaryDirectory)
+        else
+            -- Local file
+            local img = display.newImageRect(group, uri, w, h)
+            if img then
+                img.anchorX, img.anchorY = 0, 0
+            end
+            group._imageObj = img
         end
 
-        group._imageObj = img
         group._resizeMode = resizeMode
         applyCommonStyle(group, style)
         wireEvents(group, props)
@@ -476,6 +628,21 @@ function M.appendChild(parent, child)
     else
         parent:insert(child)
     end
+
+    -- Manual centering: without Yoga, justifyContent/alignItems don't work.
+    -- If the parent View has centering styles and known dimensions, center the child.
+    if parent._centerChildren and child.contentWidth then
+        local pw = parent._viewW or 0
+        local ph = parent._viewH or 0
+        local cw = child.contentWidth or child.width or 0
+        local ch = child.contentHeight or child.height or 0
+        if parent._alignItems == "center" and pw > 0 and cw > 0 then
+            child.x = (pw - cw) / 2
+        end
+        if parent._justifyContent == "center" and ph > 0 and ch > 0 then
+            child.y = (ph - ch) / 2
+        end
+    end
 end
 
 function M.removeChild(parent, child)
@@ -497,8 +664,8 @@ function M.updateInstance(instance, oldProps, newProps)
     local oldStyle = oldProps.style or {}
     local newStyle = newProps.style or {}
 
-    -- Background rect updates
-    if instance._bg then
+    -- Background rect updates (check removeSelf hasn't been called)
+    if instance._bg and instance._bg.removeSelf and instance._bg.path then
         if newStyle.backgroundColor then
             local c = parseColor(newStyle.backgroundColor)
             instance._bg:setFillColor(c[1], c[2], c[3], c[4])
@@ -522,10 +689,10 @@ function M.updateInstance(instance, oldProps, newProps)
             instance._textObj.size = newStyle.fontSize
         end
 
-        -- Font or alignment change requires recreating text object
+        -- Font, alignment, or width change requires recreating text object
         local oldFont = resolveFont(oldStyle)
         local newFont = resolveFont(newStyle)
-        if oldFont ~= newFont or (oldStyle.textAlign ~= newStyle.textAlign) then
+        if oldFont ~= newFont or (oldStyle.textAlign ~= newStyle.textAlign) or (oldStyle.width ~= newStyle.width) then
             local oldTextObj = instance._textObj
             local newTextObj = display.newText({
                 parent = instance,

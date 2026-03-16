@@ -40,24 +40,29 @@ function M.useState(initialValue)
 
     -- Initialize on first render
     if hooks[idx] == nil then
-        hooks[idx] = { state = initialValue, queue = {} }
+        hooks[idx] = { state = initialValue, queue = {}, queueLen = 0 }
     end
 
     local hook = hooks[idx]
 
-    -- Process queued updates
-    for _, update in ipairs(hook.queue) do
-        if type(update) == "function" then
-            hook.state = update(hook.state)
-        else
-            hook.state = update
+    -- Process queued updates (values wrapped in {v=...} to handle nil)
+    for i = 1, hook.queueLen or 0 do
+        local entry = hook.queue[i]
+        if entry and type(entry.v) == "function" then
+            hook.state = entry.v(hook.state)
+        elseif entry then
+            hook.state = entry.v
         end
     end
     hook.queue = {}
+    hook.queueLen = 0
 
     local fiber = currentFiber
     local function setState(newValue)
-        table.insert(hook.queue, newValue)
+        -- Wrap in table to support nil values (table.insert ignores nil)
+        local len = (hook.queueLen or 0) + 1
+        hook.queue[len] = { v = newValue }
+        hook.queueLen = len
         -- Schedule re-render (reconciler will call this)
         if fiber._scheduleUpdate then
             fiber._scheduleUpdate(fiber)
@@ -72,19 +77,25 @@ function M.useReducer(reducer, initialState)
     local hooks = currentFiber._hooks
 
     if hooks[idx] == nil then
-        hooks[idx] = { state = initialState, queue = {} }
+        hooks[idx] = { state = initialState, queue = {}, queueLen = 0 }
     end
 
     local hook = hooks[idx]
 
-    for _, action in ipairs(hook.queue) do
-        hook.state = reducer(hook.state, action)
+    for i = 1, hook.queueLen or 0 do
+        local entry = hook.queue[i]
+        if entry then
+            hook.state = reducer(hook.state, entry.v)
+        end
     end
     hook.queue = {}
+    hook.queueLen = 0
 
     local fiber = currentFiber
     local function dispatch(action)
-        table.insert(hook.queue, action)
+        local len = (hook.queueLen or 0) + 1
+        hook.queue[len] = { v = action }
+        hook.queueLen = len
         if fiber._scheduleUpdate then
             fiber._scheduleUpdate(fiber)
         end

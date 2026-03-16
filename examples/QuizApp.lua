@@ -555,9 +555,12 @@ local function QuizScreen(props)
     local timeLeft, setTimeLeft = useState(diffInfo.time)
     local timerRef = useRef(nil)
 
-    local question = questions[currentQ]
-    local letters = { "A", "B", "C", "D" }
     local total = #questions
+    -- Guard: clamp currentQ to valid range (state updates may push it past bounds)
+    if currentQ > total then currentQ = total end
+    local question = questions[currentQ]
+    if not question then return nil end
+    local letters = { "A", "B", "C", "D" }
 
     -- 倒计时
     useEffect(function()

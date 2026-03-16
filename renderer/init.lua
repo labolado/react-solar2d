@@ -69,8 +69,8 @@ local function applyLayout(yogaNode, fiber)
         local l, t, w, h = yogaNode:getLayout()
         fiber.stateNode.x = l
         fiber.stateNode.y = t
-        -- Update size for bg rect if present
-        if fiber.stateNode._bg then
+        -- Update size for bg rect if present (guard against removed objects)
+        if fiber.stateNode._bg and fiber.stateNode._bg.removeSelf and fiber.stateNode._bg.path then
             fiber.stateNode._bg.path.width = w
             fiber.stateNode._bg.path.height = h
         end
