@@ -118,17 +118,42 @@ local function addBorderSide(group, side, width, color, viewW, viewH)
 end
 
 local function wireEvents(instance, props)
+    -- Determine feedback style
+    local feedbackType = props._touchFeedback -- "opacity" or nil
+    local activeOpacity = props._activeOpacity or 0.4
+
+    -- Press feedback via transition.to (reliable — runs after tap fires)
+    local function flashFeedback()
+        if not feedbackType then return end
+        if not instance or not instance.removeSelf then return end
+        -- Cancel any in-flight feedback transition
+        if instance._feedbackTransition then
+            transition.cancel(instance._feedbackTransition)
+        end
+        local origAlpha = instance.alpha or 1
+        -- Animate: dim + shrink, then restore
+        instance.alpha = activeOpacity
+        instance.xScale = 0.95
+        instance.yScale = 0.95
+        instance._feedbackTransition = transition.to(instance, {
+            time = 120,
+            alpha = origAlpha,
+            xScale = 1, yScale = 1,
+            onComplete = function()
+                instance._feedbackTransition = nil
+            end,
+        })
+    end
+
     if props.onPress then
         instance._onPress = props.onPress
-        -- Use 'tap' event on the actual display object (_bg rect or _textObj).
-        -- 'tap' is independent of 'touch' events, so it doesn't interfere with
-        -- ScrollView scrolling (which uses touch+setFocus). Solar2D automatically
-        -- suppresses tap when the finger moves significantly (scroll gesture).
+        -- Use 'tap' event — independent of 'touch', doesn't interfere with ScrollView
         local target = instance._bg or instance._textObj or instance
         if target == instance then
             instance.isHitTestable = true
         end
         target:addEventListener("tap", function(event)
+            flashFeedback()
             props.onPress(event)
             return true
         end)
@@ -147,35 +172,6 @@ local function wireEvents(instance, props)
                 if longPressTimer then timer.cancel(longPressTimer); longPressTimer = nil end
             end
             return true
-        end)
-    end
-
-    if props._touchFeedback == "opacity" then
-        local activeOpacity = props._activeOpacity or 0.2
-        local target = instance._bg or instance._textObj or instance
-        if target == instance then
-            instance.isHitTestable = true
-        end
-        target:addEventListener("touch", function(event)
-            if event.phase == "began" then
-                instance._origAlpha = instance.alpha
-                instance._origScaleX = instance.xScale
-                instance._origScaleY = instance.yScale
-                instance.alpha = activeOpacity
-                instance.xScale = (instance._origScaleX or 1) * 0.95
-                instance.yScale = (instance._origScaleY or 1) * 0.95
-            elseif event.phase == "ended" or event.phase == "cancelled" then
-                -- Slight delay so feedback is visible even on quick taps
-                local inst = instance
-                timer.performWithDelay(50, function()
-                    if inst and inst.removeSelf then
-                        inst.alpha = inst._origAlpha or 1
-                        inst.xScale = inst._origScaleX or 1
-                        inst.yScale = inst._origScaleY or 1
-                    end
-                end)
-            end
-            return false -- don't consume; let tap (onPress) fire
         end)
     end
 end
