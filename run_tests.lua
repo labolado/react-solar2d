@@ -26,6 +26,13 @@ local testFiles = {
     "tests/components/test_scrollview.lua",
     "tests/components/test_flatlist.lua",
     "tests/components/test_textinput.lua",
+    "tests/components/test_window_calc.lua",
+    "tests/react/test_context.lua",
+    "tests/navigation/test_state.lua",
+    "tests/navigation/test_stack.lua",
+    "tests/navigation/test_tab.lua",
+    "tests/navigation/test_drawer.lua",
+    "tests/navigation/test_deeplink.lua",
     "tests/integration/test_full_render.lua",
 }
 
