@@ -27,6 +27,20 @@ local function createScrollView(props, style, applyCommonStyle)
     clipContainer._contentH = 0
     clipContainer._contentW = 0
 
+    local function fireOnScroll()
+        if props.onScroll then
+            if horizontal then
+                props.onScroll({
+                    contentOffset = { x = clipContainer._scrollX, y = 0 },
+                })
+            else
+                props.onScroll({
+                    contentOffset = { x = 0, y = clipContainer._scrollY },
+                })
+            end
+        end
+    end
+
     local refreshThreshold = 80
     local refreshOffset = 50
     clipContainer._refreshing = props.refreshing or false
@@ -112,6 +126,7 @@ local function createScrollView(props, style, applyCommonStyle)
                     end
                 end
             end
+            fireOnScroll()
             return true
 
         elseif event.phase == "ended" or event.phase == "cancelled" then
@@ -164,6 +179,7 @@ local function createScrollView(props, style, applyCommonStyle)
                 end
             end
             clipContainer._pullingToRefresh = false
+            fireOnScroll()
             isDragging = false
             return true
         end
@@ -190,6 +206,7 @@ local function createScrollView(props, style, applyCommonStyle)
                 clipContainer._scrollY = newScrollY
                 contentGroup.y = newScrollY
             end
+            fireOnScroll()
         end
         return true
     end)
