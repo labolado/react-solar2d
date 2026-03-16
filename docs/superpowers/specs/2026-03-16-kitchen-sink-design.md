@@ -10,6 +10,8 @@ NavigationContainer → BottomTabNavigator (6 tabs) → each tab has a StackNavi
 
 **Entry:** `examples/KitchenSinkApp.lua`, registered as a Screen in `examples/main.lua` TabNavigator.
 
+**Container nesting constraint:** Solar2D limits Container (clipping) nesting to 3 levels. All navigators (Tab, Stack) use Group-based rendering (no clipping), so the nesting depth Tab → Stack → embedded Stack/Drawer is safe. Only Views with `overflow: "hidden"` use Containers — demo content should avoid deep clipping nesting.
+
 ## Tab Layout
 
 | Tab | Icon | Label | Screens |
@@ -90,7 +92,8 @@ Total: 23 demo screens + 6 list screens = 29 screens.
 - Size toggle: "small" / "large" / custom number
 - Color picker (3-4 color options)
 - animating toggle (on/off switch)
-- Demonstrates: ActivityIndicator, size, color, animating, Switch
+- Auto-hide after 3 seconds using useTimeout, then re-show
+- Demonstrates: ActivityIndicator, size, color, animating, Switch, useTimeout
 
 ### Tab 3: Lists (列表)
 
@@ -171,7 +174,8 @@ Total: 23 demo screens + 6 list screens = 29 screens.
 - Pulsing opacity loop
 - Start/stop controls
 - Loop with iterations=3 (finite)
-- Demonstrates: Animated.loop, iterations, start/stop
+- useInterval-driven counter that ticks every second alongside the animation
+- Demonstrates: Animated.loop, iterations, start/stop, useInterval
 
 ### Tab 6: Interop (互操作)
 
@@ -218,15 +222,17 @@ Total: 23 demo screens + 6 list screens = 29 screens.
 | `examples/kitchen_sink/NavigationScreens.lua` | 3 navigation demo screens |
 | `examples/kitchen_sink/AnimationScreens.lua` | 5 animation demo screens |
 | `examples/kitchen_sink/InteropScreens.lua` | 2 interop demo screens |
+| `examples/kitchen_sink/theme.lua` | Shared color constants and spacing values |
 | `examples/main.lua` | Add KitchenSink as 4th tab |
 
 Each `*Screens.lua` file exports a table of `{ name, component, description, icon }` entries. The root app reads these to build list pages and register stack screens.
 
 ## What's NOT Included
 
-- No hooks-specific demo pages (hooks demonstrated naturally in every screen via useState, useEffect, useRef, useMemo)
+- No hooks-specific demo pages (hooks demonstrated naturally: useState everywhere, useEffect in interop/animation, useRef in lists, useMemo in navigation, useInterval in LoopDemo, useTimeout in ActivityIndicatorDemo)
 - No StyleSheet/Color demo page (styles demonstrated everywhere)
-- No Context/useContext page (used implicitly by navigation)
+- No createContext/useContext standalone page (used implicitly by navigation system; the outer app shell is itself a Tab Navigator demo)
+- No useLayoutEffect page (identical to useEffect in Solar2D's single-threaded model)
 - No DeepLinking demo (launch-time only, not interactive)
 - No useReducer standalone demo (overkill for showcase — used if a demo naturally needs it)
 
