@@ -168,11 +168,16 @@ local contextCounter = 0
 
 function M.createContext(defaultValue)
     contextCounter = contextCounter + 1
-    return {
-        _id = contextCounter,
+    local id = contextCounter
+    local context = {
+        _id = id,
         _defaultValue = defaultValue,
-        Provider = function() end, -- placeholder, reconciler handles
     }
+    context.Provider = {
+        _isProvider = true,
+        _contextId = id,
+    }
+    return context
 end
 
 function M.useContext(context)

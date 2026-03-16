@@ -74,7 +74,14 @@ function M.create(hostConfig)
                 local elementType = element.type
 
                 if old and old.type == elementType then
-                    local tag = type(elementType) == "function" and "function" or "host"
+                    local tag
+                    if type(elementType) == "function" then
+                        tag = "function"
+                    elseif type(elementType) == "table" and elementType._isProvider then
+                        tag = "function"  -- Provider handled in performUnitOfWork
+                    else
+                        tag = "host"
+                    end
                     newFiber = FiberNode.createFiber(tag, elementType, element.key, element.props)
                     newFiber.stateNode = old.stateNode
                     newFiber.alternate = old
@@ -82,7 +89,14 @@ function M.create(hostConfig)
                     newFiber.effectTag = "UPDATE"
                     oldChildren[key] = nil
                 else
-                    local tag = type(elementType) == "function" and "function" or "host"
+                    local tag
+                    if type(elementType) == "function" then
+                        tag = "function"
+                    elseif type(elementType) == "table" and elementType._isProvider then
+                        tag = "function"  -- Provider handled in performUnitOfWork
+                    else
+                        tag = "host"
+                    end
                     newFiber = FiberNode.createFiber(tag, elementType, element.key, element.props)
                     newFiber.effectTag = "PLACEMENT"
                     if old then
@@ -119,9 +133,30 @@ function M.create(hostConfig)
             Hooks._setCurrentFiber(fiber)
             Hooks._resetHookIndex()
             fiber._scheduleUpdate = scheduleUpdate
-            local children = fiber.type(fiber.props)
-            Hooks._finishHooks()
-            reconcileChildren(fiber, children)
+
+            local elementType = fiber.type
+            if type(elementType) == "table" and elementType._isProvider then
+                -- Context.Provider — store value on fiber for useContext
+                local contextId = elementType._contextId
+                local parentCtx = {}
+                local p = fiber.parent
+                while p do
+                    if p._contextValues then
+                        for k, v in pairs(p._contextValues) do
+                            if parentCtx[k] == nil then parentCtx[k] = v end
+                        end
+                    end
+                    p = p.parent
+                end
+                parentCtx[contextId] = fiber.props.value
+                fiber._contextValues = parentCtx
+                Hooks._finishHooks()
+                reconcileChildren(fiber, fiber.props.children)
+            else
+                local children = fiber.type(fiber.props)
+                Hooks._finishHooks()
+                reconcileChildren(fiber, children)
+            end
         elseif fiber.tag == "host" then
             if not fiber.stateNode then
                 fiber.stateNode = hostConfig.createInstance(fiber.type, fiber.props)
