@@ -7,10 +7,19 @@ local function parseColor(color)
 
     if color:sub(1, 1) == "#" then
         local hex = color:sub(2)
-        local r = tonumber(hex:sub(1, 2), 16) / 255
-        local g = tonumber(hex:sub(3, 4), 16) / 255
-        local b = tonumber(hex:sub(5, 6), 16) / 255
-        local a = #hex >= 8 and (tonumber(hex:sub(7, 8), 16) / 255) or 1
+        -- Expand 3/4-char shorthand (#RGB / #RGBA → #RRGGBB / #RRGGBBAA)
+        if #hex == 3 or #hex == 4 then
+            local expanded = ""
+            for i = 1, #hex do
+                local c = hex:sub(i, i)
+                expanded = expanded .. c .. c
+            end
+            hex = expanded
+        end
+        local r = (tonumber(hex:sub(1, 2), 16) or 0) / 255
+        local g = (tonumber(hex:sub(3, 4), 16) or 0) / 255
+        local b = (tonumber(hex:sub(5, 6), 16) or 0) / 255
+        local a = #hex >= 8 and ((tonumber(hex:sub(7, 8), 16) or 255) / 255) or 1
         return {r, g, b, a}
     end
 

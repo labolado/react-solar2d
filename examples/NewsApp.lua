@@ -1,820 +1,686 @@
 -- examples/NewsApp.lua
--- 商业级新闻浏览器 — 模拟联网、大数据、下拉刷新、图文混排、分类筛选、详情页
+-- Modern Tech News Reader — premium design, not HN clone
 local React = require("react")
+local json = require("json")
 local createElement = React.createElement
 local useState = React.useState
 local useEffect = React.useEffect
-local useRef = React.useRef
-local useCallback = React.useCallback
-local useMemo = React.useMemo
 
 local W = display.contentWidth
 local H = display.contentHeight
-local SCALE = W / 1536  -- adaptive scaling: 1.0 on iPad, ~0.62 on iPhone
+local SCALE = W / 1536
 local function s(v) return math.floor(v * SCALE + 0.5) end
 
--- ============================================================
--- 数据层：模拟 API 和大数据集
--- ============================================================
+-- Safe area
+local SAFE_TOP = 0
+if display.safeScreenOriginY and display.screenOriginY then
+    SAFE_TOP = math.abs(display.safeScreenOriginY - display.screenOriginY)
+end
+if SAFE_TOP < s(40) then SAFE_TOP = s(40) end
 
-local CATEGORIES = { "全部", "推荐", "技术", "教育", "设计", "科学", "生活" }
+-- ============================================================
+-- Network
+-- ============================================================
+local HN = "https://hacker-news.firebaseio.com/v0"
 
-local CATEGORY_COLORS = {
-    ["推荐"] = { bg = "#FFF8E1", text = "#FF8F00", icon = "*" },
-    ["技术"] = { bg = "#E3F2FD", text = "#1565C0", icon = "T" },
-    ["教育"] = { bg = "#E8F5E9", text = "#2E7D32", icon = "E" },
-    ["设计"] = { bg = "#FCE4EC", text = "#AD1457", icon = "D" },
-    ["科学"] = { bg = "#EDE7F6", text = "#4527A0", icon = "S" },
-    ["生活"] = { bg = "#FFF3E0", text = "#E65100", icon = "L" },
+local function fetchJSON(url, cb)
+    network.request(url, "GET", function(e)
+        if e.phase == "ended" and not e.isError then
+            local ok, data = pcall(json.decode, e.response)
+            if ok and data then cb(data) else cb(nil) end
+        elseif e.isError then cb(nil) end
+    end)
+end
+
+local function timeAgo(t)
+    local d = os.time() - (t or 0)
+    if d < 60 then return "just now"
+    elseif d < 3600 then return math.floor(d / 60) .. "m"
+    elseif d < 86400 then return math.floor(d / 3600) .. "h"
+    else return math.floor(d / 86400) .. "d" end
+end
+
+local function domain(url)
+    if not url then return nil end
+    local d = url:match("https?://([^/]+)")
+    if d then d = d:gsub("^www%.", "") end
+    return d
+end
+
+local function storyTag(item)
+    if not item then return nil end
+    local t = item.title or ""
+    if t:find("^Show HN") then return { label = "SHOW", bg = "#00C853", text = "#FFFFFF" }
+    elseif t:find("^Ask HN") then return { label = "ASK", bg = "#2979FF", text = "#FFFFFF" }
+    elseif t:find("^Tell HN") then return { label = "TELL", bg = "#FF6D00", text = "#FFFFFF" }
+    elseif t:find("^Launch HN") then return { label = "NEW", bg = "#D500F9", text = "#FFFFFF" }
+    end
+    return nil
+end
+
+-- Score to heat color
+local function scoreColor(score)
+    if score >= 300 then return "#FF1744"  -- red hot
+    elseif score >= 200 then return "#FF6D00"  -- orange
+    elseif score >= 100 then return "#FF9100"  -- amber
+    elseif score >= 50 then return "#FFC400"   -- yellow
+    else return "#90A4AE" end  -- cool gray
+end
+
+local FEEDS = {
+    { key = "top",  label = "Hot",     icon = "~" },
+    { key = "best", label = "Best",    icon = "*" },
+    { key = "new",  label = "New",     icon = "+" },
+    { key = "ask",  label = "Ask",     icon = "?" },
+    { key = "show", label = "Show",    icon = "!" },
 }
 
--- 生成大量新闻数据 (模拟后端返回)
-local function generateNewsDatabase()
-    local titles = {
-        { t = "React-Solar2D 正式发布 1.0：AI 生成 UI 的新纪元", c = "技术", featured = true },
-        { t = "Solar2D 3.0 带来 Metal 渲染：性能提升 200%", c = "技术", featured = true },
-        { t = "Lua 语言入选 2026 年度编程语言 Top 10", c = "技术" },
-        { t = "儿童创意应用市场年增长 40%，物理引擎类最受欢迎", c = "教育", featured = true },
-        { t = "Flexbox 布局完全指南：从入门到精通", c = "技术" },
-        { t = "Yoga 布局引擎深度解析：跨平台 UI 的秘密", c = "技术" },
-        { t = "2026 移动应用设计趋势：简洁、动效与个性化", c = "设计", featured = true },
-        { t = "如何用 React Hooks 构建高性能状态管理", c = "技术" },
-        { t = "STEM 教育革命：编程从娃娃抓起的全球实践", c = "教育" },
-        { t = "色彩心理学在 UI 设计中的应用指南", c = "设计" },
-        { t = "量子计算突破：首次实现 1000 量子比特纠缠", c = "科学", featured = true },
-        { t = "极简主义设计的回归：Less is More 的现代诠释", c = "设计" },
-        { t = "深度学习在自然语言处理中的最新进展", c = "科学" },
-        { t = "远程工作 2.0：数字游牧的生活指南", c = "生活" },
-        { t = "开源社区的力量：2026 年最具影响力的开源项目", c = "技术" },
-        { t = "蒙特梭利教育法与数字化学习的融合之路", c = "教育" },
-        { t = "响应式设计的未来：从屏幕到空间计算", c = "设计" },
-        { t = "火星探测最新发现：地下水源确认存在", c = "科学", featured = true },
-        { t = "正念冥想：科技从业者的压力管理指南", c = "生活" },
-        { t = "WebAssembly 性能突破：接近原生执行速度", c = "技术" },
-        { t = "AI 辅助教学：个性化学习路径的智能设计", c = "教育" },
-        { t = "暗模式设计规范：不只是换个颜色那么简单", c = "设计" },
-        { t = "基因编辑技术 CRISPR 3.0 获 FDA 批准", c = "科学" },
-        { t = "数字排毒：如何建立健康的屏幕时间习惯", c = "生活" },
-        { t = "Rust 语言在嵌入式开发中的崛起", c = "技术" },
-        { t = "游戏化学习：让孩子爱上数学的 10 种方法", c = "教育" },
-        { t = "动态排版：让文字成为设计的主角", c = "设计" },
-        { t = "核聚变实验取得里程碑式进展", c = "科学" },
-        { t = "高效能人士的 7 个数字工具推荐", c = "生活" },
-        { t = "微服务架构最佳实践：从混乱到秩序", c = "技术" },
-        { t = "创客教育：3D 打印在课堂中的 100 种用法", c = "教育" },
-        { t = "无障碍设计不是可选项：构建包容性产品", c = "设计" },
-        { t = "太空旅游商业化：2027 年首趟月球轨道之旅", c = "科学" },
-        { t = "城市农场：在阳台上种菜的完整指南", c = "生活" },
-        { t = "GraphQL vs REST：2026 年 API 选型指南", c = "技术" },
-        { t = "双语教育的认知优势：最新神经科学研究", c = "教育" },
-        { t = "3D 界面设计：超越平面的交互体验", c = "设计" },
-        { t = "海洋生物多样性保护取得重大突破", c = "科学" },
-        { t = "慢生活哲学：在快节奏世界中找到平衡", c = "生活" },
-        { t = "Edge Computing 边缘计算改变 IoT 格局", c = "技术" },
-        { t = "编程思维训练：逻辑能力培养的系统方法", c = "教育" },
-        { t = "设计系统构建指南：从组件到生态", c = "设计" },
-        { t = "可控核聚变离商用还有多远？", c = "科学" },
-        { t = "极简数字生活：只用 5 个 App 的 30 天挑战", c = "生活" },
-        { t = "容器编排最新进展：Kubernetes 2.0 前瞻", c = "技术" },
-        { t = "项目制学习 PBL：芬兰教育成功的秘密", c = "教育" },
-        { t = "声音设计：被忽视的用户体验维度", c = "设计" },
-        { t = "暗物质研究新线索：粒子物理的重大发现", c = "科学" },
-        { t = "四季养生食谱：跟着节气吃出健康", c = "生活" },
-        { t = "零信任安全架构：企业防护的新范式", c = "技术" },
-    }
-
-    local summaries = {
-        "这项突破性成果引发了业界广泛关注，专家认为这将深刻改变相关领域的发展方向。",
-        "最新研究表明，这一技术已经具备了大规模商用的基本条件，预计将在未来两年内普及。",
-        "来自全球顶尖研究机构的团队历时三年完成了这项成果，论文已发表在顶级期刊上。",
-        "行业分析师指出，这一趋势将持续加速，预计到 2028 年市场规模将达到千亿级别。",
-        "多位领域专家在接受采访时表示，这标志着一个新时代的开始，影响将是深远的。",
-        "该项目的成功经验已被多个国家和地区借鉴，成为全球范围内的标杆案例。",
-        "通过大量实验数据的支撑，研究团队证实了这一方法的有效性和可靠性。",
-        "社区反响热烈，短短一周内相关讨论已超过十万条，开发者们纷纷表达了期待。",
-    }
-
-    local times = {
-        "刚刚", "3 分钟前", "15 分钟前", "1 小时前", "2 小时前",
-        "3 小时前", "5 小时前", "8 小时前", "12 小时前",
-        "1 天前", "1 天前", "2 天前", "2 天前", "3 天前", "3 天前",
-        "4 天前", "5 天前", "6 天前", "1 周前", "1 周前",
-    }
-
-    local articles = {}
-    for i, item in ipairs(titles) do
-        articles[#articles + 1] = {
-            id = tostring(i),
-            title = item.t,
-            category = item.c,
-            featured = item.featured or false,
-            summary = summaries[(i - 1) % #summaries + 1],
-            time = times[(i - 1) % #times + 1],
-            readCount = math.random(100, 99999),
-            commentCount = math.random(0, 999),
-            liked = false,
-            read = false,
-            -- 模拟图片（用颜色块代替）
-            imageColor = string.format("#%02X%02X%02X",
-                math.random(60, 200), math.random(60, 200), math.random(60, 200)),
-        }
-    end
-    return articles
-end
-
--- 模拟网络请求
-local function simulateFetch(callback, delay)
-    if timer and timer.performWithDelay then
-        timer.performWithDelay(delay or 800, function()
-            callback()
-        end)
-    else
-        callback()
-    end
-end
-
--- 格式化数字 (10000 → 1.0万)
-local function formatCount(n)
-    if n >= 10000 then
-        return string.format("%.1f万", n / 10000)
-    end
-    return tostring(n)
-end
+local FEED_EPS = {
+    top = "/topstories.json",
+    best = "/beststories.json",
+    new = "/newstories.json",
+    ask = "/askstories.json",
+    show = "/showstories.json",
+}
 
 -- ============================================================
--- 组件
+-- Components
 -- ============================================================
 
--- 骨架屏加载占位
-local function SkeletonCard(props)
-    return createElement("View", {
-        style = {
-            marginHorizontal = s(32),
-            marginBottom = s(20),
-            padding = s(28),
-            backgroundColor = "#FFFFFF",
-            borderRadius = s(16),
-        },
-    },
-        -- Title skeleton
-        createElement("View", {
-            style = {
-                height = s(28),
-                width = W * 0.7,
-                backgroundColor = "#F0F0F0",
-                borderRadius = s(6),
-                marginBottom = s(12),
-            },
-        }),
-        -- Second line
-        createElement("View", {
-            style = {
-                height = s(28),
-                width = W * 0.5,
-                backgroundColor = "#F0F0F0",
-                borderRadius = s(6),
-                marginBottom = s(20),
-            },
-        }),
-        -- Summary skeleton
-        createElement("View", {
-            style = {
-                height = s(20),
-                width = W * 0.85,
-                backgroundColor = "#F5F5F5",
-                borderRadius = s(4),
-                marginBottom = s(8),
-            },
-        }),
-        createElement("View", {
-            style = {
-                height = s(20),
-                width = W * 0.6,
-                backgroundColor = "#F5F5F5",
-                borderRadius = s(4),
-            },
-        })
-    )
-end
-
--- 加载中界面
-local function LoadingScreen()
-    local skeletons = {}
-    for i = 1, 6 do
-        skeletons[#skeletons + 1] = createElement(SkeletonCard, { key = "sk_" .. i })
-    end
-    return createElement("View", {
-        style = { flex = 1, paddingTop = s(20) },
-    }, unpack(skeletons))
-end
-
--- 分类标签栏
-local function CategoryTabs(props)
-    local tabs = {}
-    for i, cat in ipairs(CATEGORIES) do
-        local isActive = cat == props.active
-        tabs[#tabs + 1] = createElement("View", {
-            key = "cat_" .. i,
-            style = {
-                paddingHorizontal = s(28),
-                paddingVertical = s(14),
-                borderRadius = s(24),
-                backgroundColor = isActive and "#1976D2" or "transparent",
-                marginRight = s(8),
-            },
-            onPress = function()
-                props.onSelect(cat)
-            end,
-        },
-            createElement("Text", {
-                style = {
-                    fontSize = s(28),
-                    color = isActive and "#FFFFFF" or "#666666",
-                    fontWeight = isActive and "bold" or "normal",
-                },
-            }, cat)
-        )
-    end
-
-    return createElement("ScrollView", {
-        style = {
-            height = s(64),
-            width = W,
-        },
-        horizontal = true,
-    },
-        createElement("View", {
-            style = {
-                flexDirection = "row",
-                alignItems = "center",
-                paddingHorizontal = s(24),
-                height = s(64),
-            },
-        }, unpack(tabs))
-    )
-end
-
--- 特色新闻卡片（大图）
-local function FeaturedCard(props)
+-- Featured hero card (first story)
+local function HeroCard(props)
     local item = props.item
-    local catInfo = CATEGORY_COLORS[item.category] or { bg = "#F5F5F5", text = "#666", icon = "N" }
-
-    return createElement("View", {
-        style = {
-            marginHorizontal = s(32),
-            marginBottom = s(24),
-            borderRadius = s(24),
-            backgroundColor = "#FFFFFF",
-            overflow = "hidden",
-        },
-        onPress = props.onPress,
-    },
-        -- 大图区域（用颜色块模拟）
-        createElement("View", {
-            style = {
-                width = W - s(64),
-                height = s(360),
-                backgroundColor = item.imageColor,
-                justifyContent = "flex-end",
-                padding = s(24),
-            },
-        },
-            -- 半透明遮罩
-            createElement("View", {
-                style = {
-                    position = "absolute",
-                    bottom = 0, left = 0,
-                    width = W - s(64), height = s(180),
-                    backgroundColor = "rgba(0,0,0,0.4)",
-                },
-            }),
-            -- 图片上的标题
-            createElement("Text", {
-                style = {
-                    fontSize = s(38),
-                    color = "#FFFFFF",
-                    fontWeight = "bold",
-                    zIndex = 10,
-                },
-            }, item.title)
-        ),
-        -- 底部信息
-        createElement("View", {
-            style = {
-                padding = s(24),
-                flexDirection = "row",
-                justifyContent = "space-between",
-                alignItems = "center",
-            },
-        },
-            createElement("View", {
-                style = {
-                    flexDirection = "row",
-                    alignItems = "center",
-                },
-            },
-                createElement("View", {
-                    style = {
-                        backgroundColor = catInfo.bg,
-                        borderRadius = s(8),
-                        paddingHorizontal = s(14),
-                        paddingVertical = s(4),
-                        marginRight = s(12),
-                    },
-                },
-                    createElement("Text", {
-                        style = { fontSize = s(22), color = catInfo.text, fontWeight = "bold" },
-                    }, catInfo.icon .. " " .. item.category)
-                ),
-                createElement("Text", {
-                    style = { fontSize = s(22), color = "#BDBDBD" },
-                }, item.time)
-            ),
-            createElement("View", {
-                style = { flexDirection = "row", alignItems = "center", gap = s(16) },
-            },
-                createElement("Text", {
-                    style = { fontSize = s(22), color = "#BDBDBD" },
-                }, "R: " .. formatCount(item.readCount)),
-                createElement("Text", {
-                    style = { fontSize = s(22), color = "#BDBDBD" },
-                }, "C: " .. formatCount(item.commentCount))
-            )
-        )
-    )
-end
-
--- 普通新闻卡片（缩略图）
-local function NewsCard(props)
-    local item = props.item
-    local catInfo = CATEGORY_COLORS[item.category] or { bg = "#F5F5F5", text = "#666", icon = "N" }
-    local isRead = item.read
-
-    return createElement("View", {
-        style = {
-            marginHorizontal = s(32),
-            marginBottom = s(16),
-            padding = s(24),
-            backgroundColor = "#FFFFFF",
-            borderRadius = s(16),
-            flexDirection = "row",
-        },
-        onPress = props.onPress,
-    },
-        -- 文字区域
-        createElement("View", {
-            style = {
-                flex = 1,
-                marginRight = s(16),
-                justifyContent = "space-between",
-            },
-        },
-            -- 标题
-            createElement("Text", {
-                style = {
-                    fontSize = s(32),
-                    color = isRead and "#999999" or "#212121",
-                    fontWeight = "bold",
-                    marginBottom = s(8),
-                },
-            }, item.title),
-            -- 底部元信息
-            createElement("View", {
-                style = {
-                    flexDirection = "row",
-                    alignItems = "center",
-                    gap = s(12),
-                },
-            },
-                createElement("View", {
-                    style = {
-                        backgroundColor = catInfo.bg,
-                        borderRadius = s(6),
-                        paddingHorizontal = s(10),
-                        paddingVertical = s(3),
-                    },
-                },
-                    createElement("Text", {
-                        style = { fontSize = s(20), color = catInfo.text },
-                    }, item.category)
-                ),
-                createElement("Text", {
-                    style = { fontSize = s(20), color = "#BDBDBD" },
-                }, item.time),
-                createElement("Text", {
-                    style = { fontSize = s(20), color = "#BDBDBD" },
-                }, formatCount(item.readCount) .. " 阅读")
-            )
-        ),
-        -- 缩略图（颜色块模拟）
-        createElement("View", {
-            style = {
-                width = s(160),
-                height = s(120),
-                borderRadius = s(12),
-                backgroundColor = item.imageColor,
-            },
-        })
-    )
-end
-
--- 文章详情页
-local function ArticleDetail(props)
-    local item = props.article
     if not item then return nil end
-    local catInfo = CATEGORY_COLORS[item.category] or { bg = "#F5F5F5", text = "#666", icon = "N" }
+    local d = domain(item.url)
+    local sc = scoreColor(item.score or 0)
+    local tag = storyTag(item)
 
-    -- 生成模拟正文段落
-    local paragraphs = {
-        item.summary,
-        "在当今快速发展的科技领域，这一进展无疑具有里程碑式的意义。多位行业专家在接受采访时表示，这将深刻影响未来几年的发展方向。",
-        "据了解，该项目历经多年研发，投入了大量人力和资源。研究团队克服了诸多技术难题，最终取得了这一突破性成果。",
-        "\"这是一个令人振奋的时刻，\" 项目负责人在发布会上表示，\"我们的目标不仅是技术创新，更是要让这项技术真正服务于社会。\"",
-        "业内分析人士指出，随着这一技术的成熟和推广，相关产业链将迎来新一轮增长。预计到 2028 年，市场规模将达到数百亿元。",
-        "然而，也有专家提醒，在快速发展的同时，需要关注潜在的风险和挑战。如何在创新与安全之间找到平衡，将是未来需要持续探讨的课题。",
-        "无论如何，这一成果的取得标志着一个新阶段的开始。我们有理由相信，在全球研究者的共同努力下，更多令人期待的突破即将到来。",
-    }
-
-    local contentChildren = {}
-    -- 返回按钮
-    contentChildren[#contentChildren + 1] = createElement("View", {
-        key = "back_btn",
+    return createElement("View", {
         style = {
-            flexDirection = "row",
-            alignItems = "center",
-            paddingHorizontal = s(32),
-            paddingVertical = s(20),
+            marginHorizontal = s(16), marginBottom = s(16),
+            backgroundColor = "#1A1A2E", borderRadius = s(20),
+            padding = s(24),
+            borderWidth = 2, borderColor = sc,
         },
-        onPress = props.onBack,
+        onPress = props.onPress,
     },
-        createElement("Text", {
-            style = { fontSize = s(32), color = "#1976D2" },
-        }, "← 返回")
-    )
-
-    -- 大图
-    contentChildren[#contentChildren + 1] = createElement("View", {
-        key = "hero_img",
-        style = {
-            width = W,
-            height = s(480),
-            backgroundColor = item.imageColor,
-        },
-    })
-
-    -- 标题区域
-    contentChildren[#contentChildren + 1] = createElement("View", {
-        key = "title_area",
-        style = {
-            padding = s(32),
-            paddingBottom = s(16),
-        },
-    },
-        -- 类别 + 时间
+        -- Top row: tag + score
         createElement("View", {
-            style = {
-                flexDirection = "row",
-                alignItems = "center",
-                marginBottom = s(16),
-                gap = s(12),
-            },
+            style = { flexDirection = "row", alignItems = "center", marginBottom = s(16) },
         },
-            createElement("View", {
+            tag and createElement("View", {
                 style = {
-                    backgroundColor = catInfo.bg,
-                    borderRadius = s(10),
-                    paddingHorizontal = s(16),
-                    paddingVertical = s(6),
+                    backgroundColor = tag.bg, borderRadius = s(6),
+                    paddingHorizontal = s(12), paddingVertical = s(4),
+                    marginRight = s(10),
                 },
             },
                 createElement("Text", {
-                    style = { fontSize = s(24), color = catInfo.text, fontWeight = "bold" },
-                }, catInfo.icon .. " " .. item.category)
+                    style = { fontSize = s(16), color = tag.text, fontWeight = "bold" },
+                }, tag.label)
+            ) or nil,
+            createElement("View", {
+                style = {
+                    backgroundColor = sc, borderRadius = s(6),
+                    paddingHorizontal = s(12), paddingVertical = s(4),
+                },
+            },
+                createElement("Text", {
+                    style = { fontSize = s(16), color = "#FFFFFF", fontWeight = "bold" },
+                }, tostring(item.score or 0) .. " pts")
+            ),
+            createElement("View", { style = { flex = 1 } }),
+            createElement("Text", {
+                style = { fontSize = s(16), color = "#6C7A89" },
+            }, "#1 TRENDING")
+        ),
+        -- Title
+        createElement("Text", {
+            style = {
+                fontSize = s(36), color = "#FFFFFF",
+                fontWeight = "bold", marginBottom = s(12),
+            },
+        }, item.title or ""),
+        -- Domain
+        d and createElement("Text", {
+            style = { fontSize = s(20), color = sc, marginBottom = s(12) },
+        }, d) or nil,
+        -- Bottom meta
+        createElement("View", {
+            style = { flexDirection = "row", alignItems = "center" },
+        },
+            createElement("Text", {
+                style = { fontSize = s(18), color = "#8899AA", marginRight = s(14) },
+            }, item.by or ""),
+            createElement("Text", {
+                style = { fontSize = s(18), color = "#556677", marginRight = s(14) },
+            }, timeAgo(item.time)),
+            (item.descendants or 0) > 0 and createElement("Text", {
+                style = { fontSize = s(18), color = "#7788FF" },
+            }, tostring(item.descendants) .. " comments") or nil
+        )
+    )
+end
+
+-- Regular story card
+local function StoryCard(props)
+    local item = props.item
+    local idx = props.index
+    if not item then return nil end
+
+    local d = domain(item.url)
+    local tag = storyTag(item)
+    local score = item.score or 0
+    local sc = scoreColor(score)
+    local isHot = score >= 100
+
+    return createElement("View", {
+        style = {
+            marginHorizontal = s(16),
+            marginBottom = s(10),
+            backgroundColor = "#FFFFFF",
+            borderRadius = s(14),
+            borderWidth = 1,
+            borderColor = isHot and sc or "#EAEAEF",
+        },
+        onPress = props.onPress,
+    },
+        createElement("View", {
+            style = { flexDirection = "row", padding = s(16) },
+        },
+            -- Score indicator (left column)
+            createElement("View", {
+                style = {
+                    width = s(56), alignItems = "center",
+                    marginRight = s(14), paddingTop = s(2),
+                },
+            },
+                createElement("View", {
+                    style = {
+                        width = s(48), height = s(48),
+                        borderRadius = s(24),
+                        backgroundColor = isHot and sc or "#F0F2F5",
+                        justifyContent = "center", alignItems = "center",
+                    },
+                },
+                    createElement("Text", {
+                        style = {
+                            fontSize = s(18),
+                            color = isHot and "#FFFFFF" or "#888888",
+                            fontWeight = "bold",
+                        },
+                    }, tostring(score))
+                ),
+                createElement("Text", {
+                    style = { fontSize = s(14), color = "#BBBBBB", marginTop = s(4) },
+                }, "#" .. tostring(idx))
+            ),
+            -- Content (right column)
+            createElement("View", {
+                style = { flex = 1 },
+            },
+                -- Tag + domain row
+                (tag or d) and createElement("View", {
+                    style = { flexDirection = "row", alignItems = "center", marginBottom = s(6) },
+                },
+                    tag and createElement("View", {
+                        style = {
+                            backgroundColor = tag.bg, borderRadius = s(4),
+                            paddingHorizontal = s(8), paddingVertical = s(2),
+                            marginRight = s(8),
+                        },
+                    },
+                        createElement("Text", {
+                            style = { fontSize = s(14), color = tag.text, fontWeight = "bold" },
+                        }, tag.label)
+                    ) or nil,
+                    d and createElement("Text", {
+                        style = { fontSize = s(16), color = "#AAAAAA" },
+                    }, d) or nil
+                ) or nil,
+                -- Title
+                createElement("Text", {
+                    style = {
+                        fontSize = s(24), color = "#222222",
+                        fontWeight = "bold",
+                    },
+                }, item.title or ""),
+                -- Meta
+                createElement("View", {
+                    style = { flexDirection = "row", alignItems = "center", marginTop = s(8) },
+                },
+                    createElement("Text", {
+                        style = { fontSize = s(16), color = "#999999", marginRight = s(10) },
+                    }, item.by or ""),
+                    createElement("Text", {
+                        style = { fontSize = s(16), color = "#CCCCCC", marginRight = s(10) },
+                    }, timeAgo(item.time)),
+                    (item.descendants or 0) > 0 and createElement("Text", {
+                        style = { fontSize = s(16), color = "#7788FF" },
+                    }, tostring(item.descendants) .. " replies") or nil
+                )
+            )
+        )
+    )
+end
+
+-- Section header
+local function SectionHeader(props)
+    return createElement("View", {
+        style = {
+            paddingHorizontal = s(20), paddingVertical = s(10),
+            flexDirection = "row", alignItems = "center",
+        },
+    },
+        createElement("View", {
+            style = { width = s(4), height = s(24), backgroundColor = "#FF6600", borderRadius = s(2), marginRight = s(10) },
+        }),
+        createElement("Text", {
+            style = { fontSize = s(20), color = "#888888", fontWeight = "bold" },
+        }, props.title or "")
+    )
+end
+
+-- Loading skeleton
+local function Skeleton()
+    local items = {}
+    for i = 1, 5 do
+        items[#items + 1] = createElement("View", {
+            key = "sk" .. i,
+            style = {
+                marginHorizontal = s(16), marginBottom = s(10),
+                backgroundColor = "#FFFFFF", borderRadius = s(14),
+                padding = s(16), flexDirection = "row",
+            },
+        },
+            createElement("View", { style = { width = s(48), height = s(48), borderRadius = s(24), backgroundColor = "#F0F2F5", marginRight = s(14) } }),
+            createElement("View", { style = { flex = 1 } },
+                createElement("View", { style = { height = s(16), width = s(100), backgroundColor = "#F0F2F5", borderRadius = s(4), marginBottom = s(8) } }),
+                createElement("View", { style = { height = s(20), width = s(400), backgroundColor = "#F0F2F5", borderRadius = s(4), marginBottom = s(6) } }),
+                createElement("View", { style = { height = s(20), width = s(300), backgroundColor = "#F5F6F8", borderRadius = s(4), marginBottom = s(8) } }),
+                createElement("View", { style = { height = s(14), width = s(200), backgroundColor = "#F8F9FA", borderRadius = s(4) } })
+            )
+        )
+    end
+    return createElement("View", {}, unpack(items))
+end
+
+-- Bottom nav bar
+local function BottomNav(props)
+    local tabs = {}
+    for i, f in ipairs(FEEDS) do
+        local active = f.key == props.active
+        tabs[#tabs + 1] = createElement("View", {
+            key = "nav" .. i,
+            style = {
+                flex = 1, alignItems = "center",
+                paddingVertical = s(8),
+            },
+            onPress = function() props.onSelect(f.key) end,
+        },
+            createElement("View", {
+                style = {
+                    width = s(40), height = s(40),
+                    borderRadius = s(20),
+                    backgroundColor = active and "#FF6600" or "#F0F2F5",
+                    justifyContent = "center", alignItems = "center",
+                    marginBottom = s(4),
+                },
+            },
+                createElement("Text", {
+                    style = {
+                        fontSize = s(20),
+                        color = active and "#FFFFFF" or "#AAAAAA",
+                        fontWeight = "bold",
+                    },
+                }, f.icon)
             ),
             createElement("Text", {
-                style = { fontSize = s(24), color = "#BDBDBD" },
-            }, item.time)
-        ),
-        -- 标题
-        createElement("Text", {
-            style = {
-                fontSize = s(44),
-                color = "#212121",
-                fontWeight = "bold",
-                lineHeight = s(60),
-            },
-        }, item.title),
-        -- 统计
-        createElement("View", {
-            style = {
-                flexDirection = "row",
-                marginTop = s(16),
-                gap = s(24),
-            },
-        },
-            createElement("Text", {
-                style = { fontSize = s(24), color = "#9E9E9E" },
-            }, "R: " .. formatCount(item.readCount) .. " 阅读"),
-            createElement("Text", {
-                style = { fontSize = s(24), color = "#9E9E9E" },
-            }, "C: " .. formatCount(item.commentCount) .. " 评论")
-        ),
-        -- 分割线
-        createElement("View", {
-            style = {
-                height = 1,
-                backgroundColor = "#EEEEEE",
-                marginTop = s(24),
-            },
-        })
-    )
-
-    -- 正文段落
-    for i, para in ipairs(paragraphs) do
-        contentChildren[#contentChildren + 1] = createElement("View", {
-            key = "para_" .. i,
-            style = {
-                paddingHorizontal = s(32),
-                marginBottom = s(24),
-            },
-        },
-            createElement("Text", {
                 style = {
-                    fontSize = s(32),
-                    color = "#424242",
-                    lineHeight = s(52),
+                    fontSize = s(16),
+                    color = active and "#FF6600" or "#AAAAAA",
+                    fontWeight = active and "bold" or "normal",
                 },
-            }, "　　" .. para)
+            }, f.label)
         )
     end
-
-    -- 底部间距
-    contentChildren[#contentChildren + 1] = createElement("View", {
-        key = "bottom_spacer",
-        style = { height = s(100) },
-    })
-
     return createElement("View", {
         style = {
-            position = "absolute",
-            top = 0, left = 0,
-            width = W, height = H,
-            backgroundColor = "#FFFFFF",
-            zIndex = 50,
+            position = "absolute", bottom = 0, left = 0, width = W,
+            height = s(90), backgroundColor = "#FFFFFF",
+            flexDirection = "row", alignItems = "center",
+            borderTopWidth = 1, borderTopColor = "#EAEAEF",
+            paddingBottom = s(10),
         },
-    },
-        createElement("ScrollView", {
-            style = { width = W, height = H },
-        }, unpack(contentChildren))
-    )
+    }, unpack(tabs))
 end
 
--- 下拉刷新指示器
-local function RefreshIndicator(props)
-    if not props.visible then return nil end
-    return createElement("View", {
-        style = {
-            height = s(60),
-            justifyContent = "center",
-            alignItems = "center",
-        },
-    },
-        createElement("Text", {
-            style = { fontSize = s(24), color = "#999999" },
-        }, props.refreshing and "正在刷新..." or "下拉刷新")
-    )
-end
+-- Story detail page
+local function DetailPage(props)
+    local item = props.story
+    if not item then return nil end
+    local d = domain(item.url)
+    local tag = storyTag(item)
+    local sc = scoreColor(item.score or 0)
+    local bodyText = item.text and (item.text:gsub("<[^>]+>", ""):gsub("&#x27;", "'"):gsub("&amp;", "&"):gsub("&lt;", "<"):gsub("&gt;", ">"):gsub("&quot;", "\"")) or nil
 
--- 加载更多指示器
-local function LoadMoreIndicator(props)
-    if not props.visible then return nil end
-    return createElement("View", {
-        style = {
-            height = s(80),
-            justifyContent = "center",
-            alignItems = "center",
-            paddingVertical = s(20),
-        },
-    },
-        createElement("Text", {
-            style = { fontSize = s(24), color = "#BDBDBD" },
-        }, props.loading and "加载中..." or (props.hasMore and "上拉加载更多" or "— 没有更多了 —"))
-    )
-end
+    local detailItems = {}
+    detailItems[#detailItems + 1] = createElement("View", { key = "dtop", style = { height = s(12) } })
 
--- 导航栏
-local function NavBar(props)
-    return createElement("View", {
+    -- Hero card
+    detailItems[#detailItems + 1] = createElement("View", {
+        key = "dhero",
         style = {
-            height = s(130),
-            backgroundColor = "#1976D2",
-            flexDirection = "row",
-            justifyContent = "space-between",
-            alignItems = "flex-end",
-            paddingHorizontal = s(32),
-            paddingBottom = s(16),
+            marginHorizontal = s(16), marginBottom = s(12),
+            padding = s(24), backgroundColor = "#1A1A2E",
+            borderRadius = s(16),
         },
     },
-        createElement("Text", {
-            style = {
-                fontSize = s(48),
-                color = "#FFFFFF",
-                fontWeight = "bold",
-            },
-        }, "新闻"),
+        -- Tag + Score
         createElement("View", {
-            style = { flexDirection = "row", gap = s(20), alignItems = "center" },
+            style = { flexDirection = "row", alignItems = "center", marginBottom = s(14) },
+        },
+            tag and createElement("View", {
+                style = {
+                    backgroundColor = tag.bg, borderRadius = s(6),
+                    paddingHorizontal = s(12), paddingVertical = s(4),
+                    marginRight = s(10),
+                },
+            },
+                createElement("Text", {
+                    style = { fontSize = s(16), color = tag.text, fontWeight = "bold" },
+                }, tag.label)
+            ) or nil,
+            createElement("View", {
+                style = {
+                    backgroundColor = sc, borderRadius = s(6),
+                    paddingHorizontal = s(12), paddingVertical = s(4),
+                },
+            },
+                createElement("Text", {
+                    style = { fontSize = s(16), color = "#FFFFFF", fontWeight = "bold" },
+                }, tostring(item.score or 0) .. " pts")
+            )
+        ),
+        -- Title
+        createElement("Text", {
+            style = { fontSize = s(34), color = "#FFFFFF", fontWeight = "bold" },
+        }, item.title or ""),
+        -- Domain
+        d and createElement("Text", {
+            style = { fontSize = s(22), color = sc, marginTop = s(10) },
+        }, d) or nil,
+        -- Meta
+        createElement("View", {
+            style = { flexDirection = "row", marginTop = s(14) },
+        },
+            createElement("Text", { style = { fontSize = s(18), color = "#8899AA", marginRight = s(14) } },
+                "by " .. (item.by or "?")),
+            createElement("Text", { style = { fontSize = s(18), color = "#556677", marginRight = s(14) } },
+                timeAgo(item.time)),
+            createElement("Text", { style = { fontSize = s(18), color = "#7788FF" } },
+                tostring(item.descendants or 0) .. " comments")
+        )
+    )
+
+    -- URL
+    if item.url then
+        detailItems[#detailItems + 1] = createElement("View", {
+            key = "durl",
+            style = {
+                marginHorizontal = s(16), marginBottom = s(12),
+                padding = s(20), backgroundColor = "#FFFFFF",
+                borderRadius = s(14), borderWidth = 1, borderColor = "#EAEAEF",
+            },
         },
             createElement("Text", {
-                style = { fontSize = s(24), color = "rgba(255,255,255,0.7)" },
-            }, tostring(props.totalCount) .. " 篇文章")
+                style = { fontSize = s(16), color = "#AAAAAA", marginBottom = s(6) },
+            }, "SOURCE"),
+            createElement("Text", {
+                style = { fontSize = s(20), color = "#2979FF" },
+            }, item.url)
         )
-    )
-end
-
--- ============================================================
--- 主应用
--- ============================================================
-
-local function NewsApp()
-    -- 状态管理
-    local allArticles, setAllArticles = useState({})
-    local isLoading, setIsLoading = useState(true)
-    local isRefreshing, setIsRefreshing = useState(false)
-    local isLoadingMore, setIsLoadingMore = useState(false)
-    local activeCategory, setActiveCategory = useState("全部")
-    local displayCount, setDisplayCount = useState(10)
-    local selectedArticle, setSelectedArticle = useState(nil)
-    local readArticles, setReadArticles = useState({})
-
-    -- 初始加载
-    useEffect(function()
-        simulateFetch(function()
-            math.randomseed(os.time())
-            setAllArticles(generateNewsDatabase())
-            setIsLoading(false)
-            print("[NewsApp] Loaded " .. 50 .. " articles")
-        end, 1200)
-    end, {})
-
-    -- 下拉刷新
-    local function handleRefresh()
-        setIsRefreshing(true)
-        print("[NewsApp] Refreshing...")
-        simulateFetch(function()
-            math.randomseed(os.time())
-            setAllArticles(generateNewsDatabase())
-            setDisplayCount(10)
-            setIsRefreshing(false)
-            print("[NewsApp] Refresh complete")
-        end, 1000)
     end
 
-    -- 加载更多
-    local function handleLoadMore()
-        if isLoadingMore then return end
-        setIsLoadingMore(true)
-        print("[NewsApp] Loading more...")
-        simulateFetch(function()
-            setDisplayCount(function(c) return c + 10 end)
-            setIsLoadingMore(false)
-        end, 600)
-    end
-
-    -- 过滤文章
-    local filteredArticles = {}
-    for _, article in ipairs(allArticles) do
-        if activeCategory == "全部" or activeCategory == "推荐" and article.featured or article.category == activeCategory then
-            filteredArticles[#filteredArticles + 1] = article
-        end
-    end
-
-    -- 分页
-    local displayArticles = {}
-    local maxDisplay = math.min(displayCount, #filteredArticles)
-    for i = 1, maxDisplay do
-        displayArticles[i] = filteredArticles[i]
-    end
-    local hasMore = maxDisplay < #filteredArticles
-
-    -- 打开文章
-    local function openArticle(article)
-        -- 标记已读
-        article.read = true
-        article.readCount = article.readCount + 1
-        setSelectedArticle(article)
-        print("[NewsApp] Opened: " .. article.title)
-    end
-
-    -- 加载中状态
-    if isLoading then
-        return createElement("View", {
-            style = { flex = 1, width = W, height = H, backgroundColor = "#F5F5F5" },
+    -- Body
+    if bodyText then
+        detailItems[#detailItems + 1] = createElement("View", {
+            key = "dbody",
+            style = {
+                marginHorizontal = s(16), marginBottom = s(12),
+                padding = s(24), backgroundColor = "#FFFFFF",
+                borderRadius = s(14), borderWidth = 1, borderColor = "#EAEAEF",
+            },
         },
-            createElement(NavBar, { totalCount = 0 }),
-            createElement(LoadingScreen)
+            createElement("Text", {
+                style = { fontSize = s(22), color = "#333333" },
+            }, bodyText)
         )
     end
+    detailItems[#detailItems + 1] = createElement("View", { key = "dpad", style = { height = s(80) } })
 
-    -- 构建文章列表
-    local listChildren = {}
-
-    -- 刷新指示器
-    listChildren[#listChildren + 1] = createElement(RefreshIndicator, {
-        key = "refresh",
-        visible = isRefreshing,
-        refreshing = isRefreshing,
-    })
-
-    -- 间距
-    listChildren[#listChildren + 1] = createElement("View", {
-        key = "top_spacer",
-        style = { height = s(16) },
-    })
-
-    -- 文章卡片
-    for i, article in ipairs(displayArticles) do
-        if article.featured and activeCategory ~= "推荐" and i <= 3 then
-            listChildren[#listChildren + 1] = createElement(FeaturedCard, {
-                key = "art_" .. article.id,
-                item = article,
-                onPress = function() openArticle(article) end,
-            })
-        else
-            listChildren[#listChildren + 1] = createElement(NewsCard, {
-                key = "art_" .. article.id,
-                item = article,
-                onPress = function() openArticle(article) end,
-            })
-        end
-    end
-
-    -- 加载更多
-    listChildren[#listChildren + 1] = createElement(LoadMoreIndicator, {
-        key = "load_more",
-        visible = true,
-        loading = isLoadingMore,
-        hasMore = hasMore,
-    })
-
-    -- 底部安全区
-    listChildren[#listChildren + 1] = createElement("View", {
-        key = "bottom_safe",
-        style = { height = s(40) },
-    })
-
-    local headerH = s(130) + s(64)
+    local topBarH = s(56) + SAFE_TOP
 
     return createElement("View", {
         style = {
-            flex = 1,
-            width = W, height = H,
-            backgroundColor = "#F5F5F5",
+            position = "absolute", top = 0, left = 0,
+            width = W, height = H, backgroundColor = "#F4F5F7",
         },
     },
-        -- 文章列表（先渲染，在底层）
+        -- Scroll (bottom z-layer)
         createElement("View", {
-            style = {
-                position = "absolute",
-                top = headerH, left = 0,
-                width = W,
-                height = H - headerH,
-            },
+            style = { position = "absolute", top = topBarH, left = 0, width = W, height = H - topBarH },
         },
             createElement("ScrollView", {
-                style = {
-                    width = W,
-                    height = H - headerH,
-                },
-                onRefresh = handleRefresh,
-                refreshing = isRefreshing,
-            }, unpack(listChildren))
+                style = { width = W, height = H - topBarH },
+            }, unpack(detailItems))
         ),
-        -- 导航栏（后渲染，在上层覆盖滚动内容）
-        createElement(NavBar, { totalCount = #filteredArticles }),
-        -- 分类标签栏
+        -- Top bar (top z-layer)
         createElement("View", {
             style = {
-                backgroundColor = "#FFFFFF",
-                borderBottomWidth = 1,
-                borderBottomColor = "#EEEEEE",
+                height = topBarH, paddingTop = SAFE_TOP,
+                backgroundColor = "#1A1A2E",
+                flexDirection = "row", alignItems = "center",
+                paddingHorizontal = s(16),
             },
         },
-            createElement(CategoryTabs, {
-                active = activeCategory,
-                onSelect = function(cat)
-                    setActiveCategory(cat)
-                    setDisplayCount(10)
-                    print("[NewsApp] Category: " .. cat)
-                end,
-            })
+            createElement("View", {
+                style = {
+                    paddingVertical = s(8), paddingHorizontal = s(14),
+                    backgroundColor = "rgba(255,255,255,0.1)", borderRadius = s(8),
+                },
+                onPress = props.onBack,
+            },
+                createElement("Text", {
+                    style = { fontSize = s(24), color = "#FF6600", fontWeight = "bold" },
+                }, "< Back")
+            ),
+            createElement("View", { style = { flex = 1 } }),
+            createElement("Text", {
+                style = { fontSize = s(20), color = "#8888AA" },
+            }, tostring(item.score or 0) .. " points")
+        )
+    )
+end
+
+-- ============================================================
+-- Main App
+-- ============================================================
+local function NewsApp()
+    local stories, setStories = useState({})
+    local loading, setLoading = useState(true)
+    local err, setErr = useState(nil)
+    local feed, setFeed = useState("top")
+    local detail, setDetail = useState(nil)
+    local subtitle, setSubtitle = useState("Loading...")
+
+    local function load(feedKey)
+        setLoading(true)
+        setErr(nil)
+        setStories({})
+        setSubtitle("Loading...")
+
+        fetchJSON(HN .. (FEED_EPS[feedKey] or "/topstories.json"), function(ids)
+            if not ids or #ids == 0 then
+                setErr("Could not reach Hacker News")
+                setLoading(false)
+                setSubtitle("Offline")
+                return
+            end
+
+            local n = math.min(25, #ids)
+            local loaded, count = {}, 0
+
+            for i = 1, n do
+                fetchJSON(HN .. "/item/" .. ids[i] .. ".json", function(story)
+                    if story then loaded[i] = story end
+                    count = count + 1
+                    setSubtitle(count .. "/" .. n)
+                    if count >= n then
+                        local result = {}
+                        for j = 1, n do
+                            if loaded[j] then result[#result + 1] = loaded[j] end
+                        end
+                        setStories(result)
+                        setLoading(false)
+                        setSubtitle(#result .. " stories")
+                    end
+                end)
+            end
+        end)
+    end
+
+    useEffect(function() load(feed) end, {})
+
+    local function switchFeed(k)
+        if k == feed then return end
+        setFeed(k)
+        load(k)
+    end
+
+    -- Build content
+    local listItems = {}
+    listItems[#listItems + 1] = createElement("View", { key = "toppad", style = { height = s(8) } })
+
+    if err then
+        listItems[#listItems + 1] = createElement("View", {
+            key = "err",
+            style = {
+                margin = s(16), padding = s(24),
+                backgroundColor = "#FFFFFF", borderRadius = s(14),
+                borderWidth = 1, borderColor = "#FF4444",
+                alignItems = "center",
+            },
+        },
+            createElement("Text", {
+                style = { fontSize = s(26), color = "#333333", fontWeight = "bold", marginBottom = s(8) },
+            }, "Connection Issue"),
+            createElement("Text", {
+                style = { fontSize = s(20), color = "#888888", marginBottom = s(16) },
+            }, err),
+            createElement("View", {
+                style = {
+                    backgroundColor = "#FF6600", borderRadius = s(10),
+                    paddingVertical = s(10), paddingHorizontal = s(28),
+                },
+                onPress = function() load(feed) end,
+            },
+                createElement("Text", {
+                    style = { fontSize = s(20), color = "#FFFFFF", fontWeight = "bold" },
+                }, "Retry")
+            )
+        )
+    end
+
+    if loading and #stories == 0 then
+        listItems[#listItems + 1] = createElement(Skeleton, { key = "skel" })
+    end
+
+    -- Hero card for first story
+    if #stories > 0 then
+        listItems[#listItems + 1] = createElement(HeroCard, {
+            key = "hero",
+            item = stories[1],
+            onPress = function() setDetail(stories[1]) end,
+        })
+        listItems[#listItems + 1] = createElement(SectionHeader, { key = "sh", title = "MORE STORIES" })
+    end
+
+    -- Regular cards for rest
+    for i = 2, #stories do
+        local s2 = stories[i]
+        listItems[#listItems + 1] = createElement(StoryCard, {
+            key = "s" .. (s2.id or i),
+            item = s2, index = i,
+            onPress = function() setDetail(s2) end,
+        })
+    end
+
+    listItems[#listItems + 1] = createElement("View", { key = "pad", style = { height = s(120) } })
+
+    -- Header height
+    local headerH = SAFE_TOP + s(72)
+
+    return createElement("View", {
+        style = { flex = 1, width = W, height = H, backgroundColor = "#F4F5F7" },
+    },
+        -- List (bottom z-layer)
+        createElement("View", {
+            style = { position = "absolute", top = headerH, left = 0, width = W, height = H - headerH - s(90) },
+        },
+            createElement("ScrollView", {
+                style = { width = W, height = H - headerH - s(90) },
+            }, unpack(listItems))
         ),
-        -- 文章详情（覆盖层）
-        selectedArticle and createElement(ArticleDetail, {
-            article = selectedArticle,
-            onBack = function()
-                setSelectedArticle(nil)
-            end,
+        -- Header (top z-layer)
+        createElement("View", {
+            style = {
+                height = headerH, paddingTop = SAFE_TOP,
+                backgroundColor = "#1A1A2E",
+                flexDirection = "row", alignItems = "center",
+                paddingHorizontal = s(24),
+            },
+        },
+            -- Logo
+            createElement("View", {
+                style = {
+                    width = s(42), height = s(42),
+                    backgroundColor = "#FF6600", borderRadius = s(10),
+                    justifyContent = "center", alignItems = "center",
+                    marginRight = s(12),
+                },
+            },
+                createElement("Text", {
+                    style = { fontSize = s(26), color = "#FFFFFF", fontWeight = "bold" },
+                }, "Y")
+            ),
+            createElement("View", { style = { flex = 1 } },
+                createElement("Text", {
+                    style = { fontSize = s(28), color = "#FFFFFF", fontWeight = "bold" },
+                }, "Tech News"),
+                createElement("Text", {
+                    style = { fontSize = s(16), color = "#6C7A89" },
+                }, subtitle)
+            ),
+            -- Refresh
+            createElement("View", {
+                style = {
+                    paddingVertical = s(8), paddingHorizontal = s(14),
+                    backgroundColor = "rgba(255,255,255,0.08)", borderRadius = s(8),
+                },
+                onPress = function() load(feed) end,
+            },
+                createElement("Text", {
+                    style = { fontSize = s(20), color = "#FF6600" },
+                }, "Refresh")
+            )
+        ),
+        -- Bottom nav
+        createElement(BottomNav, { active = feed, onSelect = switchFeed }),
+        -- Detail overlay
+        detail and createElement(DetailPage, {
+            story = detail,
+            onBack = function() setDetail(nil) end,
         }) or nil
     )
 end
