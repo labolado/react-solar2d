@@ -185,11 +185,27 @@ local function AppPickerDialog(props)
     )
 end
 
+-- Route: read .route file to jump directly to a specific demo
+-- Usage: echo "quiz" > examples/.route   then launch simulator
+local INITIAL_DEMO = "news"
+local routePath = system.pathForFile(".route", system.ResourceDirectory)
+if routePath then
+    local f = io.open(routePath, "r")
+    if f then
+        local route = f:read("*l")
+        f:close()
+        if route and route ~= "" and DEMO_COMPONENTS[route] then
+            INITIAL_DEMO = route
+            print("[ROUTE] Jumping to: " .. route)
+        end
+    end
+end
+
 -- ============================================================
 -- Root App (manages demo switching)
 -- ============================================================
 local function RootApp()
-    local currentDemo, setCurrentDemo = useState("news")
+    local currentDemo, setCurrentDemo = useState(INITIAL_DEMO)
     local showPicker, setShowPicker = useState(false)
 
     local DemoComponent = DEMO_COMPONENTS[currentDemo]
