@@ -8,6 +8,16 @@ local Navigation = require("navigation")
 local T = require("examples.kitchen_sink.theme")
 local RN = require("react_solar2d")
 
+-- Safe area
+local W = display and display.contentWidth or 320
+local SCALE = W / 1536
+local function s(v) return math.floor(v * SCALE + 0.5) end
+local SAFE_TOP = 0
+if display and display.safeScreenOriginY and display.screenOriginY then
+    SAFE_TOP = math.abs(display.safeScreenOriginY - display.screenOriginY)
+end
+if SAFE_TOP < s(40) then SAFE_TOP = s(40) end
+
 -- Safe require: if a screen module fails, log the error and use empty table
 local function safeRequire(mod)
     local ok, result = pcall(require, mod)
@@ -110,7 +120,8 @@ local function KitchenSinkApp()
             flexDirection = "row",
             backgroundColor = T.surface,
             paddingHorizontal = T.pad,
-            paddingVertical = 8,
+            paddingTop = SAFE_TOP + 8,
+            paddingBottom = 8,
             borderBottomWidth = 1,
             borderColor = T.border,
         },

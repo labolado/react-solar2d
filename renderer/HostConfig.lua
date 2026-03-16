@@ -151,7 +151,7 @@ local function wireEvents(instance, props)
             elseif event.phase == "ended" or event.phase == "cancelled" then
                 instance.alpha = instance._origAlpha or 1
             end
-            return true
+            return false -- don't consume; let tap (onPress) fire
         end)
     end
 end
