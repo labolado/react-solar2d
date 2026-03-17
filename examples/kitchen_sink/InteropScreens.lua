@@ -209,7 +209,119 @@ local function Solar2DInReactDemo()
     )
 end
 
+-- 3. AsyncStorageDemo
+-- Demonstrates @react-native-async-storage/async-storage
+local function AsyncStorageDemo()
+    local storageKey, setStorageKey = useState("")
+    local storageValue, setStorageValue = useState("")
+    local result, setResult = useState("")
+    local allKeys, setAllKeys = useState({})
+
+    local AsyncStorage = require("lib.async-storage")
+
+    local function refreshKeys()
+        local keys = AsyncStorage.getAllKeys()
+        setAllKeys(keys)
+    end
+
+    useEffect(function()
+        refreshKeys()
+    end, {})
+
+    local function handleSetItem()
+        if storageKey ~= "" and storageValue ~= "" then
+            AsyncStorage.setItem(storageKey, storageValue)
+            setResult("Set: " .. storageKey)
+            refreshKeys()
+        end
+    end
+
+    local function handleGetItem()
+        if storageKey ~= "" then
+            local value = AsyncStorage.getItem(storageKey)
+            setResult("Got: " .. tostring(value))
+        end
+    end
+
+    local function handleRemoveItem()
+        if storageKey ~= "" then
+            AsyncStorage.removeItem(storageKey)
+            setResult("Removed: " .. storageKey)
+            refreshKeys()
+        end
+    end
+
+    local function handleClear()
+        AsyncStorage.clear()
+        setResult("Cleared all")
+        refreshKeys()
+    end
+
+    return ce("ScrollView", {
+        style = { flex = 1, backgroundColor = T.bg },
+        contentContainerStyle = { padding = T.pad },
+    },
+        ce("Text", { style = { fontSize: 14, color: T.accent, marginBottom: 8 } },
+            "@react-native-async-storage/async-storage"),
+
+        -- Key input
+        ce("View", { style = { marginBottom: T.gap } },
+            ce("Text", { style = { fontSize: 12, color: T.textSecondary, marginBottom: 4 } }, "Key:"),
+            ce(RN.TextInput, {
+                style = { backgroundColor: T.surface, padding: 8, borderRadius: T.radius, color: T.textPrimary },
+                value = storageKey,
+                onChangeText = setStorageKey,
+                placeholder = "Enter key...",
+            })
+        ),
+
+        -- Value input
+        ce("View", { style = { marginBottom: T.gap } },
+            ce("Text", { style = { fontSize: 12, color: T.textSecondary, marginBottom: 4 } }, "Value:"),
+            ce(RN.TextInput, {
+                style = { backgroundColor: T.surface, padding: 8, borderRadius: T.radius, color: T.textPrimary },
+                value = storageValue,
+                onChangeText = setStorageValue,
+                placeholder = "Enter value...",
+            })
+        ),
+
+        -- Actions
+        ce("View", { style = { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: T.gap } },
+            ce(RN.Button, { title = "Set Item", color = T.accent, onPress = handleSetItem }),
+            ce(RN.Button, { title = "Get Item", color = "#2ECC71", onPress = handleGetItem }),
+            ce(RN.Button, { title = "Remove", color = "#E74C3C", onPress = handleRemoveItem }),
+            ce(RN.Button, { title = "Clear All", color = "#666", onPress = handleClear })
+        ),
+
+        -- Result
+        ce("View", { style = { backgroundColor: T.surface, padding: 12, borderRadius: T.radius, marginBottom: T.gap } },
+            ce("Text", { style = { fontSize: 14, color: T.textPrimary } },
+                result ~= "" and result or "(no result)"
+            )
+        ),
+
+        -- All keys
+        ce("Text", { style = { fontSize: 14, color: T.accent, marginBottom: 8 } }, "All Keys:"),
+        ce("View", { style = { backgroundColor: T.surface, padding: 12, borderRadius: T.radius } },
+            #allKeys > 0 and ce("View", {},
+                (function()
+                    local items = {}
+                    for i, key in ipairs(allKeys) do
+                        table.insert(items, ce("Text", {
+                            key = key,
+                            style = { fontSize: 12, color: T.textSecondary, marginBottom: 2 }
+                        }, "• " .. key))
+                    end
+                    return items
+                end)()
+            ) or ce("Text", { style = { fontSize: 12, color: T.textSecondary } }, "(empty)")
+        )
+    )
+end
+
 return {
     { name = "ReactInSolar", component = ReactInSolar2DDemo, description = "Native code hosts React subtree",     icon = "R" },
     { name = "Solar2DInReact", component = Solar2DInReactDemo, description = "React layout with native canvas", icon = "S" },
+    { name = "AsyncStorage", component = AsyncStorageDemo, description = "Local storage (@react-native-async-storage)", icon = "A" },
 }
