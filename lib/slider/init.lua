@@ -28,9 +28,6 @@ function M.Slider(props)
     local thumbSize = style.thumbSize or 20
     local trackWidth = style.width or 200
 
-    -- Internal state
-    local isDragging, setIsDragging = useState(false)
-
     -- Calculate thumb position from value
     local function getThumbPosition()
         local ratio = (value - minimumValue) / (maximumValue - minimumValue)
@@ -98,7 +95,7 @@ function M.Slider(props)
             justifyContent = "center",
         }
     },
-        -- Decrement button
+        -- Decrement button (no feedback for instant response)
         React.createElement("Pressable", {
             style = {
                 position = "absolute",
@@ -112,6 +109,7 @@ function M.Slider(props)
             },
             onPress = handleDecrement,
             disabled = disabled,
+            activeOpacity = 1.0,
         },
             React.createElement("Text", {
                 style = {
@@ -124,17 +122,18 @@ function M.Slider(props)
             }, "-")
         ),
 
-        -- Track background (with tap handler)
+        -- Track background (with tap handler, no feedback)
         React.createElement("Pressable", {
             style = {
                 position = "absolute",
                 left = 0,
                 right = 0,
-                height = trackHeight + 20, -- Larger hit area
+                height = trackHeight + 20,
                 justifyContent = "center",
             },
             onPress = handleTrackPress,
             disabled = disabled,
+            activeOpacity = 1.0,
         },
             -- Visual track background
             React.createElement("View", {
@@ -172,7 +171,7 @@ function M.Slider(props)
             })
         ),
 
-        -- Increment button
+        -- Increment button (no feedback for instant response)
         React.createElement("Pressable", {
             style = {
                 position = "absolute",
@@ -186,6 +185,7 @@ function M.Slider(props)
             },
             onPress = handleIncrement,
             disabled = disabled,
+            activeOpacity = 1.0,
         },
             React.createElement("Text", {
                 style = {

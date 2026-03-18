@@ -1,6 +1,6 @@
 -- lib/datetime-picker/init.lua
 -- @react-native-community/datetimepicker implementation for Solar2D
--- Date and time picker component using native text input
+-- Date and time picker component
 
 local M = {}
 
@@ -18,54 +18,33 @@ M.EventType = {
     DISMISSED = "dismissed",
 }
 
--- Parse date string to timestamp
-local function parseDate(dateStr, mode)
-    if not dateStr then return nil end
-
-    local year, month, day, hour, min
-
-    if mode == "date" then
-        -- Expected format: YYYY-MM-DD
-        year, month, day = dateStr:match("(%d%d%d%d)-(%d%d)-(%d%d)")
-        if year and month and day then
-            return os.time({
-                year = tonumber(year),
-                month = tonumber(month),
-                day = tonumber(day),
-            })
+-- Create wheel picker data
+local function createWheelData(min, max, pad)
+    local data = {}
+    for i = min, max do
+        local s = tostring(i)
+        if pad and i < 10 then
+            s = "0" .. s
         end
-    elseif mode == "time" then
-        -- Expected format: HH:MM
-        hour, min = dateStr:match("(%d%d):(%d%d)")
-        if hour and min then
-            local now = os.date("*t")
-            return os.time({
-                year = now.year,
-                month = now.month,
-                day = now.day,
-                hour = tonumber(hour),
-                min = tonumber(min),
-            })
-        end
-    else
-        -- datetime format: YYYY-MM-DDTHH:MM
-        year, month, day, hour, min = dateStr:match("(%d%d%d%d)-(%d%d)-(%d%d)T(%d%d):(%d%d)")
-        if year and month and day and hour and min then
-            return os.time({
-                year = tonumber(year),
-                month = tonumber(month),
-                day = tonumber(day),
-                hour = tonumber(hour),
-                min = tonumber(min),
-            })
-        end
+        table.insert(data, s)
     end
-
-    return nil
+    return data
 end
 
--- Format timestamp for display
-local function formatForDisplay(timestamp, mode)
+-- Get current date parts
+local function getDateParts(timestamp)
+    local t = os.date("*t", timestamp)
+    return {
+        year = t.year,
+        month = t.month,
+        day = t.day,
+        hour = t.hour,
+        min = t.min,
+    }
+end
+
+-- Format for display
+local function formatDisplay(timestamp, mode)
     if mode == "time" then
         return os.date("%H:%M", timestamp)
     elseif mode == "datetime" then
@@ -75,104 +54,222 @@ local function formatForDisplay(timestamp, mode)
     end
 end
 
--- Format timestamp for native input value
-local function formatForInput(timestamp, mode)
-    if mode == "time" then
-        return os.date("%H:%M", timestamp)
-    elseif mode == "datetime" then
-        return os.date("%Y-%m-%dT%H:%M", timestamp)
-    else
-        return os.date("%Y-%m-%d", timestamp)
-    end
+-- Build timestamp from parts
+local function buildTimestamp(parts)
+    return os.time({
+        year = parts.year,
+        month = parts.month,
+        day = parts.day,
+        hour = parts.hour or 0,
+        min = parts.min or 0,
+    })
 end
 
--- Create a date picker using native text field
+-- Simple picker using text input with increment/decrement buttons
 function M.DateTimePicker(props)
     local React = require("react")
     local useState = React.useState
-    local useCallback = React.useCallback
-    local useRef = React.useRef
+    local ce = React.createElement
 
     local value = props.value or os.time()
-    local mode = props.mode or "date" -- "date", "time", "datetime"
+    local mode = props.mode or "date"
     local onChange = props.onChange
     local disabled = props.disabled or false
     local style = props.style or {}
 
-    -- Input type based on mode
-    local inputType = "default"
-    if mode == "date" then
-        inputType = "date"
-    elseif mode == "time" then
-        inputType = "time"
-    elseif mode == "datetime" then
-        inputType = "datetime"
+    local minimumDate = props.minimumDate
+    local maximumDate = props.maximumDate
+
+    -- Local state for editing
+    local displayValue = formatDisplay(value, mode)
+    local inputText, setInputText = useState(displayValue)
+
+    -- Update input when value prop changes
+    React.useEffect(function()
+        setInputText(formatDisplay(value, mode))
+    end, {value, mode})
+
+    -- Parse and set value
+    local function tryParseAndSet(text)
+        local parts = getDateParts(value)
+        local valid = false
+
+        if mode == "date" then
+            -- Try YYYY-MM-DD
+            local y, m, d = text:match("^(%d%d%d%d)%-(%d%d)%-(%d%d)$")
+            if y and m and d then
+                parts.year = tonumber(y)
+                parts.month = tonumber(m)
+                parts.day = tonumber(d)
+                valid = true
+            end
+        elseif mode == "time" then
+            -- Try HH:MM
+            local h, mi = text:match("^(%d%d):(%d%d)$")
+            if h and mi then
+                parts.hour = tonumber(h)
+                parts.min = tonumber(mi)
+                valid = true
+            end
+        else
+            -- Try YYYY-MM-DD HH:MM
+            local y, m, d, h, mi = text:match("^(%d%d%d%d)%-(%d%d)%-(%d%d) (%d%d):(%d%d)$")
+            if y and m and d and h and mi then
+                parts.year = tonumber(y)
+                parts.month = tonumber(m)
+                parts.day = tonumber(d)
+                parts.hour = tonumber(h)
+                parts.min = tonumber(mi)
+                valid = true
+            end
+        end
+
+        if valid then
+            local newTs = buildTimestamp(parts)
+            -- Check bounds
+            if minimumDate and newTs < minimumDate then
+                newTs = minimumDate
+            end
+            if maximumDate and newTs > maximumDate then
+                newTs = maximumDate
+            end
+
+            if onChange then
+                onChange({
+                    type = M.EventType.SET,
+                    nativeEvent = { timestamp = newTs },
+                })
+            end
+            setInputText(formatDisplay(newTs, mode))
+        else
+            -- Invalid format, reset to current
+            setInputText(formatDisplay(value, mode))
+        end
     end
 
-    local handleChange = useCallback(function(text)
-        if disabled then return end
+    -- Increment/decrement helpers
+    local function adjustDate(field, delta)
+        local parts = getDateParts(value)
+        parts[field] = parts[field] + delta
+        local newTs = buildTimestamp(parts)
 
-        local newTimestamp = parseDate(text, mode)
-        if newTimestamp and onChange then
+        if minimumDate and newTs < minimumDate then
+            newTs = minimumDate
+        end
+        if maximumDate and newTs > maximumDate then
+            newTs = maximumDate
+        end
+
+        if onChange then
             onChange({
                 type = M.EventType.SET,
-                nativeEvent = {
-                    timestamp = newTimestamp,
-                },
+                nativeEvent = { timestamp = newTs },
             })
         end
-    end)
+    end
 
-    return React.createElement("View", {
+    local pickerHeight = style.height or 44
+
+    return ce("View", {
         style = {
             backgroundColor = style.backgroundColor or "#FFFFFF",
             borderWidth = style.borderWidth or 1,
             borderColor = style.borderColor or "#CCCCCC",
             borderRadius = style.borderRadius or 4,
-            padding = style.padding or 0,
             opacity = disabled and 0.5 or 1,
+            height = pickerHeight,
+            flexDirection = "row",
+            alignItems = "center",
         }
     },
-        React.createElement(require("react_solar2d").TextInput, {
+        -- Decrement button
+        ce("Pressable", {
             style = {
+                width = 36,
+                height = pickerHeight - 2,
+                justifyContent = "center",
+                alignItems = "center",
+                borderRightWidth = 1,
+                borderColor = "#EEEEEE",
+            },
+            onPress = function()
+                if disabled then return end
+                if mode == "date" then
+                    adjustDate("day", -1)
+                elseif mode == "time" then
+                    adjustDate("min", -1)
+                else
+                    adjustDate("hour", -1)
+                end
+            end,
+            activeOpacity = 0.7,
+        }, ce("Text", { style = { fontSize = 18, color = "#007AFF" } }, "-")),
+
+        -- Text input for direct editing
+        ce(require("react_solar2d").TextInput, {
+            style = {
+                flex = 1,
                 fontSize = style.fontSize or 16,
                 color = style.color or "#333333",
-                padding = 12,
-                height = 44,
+                textAlign = "center",
+                height = pickerHeight - 2,
+                padding = 0,
             },
-            value = formatForInput(value, mode),
-            onChangeText = handleChange,
+            value = inputText,
+            onChangeText = function(text)
+                setInputText(text)
+            end,
+            onEndEditing = function()
+                tryParseAndSet(inputText)
+            end,
             editable = not disabled,
-            placeholder = mode == "time" and "HH:MM" or (mode == "date" and "YYYY-MM-DD" or "YYYY-MM-DD HH:MM"),
-        })
+            returnKeyType = "done",
+        }),
+
+        -- Increment button
+        ce("Pressable", {
+            style = {
+                width = 36,
+                height = pickerHeight - 2,
+                justifyContent = "center",
+                alignItems = "center",
+                borderLeftWidth = 1,
+                borderColor = "#EEEEEE",
+            },
+            onPress = function()
+                if disabled then return end
+                if mode == "date" then
+                    adjustDate("day", 1)
+                elseif mode == "time" then
+                    adjustDate("min", 1)
+                else
+                    adjustDate("hour", 1)
+                end
+            end,
+            activeOpacity = 0.7,
+        }, ce("Text", { style = { fontSize = 18, color = "#007AFF" } }, "+"))
     )
 end
 
 -- Open native date picker (imperative API)
--- Uses native.showAlert as a fallback since Solar2D doesn't have native date picker
 function M.open(params)
     local mode = params.mode or "date"
     local value = params.value or os.time()
     local onChange = params.onChange
     local title = params.title or (mode == "time" and "Select Time" or "Select Date")
 
-    -- Format current value for display
-    local currentValue = formatForDisplay(value, mode)
+    local current = formatDisplay(value, mode)
 
-    -- Show alert with current value - this is a simplified fallback
-    -- In production, you'd want a custom native plugin or picker UI
     if native and native.showAlert then
         native.showAlert(
             title,
-            "Current: " .. currentValue .. "\n\nPlease use the picker component for better UX.",
+            "Current: " .. current .. "\n\nUse +/- buttons or edit directly.",
             {"OK"},
             function(event)
-                if event.action == "clicked" and onChange then
+                if onChange then
                     onChange({
                         type = M.EventType.SET,
-                        nativeEvent = {
-                            timestamp = value,
-                        },
+                        nativeEvent = { timestamp = value },
                     })
                 end
             end
