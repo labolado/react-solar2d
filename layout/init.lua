@@ -6,7 +6,55 @@ local ok, yoga = pcall(require, "plugin_yoga")
 if not ok then
     -- Fallback: try LuaJIT standalone .so (for testing outside Solar2D)
     package.cpath = "./plugins/yoga/build/?.so;" .. package.cpath
-    yoga = require("plugin_yoga")
+    ok, yoga = pcall(require, "plugin_yoga")
+end
+
+-- If Yoga is not available, return a stub module
+if not ok then
+    local stub = {}
+    stub.applyStyle = function() end
+    stub.newNode = function()
+        return {
+            setWidth = function() end,
+            setHeight = function() end,
+            setWidthAuto = function() end,
+            setHeightAuto = function() end,
+            setMinWidth = function() end,
+            setMinHeight = function() end,
+            setMaxWidth = function() end,
+            setMaxHeight = function() end,
+            setFlexDirection = function() end,
+            setJustifyContent = function() end,
+            setAlignItems = function() end,
+            setAlignSelf = function() end,
+            setAlignContent = function() end,
+            setFlexWrap = function() end,
+            setFlex = function() end,
+            setFlexGrow = function() end,
+            setFlexShrink = function() end,
+            setFlexBasis = function() end,
+            setFlexBasisAuto = function() end,
+            setPadding = function() end,
+            setMargin = function() end,
+            setMarginAuto = function() end,
+            setBorder = function() end,
+            setGap = function() end,
+            setPositionType = function() end,
+            setPosition = function() end,
+            setDisplay = function() end,
+            setOverflow = function() end,
+            setAspectRatio = function() end,
+            calculateLayout = function() end,
+            freeRecursive = function() end,
+            insertChild = function() end,
+            setWidthPercent = function() end,
+            setHeightPercent = function() end,
+        }
+    end
+    stub.yoga = {}
+    stub.Edge = {}
+    stub.Gutter = {}
+    return stub
 end
 
 local M = {}

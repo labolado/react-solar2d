@@ -47,6 +47,21 @@ end
 -- Usage: echo "quiz" > examples/.route   then launch simulator
 local ROUTE_MAP = { news = "News", quiz = "Quiz", tetris = "Game", sink = "Showcase" }
 local initialRoute = "News"
+
+-- Test mode: read .test file to auto-run tests on startup
+-- Usage: echo "pressable" > examples/.test   then launch simulator
+-- Or: echo "all" > examples/.test   to run all tests
+local testMode = nil
+local testPath = system.pathForFile(".test", system.ResourceDirectory)
+if testPath then
+    local f = io.open(testPath, "r")
+    if f then
+        testMode = f:read("*l")
+        f:close()
+        testMode = testMode and testMode:gsub("%s+", "")
+        print("[TEST] Test mode: " .. tostring(testMode))
+    end
+end
 local routePath = system.pathForFile(".route", system.ResourceDirectory)
 if routePath then
     local f = io.open(routePath, "r")
@@ -58,6 +73,36 @@ if routePath then
             print("[ROUTE] Jumping to: " .. route .. " → " .. initialRoute)
         end
     end
+end
+
+-- ============================================================
+-- Auto-test runner (if .test file exists)
+-- ============================================================
+if testMode then
+    print("[TEST] Running tests: " .. testMode)
+    timer.performWithDelay(1000, function()
+        local ok, testRunner = pcall(require, "tests.infra.test_runner_solar2d")
+        if not ok then
+            print("[TEST] ERROR loading test_runner: " .. tostring(testRunner))
+            return
+        end
+        local results = testRunner.run(testMode)
+        print("[TEST] Results: " .. results.passed .. " passed, " .. results.failed .. " failed")
+
+        -- Display results on screen
+        local resultText = display.newText({
+            text = "Tests: " .. results.passed .. " passed, " .. results.failed .. " failed",
+            x = display.contentCenterX,
+            y = display.contentCenterY,
+            font = native.systemFontBold,
+            fontSize = 20,
+        })
+        if results.failed == 0 then
+            resultText:setFillColor(0, 1, 0)
+        else
+            resultText:setFillColor(1, 0, 0)
+        end
+    end)
 end
 
 -- ============================================================
@@ -105,3 +150,21 @@ end
 local container = display.newGroup()
 RN.render(ce(App), container)
 RN.startAutoFlush()
+
+-- ============================================================
+-- Start test server for remote control (optional)
+-- ============================================================
+timer.performWithDelay(500, function()
+    local ok, testServer = pcall(require, "tests.infra.test_server")
+    if ok then
+        testServer.start(9876)
+
+        -- Register callbacks for remote control
+        testServer.onCategoryTap(function(category)
+            print("[TEST_SERVER] Category tapped: " .. category)
+            -- Dispatch event to KitchenSink if active
+        end)
+    else
+        print("[TEST_SERVER] Not started: " .. tostring(testServer))
+    end
+end)

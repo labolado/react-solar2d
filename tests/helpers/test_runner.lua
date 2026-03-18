@@ -56,6 +56,9 @@ function M.expect(val)
         toBeType = function(t)
             if type(val) ~= t then error("Expected type " .. t .. " but got " .. type(val), 2) end
         end,
+        toNotBe = function(expected)
+            if val == expected then error("Expected not " .. tostring(expected) .. " but got " .. tostring(val), 2) end
+        end,
     }
 end
 

@@ -17,6 +17,7 @@ local function createScrollView(props, style, applyCommonStyle)
     touchOverlay.anchorX, touchOverlay.anchorY = 0, 0
     touchOverlay:setFillColor(0, 0, 0, 0.001)
     touchOverlay.isHitTestable = true
+    touchOverlay._isTouchOverlay = true
 
     clipContainer._contentGroup = contentGroup
     clipContainer._scrollW = w
@@ -132,17 +133,39 @@ local function createScrollView(props, style, applyCommonStyle)
         elseif event.phase == "ended" or event.phase == "cancelled" then
             if not isDragging and startX then
                 -- Tap: find pressable child
+                -- Touch coordinates and contentBounds are both screen coordinates
                 local ex, ey = startX, startY
-                local function findPressable(grp)
+                local function findPressable(grp, depth)
+                    depth = depth or 0
                     if not grp or not grp.numChildren then return nil end
                     for i = grp.numChildren, 1, -1 do
                         local child = grp[i]
                         if child and child.isVisible ~= false then
                             local cb = child.contentBounds
-                            if cb and ex >= cb.xMin and ex <= cb.xMax
-                               and ey >= cb.yMin and ey <= cb.yMax then
-                                if child._onPress then return child end
-                                local found = findPressable(child)
+                            local hasPress = child._onPress ~= nil
+                            -- Fallback: if no contentBounds, use x/y/width/height
+                            local inBounds = false
+                            if cb then
+                                inBounds = ex >= cb.xMin and ex <= cb.xMax
+                                      and ey >= cb.yMin and ey <= cb.yMax
+                            elseif child.x and child.y and child.width and child.height then
+                                local halfW = child.width / 2
+                                local halfH = child.height / 2
+                                -- Account for anchor point (default is center 0.5,0.5)
+                                local anchorX = child.anchorX or 0.5
+                                local anchorY = child.anchorY or 0.5
+                                local xMin = child.x - child.width * anchorX
+                                local xMax = xMin + child.width
+                                local yMin = child.y - child.height * anchorY
+                                local yMax = yMin + child.height
+                                inBounds = ex >= xMin and ex <= xMax
+                                      and ey >= yMin and ey <= yMax
+                            end
+                            if inBounds then
+                                if hasPress then
+                                    return child
+                                end
+                                local found = findPressable(child, depth + 1)
                                 if found then return found end
                             end
                         end
@@ -150,7 +173,9 @@ local function createScrollView(props, style, applyCommonStyle)
                     return nil
                 end
                 local pressable = findPressable(contentGroup)
-                if pressable then pressable._onPress(event) end
+                if pressable then
+                    pressable._onPress(event)
+                end
             end
 
             -- Snap back from overscroll

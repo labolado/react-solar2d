@@ -77,80 +77,75 @@ local function SwitchDemo()
     )
 end
 
--- Shared: centered modal backdrop
-local function ModalBackdrop(props)
+-- Shared: centered modal content wrapper (renders inside Modal's centered container)
+local function ModalContent(props)
     return ce("View", {
         style = {
-            position = "absolute", left = 0, right = 0, top = 0, bottom = 0,
-            backgroundColor = "rgba(0,0,0,0.55)",
-            justifyContent = "center", alignItems = "center",
+            backgroundColor = T.surface,
+            borderRadius = T.radius,
+            borderWidth = 1,
+            borderColor = T.border,
+            padding = props.padding or 24,
+            width = props.width or 300,
         },
     }, props.children)
 end
 
--- 3. ModalDemo — multiple modal styles
-local function ModalDemo()
-    local activeModal, setActiveModal = useState(nil)
+-- 3. ModalDemo — multiple modal styles (uses pushOverlay/popOverlay for global overlay)
+local function ModalDemo(props)
+    local pushOverlay = props.pushOverlay
+    local popOverlay = props.popOverlay
     local formName, setFormName = useState("")
     local formEmail, setFormEmail = useState("")
     local formNotes, setFormNotes = useState("")
     local formResult, setFormResult = useState("")
     local agreed, setAgreed = useState(false)
 
-    local function close() setActiveModal(nil) end
+    local function close()
+        if popOverlay then popOverlay() end
+    end
 
-    -- ── Modal A: Basic centered dialog ──
-    local modalBasic = activeModal == "basic" and ce(RN.Modal, {
-        visible = true, transparent = true, onRequestClose = close,
-    },
-        ce(ModalBackdrop, {},
-            ce("View", {
-                style = {
-                    backgroundColor = T.surface, borderRadius = T.radius,
-                    padding = 24, width = 300, maxWidth = 300,
-                    borderWidth = 1, borderColor = T.border,
-                },
-            },
+    -- ── Modal content builders ──
+    local function showBasicModal()
+        if not pushOverlay then return end
+        pushOverlay(ce(RN.Modal, {
+            visible = true, transparent = true, onRequestClose = close,
+        },
+            ce(ModalContent, {},
                 ce("Text", {
-                    style = { fontSize = 18, color = T.textPrimary, fontWeight = "bold", marginBottom = 10 },
+                    style = { fontSize = 18, color = T.textPrimary, fontWeight = "bold", marginBottom = 10, width = 252 },
                 }, "Basic Modal"),
                 ce("Text", {
-                    style = { fontSize = 14, color = T.textSecondary, marginBottom = 20, lineHeight = 20 },
+                    style = { fontSize = 14, color = T.textSecondary, marginBottom = 20, lineHeight = 20, width = 252 },
                 }, "This is a centered modal dialog with text that wraps automatically when the content is long enough to exceed the container width."),
                 ce(RN.Button, { title = "OK", color = T.accent, onPress = close })
             )
-        )
-    ) or nil
+        ))
+    end
 
-    -- ── Modal B: Rich content with sections ──
-    local modalRich = activeModal == "rich" and ce(RN.Modal, {
-        visible = true, transparent = true, onRequestClose = close,
-    },
-        ce(ModalBackdrop, {},
-            ce("View", {
-                style = {
-                    backgroundColor = T.surface, borderRadius = T.radius,
-                    width = 320, maxWidth = 320, overflow = "hidden",
-                    borderWidth = 1, borderColor = T.border,
-                },
-            },
+    local function showRichModal()
+        if not pushOverlay then return end
+        pushOverlay(ce(RN.Modal, {
+            visible = true, transparent = true, onRequestClose = close,
+        },
+            ce(ModalContent, { width = 320, padding = 0 },
                 -- Header with accent background
                 ce("View", { style = { backgroundColor = T.accent, padding = 16 } },
-                    ce("Text", { style = { fontSize = 18, color = "#FFF", fontWeight = "bold" } }, "Update Available"),
-                    ce("Text", { style = { fontSize = 12, color = "rgba(255,255,255,0.8)", marginTop = 4 } }, "Version 2.5.0")
+                    ce("Text", { style = { fontSize = 18, color = "#FFF", fontWeight = "bold", width = 288 } }, "Update Available"),
+                    ce("Text", { style = { fontSize = 12, color = "rgba(255,255,255,0.8)", marginTop = 4, width = 288 } }, "Version 2.5.0")
                 ),
                 -- Body
                 ce("View", { style = { padding = 16 } },
-                    ce("Text", { style = { fontSize = 14, color = T.textPrimary, fontWeight = "bold", marginBottom = 8 } }, "What's New:"),
-                    ce("Text", { style = { fontSize = 13, color = T.textSecondary, lineHeight = 20, marginBottom = 4 } }, "• Modal overlay system with centering"),
-                    ce("Text", { style = { fontSize = 13, color = T.textSecondary, lineHeight = 20, marginBottom = 4 } }, "• Action sheet slide-up menu"),
-                    ce("Text", { style = { fontSize = 13, color = T.textSecondary, lineHeight = 20, marginBottom = 4 } }, "• Toast notification stack"),
-                    ce("Text", { style = { fontSize = 13, color = T.textSecondary, lineHeight = 20, marginBottom = 12 } }, "• Responsive layout components"),
+                    ce("Text", { style = { fontSize = 14, color = T.textPrimary, fontWeight = "bold", marginBottom = 8, width = 288 } }, "What's New:"),
+                    ce("Text", { style = { fontSize = 13, color = T.textSecondary, lineHeight = 20, marginBottom = 4, width = 288 } }, "• Modal overlay system with centering"),
+                    ce("Text", { style = { fontSize = 13, color = T.textSecondary, lineHeight = 20, marginBottom = 4, width = 288 } }, "• Action sheet slide-up menu"),
+                    ce("Text", { style = { fontSize = 13, color = T.textSecondary, lineHeight = 20, marginBottom = 4, width = 288 } }, "• Toast notification stack"),
+                    ce("Text", { style = { fontSize = 13, color = T.textSecondary, lineHeight = 20, marginBottom = 12, width = 288 } }, "• Responsive layout components"),
                     -- Progress bar
                     ce("View", { style = { height = 6, backgroundColor = T.border, borderRadius = 3, overflow = "hidden", marginBottom = 4 } },
                         ce("View", { style = { width = 200, height = 6, backgroundColor = "#2ECC71", borderRadius = 3 } })
                     ),
-                    ce("Text", { style = { fontSize = 11, color = T.textSecondary } }, "Download: 78%")
+                    ce("Text", { style = { fontSize = 11, color = T.textSecondary, width = 288 } }, "Download: 78%")
                 ),
                 -- Footer with buttons
                 ce("View", { style = { flexDirection = "row", borderTopWidth = 1, borderColor = T.border } },
@@ -164,30 +159,25 @@ local function ModalDemo()
                     }, ce("Text", { style = { fontSize = 14, color = T.accent, fontWeight = "bold" } }, "Update Now"))
                 )
             )
-        )
-    ) or nil
+        ))
+    end
 
-    -- ── Modal C: Form dialog ──
-    local modalForm = activeModal == "form" and ce(RN.Modal, {
-        visible = true, transparent = true, onRequestClose = close,
-    },
-        ce(ModalBackdrop, {},
-            ce("View", {
-                style = {
-                    backgroundColor = T.surface, borderRadius = T.radius,
-                    width = 320, maxWidth = 320, overflow = "hidden",
-                    borderWidth = 1, borderColor = T.border,
-                },
-            },
+    local function showFormModal()
+        if not pushOverlay then return end
+        pushOverlay(ce(RN.Modal, {
+            visible = true, transparent = true, onRequestClose = close,
+        },
+            ce(ModalContent, { width = 320, padding = 0 },
                 -- Header
                 ce("View", { style = { flexDirection = "row", justifyContent = "space-between", alignItems = "center", padding = 16, borderBottomWidth = 1, borderColor = T.border } },
-                    ce("Text", { style = { fontSize = 16, color = T.textPrimary, fontWeight = "bold" } }, "Contact Form"),
-                    ce(RN.Pressable, { onPress = close },
-                        ce("Text", { style = { fontSize = 18, color = T.textSecondary } }, "✕"))
+                    ce("Text", { style = { fontSize = 16, color = T.textPrimary, fontWeight = "bold", width = 250 } }, "Contact Form"),
+                    ce(RN.Pressable, {
+                        onPress = close,
+                        style = { width = 40, height = 40, justifyContent = "center", alignItems = "center" },
+                    }, ce("Text", { style = { fontSize = 24, color = T.textSecondary } }, "×"))
                 ),
                 -- Form fields
                 ce("View", { style = { padding = 16 } },
-                    -- Name
                     ce("Text", { style = { fontSize = 12, color = T.textSecondary, marginBottom = 4 } }, "Name"),
                     ce(RN.TextInput, {
                         value = formName, onChangeText = setFormName,
@@ -195,10 +185,9 @@ local function ModalDemo()
                         style = {
                             backgroundColor = T.bg, borderWidth = 1, borderColor = T.border,
                             borderRadius = T.radiusSmall, padding = 10, fontSize = 14,
-                            color = T.textPrimary, marginBottom = 12,
+                            color = T.textPrimary, marginBottom = 12, height = 42,
                         },
                     }),
-                    -- Email
                     ce("Text", { style = { fontSize = 12, color = T.textSecondary, marginBottom = 4 } }, "Email"),
                     ce(RN.TextInput, {
                         value = formEmail, onChangeText = setFormEmail,
@@ -206,10 +195,9 @@ local function ModalDemo()
                         style = {
                             backgroundColor = T.bg, borderWidth = 1, borderColor = T.border,
                             borderRadius = T.radiusSmall, padding = 10, fontSize = 14,
-                            color = T.textPrimary, marginBottom = 12,
+                            color = T.textPrimary, marginBottom = 12, height = 42,
                         },
                     }),
-                    -- Notes
                     ce("Text", { style = { fontSize = 12, color = T.textSecondary, marginBottom = 4 } }, "Notes"),
                     ce(RN.TextInput, {
                         value = formNotes, onChangeText = setFormNotes,
@@ -218,17 +206,16 @@ local function ModalDemo()
                         style = {
                             backgroundColor = T.bg, borderWidth = 1, borderColor = T.border,
                             borderRadius = T.radiusSmall, padding = 10, fontSize = 14,
-                            color = T.textPrimary, height = 70, marginBottom = 12,
+                            color = T.textPrimary, height = 80, marginBottom = 12,
                         },
                     }),
-                    -- Agreement switch
                     ce("View", { style = { flexDirection = "row", alignItems = "center", marginBottom = 16 } },
                         ce(RN.Switch, { value = agreed, onValueChange = setAgreed, trackColor = { ["true"] = T.accent, ["false"] = "#444" } }),
-                        ce("Text", { style = { fontSize = 12, color = T.textSecondary, marginLeft = 8, flex = 1 } }, "I agree to the terms and conditions")
+                        ce("Text", { style = { fontSize = 12, color = T.textSecondary, marginLeft = 8, width = 240 } }, "I agree to the terms")
                     )
                 ),
                 -- Actions
-                ce("View", { style = { flexDirection = "row", padding = 16, paddingTop = 0, gap = 8 } },
+                ce("View", { style = { flexDirection = "row", padding = 16, paddingTop = 0, gap = 12 } },
                     ce("View", { style = { flex = 1 } },
                         ce(RN.Button, { title = "Cancel", color = T.textSecondary, onPress = close })),
                     ce("View", { style = { flex = 1 } },
@@ -244,34 +231,29 @@ local function ModalDemo()
                         }))
                 )
             )
-        )
-    ) or nil
+        ))
+    end
 
-    -- ── Modal D: Confirmation with icon ──
-    local modalConfirm = activeModal == "confirm" and ce(RN.Modal, {
-        visible = true, transparent = true, onRequestClose = close,
-    },
-        ce(ModalBackdrop, {},
-            ce("View", {
-                style = {
-                    backgroundColor = T.surface, borderRadius = T.radius,
-                    padding = 24, width = 300, maxWidth = 300, alignItems = "center",
-                    borderWidth = 1, borderColor = T.border,
-                },
-            },
-                -- Warning icon circle
+    local function showConfirmModal()
+        if not pushOverlay then return end
+        pushOverlay(ce(RN.Modal, {
+            visible = true, transparent = true, onRequestClose = close,
+        },
+            ce(ModalContent, { width = 300 },
+                -- Warning icon circle (center using alignSelf)
                 ce("View", {
                     style = {
                         width = 56, height = 56, borderRadius = 28,
                         backgroundColor = "rgba(231,76,60,0.15)",
                         justifyContent = "center", alignItems = "center", marginBottom = 16,
+                        alignSelf = "center",
                     },
                 }, ce("Text", { style = { fontSize = 28, color = "#E74C3C" } }, "!")),
                 ce("Text", {
-                    style = { fontSize = 18, color = T.textPrimary, fontWeight = "bold", marginBottom = 8, textAlign = "center" },
+                    style = { fontSize = 18, color = T.textPrimary, fontWeight = "bold", marginBottom = 8, width = 252 },
                 }, "Delete Project?"),
                 ce("Text", {
-                    style = { fontSize = 14, color = T.textSecondary, textAlign = "center", lineHeight = 20, marginBottom = 20 },
+                    style = { fontSize = 14, color = T.textSecondary, lineHeight = 20, marginBottom = 20, width = 252 },
                 }, "This will permanently delete the project and all associated data. This action cannot be undone."),
                 ce("View", { style = { flexDirection = "row", gap = 10 } },
                     ce("View", { style = { flex = 1 } },
@@ -280,65 +262,78 @@ local function ModalDemo()
                         ce(RN.Button, { title = "Delete", color = "#E74C3C", onPress = close }))
                 )
             )
-        )
-    ) or nil
+        ))
+    end
 
-    -- ── Modal E: Full-screen modal ──
-    local modalFull = activeModal == "full" and ce(RN.Modal, {
-        visible = true, transparent = true, onRequestClose = close,
-    },
-        ce("View", {
-            style = {
-                position = "absolute", left = 12, right = 12, top = 40, bottom = 40,
-                backgroundColor = T.surface, borderRadius = T.radius,
-                borderWidth = 1, borderColor = T.border, overflow = "hidden",
-            },
+    local function showFullModal()
+        if not pushOverlay then return end
+        local screenW = display.contentWidth
+        local screenH = display.contentHeight
+        pushOverlay(ce(RN.Modal, {
+            visible = true, transparent = true, onRequestClose = close,
         },
-            -- Header bar
-            ce("View", { style = { flexDirection = "row", alignItems = "center", padding = 14, borderBottomWidth = 1, borderColor = T.border } },
-                ce(RN.Pressable, { onPress = close },
-                    ce("Text", { style = { fontSize = 14, color = T.accent } }, "← Close")),
-                ce("View", { style = { flex = 1 } }),
-                ce("Text", { style = { fontSize = 16, color = T.textPrimary, fontWeight = "bold" } }, "Full Screen Modal"),
-                ce("View", { style = { flex = 1 } })
-            ),
-            -- Scrollable content
-            ce("ScrollView", {
-                style = { flex = 1 },
-                contentContainerStyle = { padding = 16 },
+            ce("View", {
+                style = {
+                    position = "absolute",
+                    left = 12, top = 40,
+                    width = screenW - 24,
+                    height = screenH - 80,
+                    backgroundColor = T.surface,
+                    borderRadius = T.radius,
+                    borderWidth = 1,
+                    borderColor = T.border,
+                    overflow = "hidden",
+                },
             },
-                ce("Text", { style = { fontSize = 14, color = T.textPrimary, lineHeight = 22, marginBottom = 12 } },
-                    "This is a near-full-screen modal that demonstrates how to build complex overlay interfaces. It has a sticky header with a close button and scrollable content below."),
-                ce("Text", { style = { fontSize = 14, color = T.textPrimary, lineHeight = 22, marginBottom = 12 } },
-                    "Use this pattern for settings pages, detailed forms, media viewers, or any content that needs more space than a small dialog provides."),
-                ce("View", { style = { height = 120, backgroundColor = T.bg, borderRadius = T.radiusSmall, justifyContent = "center", alignItems = "center", marginBottom = 12 } },
-                    ce("Text", { style = { fontSize = 16, color = T.textSecondary } }, "[ Content Area ]")),
-                ce("Text", { style = { fontSize = 14, color = T.textPrimary, lineHeight = 22, marginBottom = 12 } },
-                    "The modal uses absolute positioning with insets (12px from edges, 40px from top/bottom) to create a floating panel effect. Content inside can scroll independently."),
-                ce("View", { style = { height = 120, backgroundColor = T.bg, borderRadius = T.radiusSmall, justifyContent = "center", alignItems = "center", marginBottom = 12 } },
-                    ce("Text", { style = { fontSize = 16, color = T.textSecondary } }, "[ More Content ]")),
-                ce("Text", { style = { fontSize = 13, color = T.textSecondary, lineHeight = 20 } },
-                    "Scroll down to see more. The content area is flexible and adapts to the available space. Long text like this paragraph wraps naturally within the modal boundaries.")
+                -- Header bar
+                ce("View", { style = { flexDirection = "row", alignItems = "center", padding = 14, borderBottomWidth = 1, borderColor = T.border } },
+                    ce(RN.Pressable, { onPress = close },
+                        ce("Text", { style = { fontSize = 14, color = T.accent } }, "← Close")),
+                    ce("View", { style = { flex = 1 } }),
+                    ce("Text", { style = { fontSize = 16, color = T.textPrimary, fontWeight = "bold" } }, "Full Screen Modal"),
+                    ce("View", { style = { flex = 1 } })
+                ),
+                -- Scrollable content
+                ce("ScrollView", {
+                    style = { flex = 1 },
+                    contentContainerStyle = { padding = 16 },
+                },
+                    ce("Text", { style = { fontSize = 14, color = T.textPrimary, lineHeight = 22, marginBottom = 12, width = screenW - 56 } },
+                        "This is a near-full-screen modal that demonstrates how to build complex overlay interfaces. It has a sticky header with a close button and scrollable content below."),
+                    ce("Text", { style = { fontSize = 14, color = T.textPrimary, lineHeight = 22, marginBottom = 12, width = screenW - 56 } },
+                        "Use this pattern for settings pages, detailed forms, media viewers, or any content that needs more space than a small dialog provides."),
+                    ce("View", { style = { height = 120, backgroundColor = T.bg, borderRadius = T.radiusSmall, justifyContent = "center", alignItems = "center", marginBottom = 12 } },
+                        ce("Text", { style = { fontSize = 16, color = T.textSecondary } }, "[ Content Area ]")),
+                    ce("Text", { style = { fontSize = 14, color = T.textPrimary, lineHeight = 22, marginBottom = 12, width = screenW - 56 } },
+                        "The modal uses absolute positioning with insets (12px from edges, 40px from top/bottom) to create a floating panel effect. Content inside can scroll independently."),
+                    ce("View", { style = { height = 120, backgroundColor = T.bg, borderRadius = T.radiusSmall, justifyContent = "center", alignItems = "center", marginBottom = 12 } },
+                        ce("Text", { style = { fontSize = 16, color = T.textSecondary } }, "[ More Content ]")),
+                    ce("Text", { style = { fontSize = 13, color = T.textSecondary, lineHeight = 20, width = screenW - 56 } },
+                        "Scroll down to see more. The content area is flexible and adapts to the available space. Long text like this paragraph wraps naturally within the modal boundaries.")
+                )
             )
-        )
-    ) or nil
+        ))
+    end
 
-    return ce(DemoPage, {},
+    -- Render modals via pushOverlay - they appear at root level, covering categoryBar
+    return ce("ScrollView", {
+        style = { flex = 1, backgroundColor = T.bg },
+        contentContainerStyle = { padding = T.pad },
+    },
         ce(Section, { title = "Modal Styles" },
-            ce(RN.Button, { title = "Basic Dialog", color = T.accent, onPress = function() setActiveModal("basic") end }),
+            ce(RN.Button, { title = "Basic Dialog", color = T.accent, onPress = showBasicModal }),
             ce("View", { style = { height = 8 } }),
-            ce(RN.Button, { title = "Rich Content (changelog)", color = "#2ECC71", onPress = function() setActiveModal("rich") end }),
+            ce(RN.Button, { title = "Rich Content (changelog)", color = "#2ECC71", onPress = showRichModal }),
             ce("View", { style = { height = 8 } }),
-            ce(RN.Button, { title = "Form Dialog", color = "#9B59B6", onPress = function() setActiveModal("form") end }),
+            ce(RN.Button, { title = "Form Dialog", color = "#9B59B6", onPress = showFormModal }),
             ce("View", { style = { height = 8 } }),
-            ce(RN.Button, { title = "Confirm Delete (icon)", color = "#E74C3C", onPress = function() setActiveModal("confirm") end }),
+            ce(RN.Button, { title = "Confirm Delete (icon)", color = "#E74C3C", onPress = showConfirmModal }),
             ce("View", { style = { height = 8 } }),
-            ce(RN.Button, { title = "Full Screen Modal", color = "#F39C12", onPress = function() setActiveModal("full") end })
+            ce(RN.Button, { title = "Full Screen Modal", color = "#F39C12", onPress = showFullModal })
         ),
         formResult ~= "" and ce(Section, { title = "Form Result" },
             ce("Text", { style = { fontSize = 13, color = "#2ECC71" } }, formResult)
-        ) or nil,
-        modalBasic, modalRich, modalForm, modalConfirm, modalFull
+        ) or nil
     )
 end
 

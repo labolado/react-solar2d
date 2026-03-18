@@ -4,8 +4,18 @@ local React = require("react")
 local createElement = React.createElement
 
 local function Pressable(props)
+    local style = props.style or {}
+    -- Ensure Pressable has a background so the group can receive taps.
+    -- If the consumer didn't set a backgroundColor, use transparent.
+    if style.backgroundColor == nil then
+        style = {}
+        for k, v in pairs(props.style or {}) do
+            style[k] = v
+        end
+        style.backgroundColor = "transparent"
+    end
     return createElement("View", {
-        style = props.style,
+        style = style,
         onPress = props.onPress,
         onLongPress = props.onLongPress,
         _touchFeedback = "opacity",

@@ -25,72 +25,83 @@ end
 -- ═══════════════════════════════════════════════════════════════════════════
 -- 1. AlertDemo — simple alert dialogs (OK / OK+Cancel / custom buttons)
 -- ═══════════════════════════════════════════════════════════════════════════
-local function AlertDemo()
+local function AlertDemo(props)
+    local pushOverlay = props.pushOverlay
+    local clearOverlay = props.clearOverlay
     local alertType, setAlertType = useState(nil) -- nil | "info" | "confirm" | "custom"
     local result, setResult = useState("")
 
     local function closeAlert(msg)
         setAlertType(nil)
         if msg then setResult(msg) end
+        if clearOverlay then clearOverlay() end
     end
 
-    -- Alert overlay
-    local overlay = nil
-    if alertType == "info" then
-        overlay = ce(RN.Modal, { visible = true, transparent = true },
-            ce(Backdrop, {},
-                ce("View", { style = { width = 280, backgroundColor = T.surface, borderRadius = T.radius, padding = 24 } },
-                    ce("Text", { style = { fontSize = 18, fontWeight = "bold", color = T.textPrimary, marginBottom = 8 } }, "Info"),
-                    ce("Text", { style = { fontSize = 14, color = T.textSecondary, marginBottom = 20 } }, "This is an information alert. Tap OK to dismiss."),
-                    ce(RN.Button, { title = "OK", color = T.accent, onPress = function() closeAlert("Dismissed info") end })
-                )
-            )
-        )
-    elseif alertType == "confirm" then
-        overlay = ce(RN.Modal, { visible = true, transparent = true },
-            ce(Backdrop, {},
-                ce("View", { style = { width = 280, backgroundColor = T.surface, borderRadius = T.radius, padding = 24 } },
-                    ce("Text", { style = { fontSize = 18, fontWeight = "bold", color = T.textPrimary, marginBottom = 8 } }, "Confirm"),
-                    ce("Text", { style = { fontSize = 14, color = T.textSecondary, marginBottom = 20 } }, "Are you sure you want to proceed?"),
-                    ce("View", { style = { flexDirection = "row", justifyContent = "flex-end", gap = 12 } },
-                        ce(RN.Button, { title = "Cancel", color = T.textSecondary, onPress = function() closeAlert("Cancelled") end }),
-                        ce(RN.Button, { title = "Confirm", color = "#E74C3C", onPress = function() closeAlert("Confirmed!") end })
+    -- Show alert using global overlay layer
+    local function showAlert(type)
+        setAlertType(type)
+        if not pushOverlay then return end
+
+        local alertContent
+        if type == "info" then
+            alertContent = ce(RN.Modal, { visible = true, transparent = true, onRequestClose = function() closeAlert() end },
+                ce(Backdrop, {},
+                    ce("View", { style = { width = 280, backgroundColor = T.surface, borderRadius = T.radius, padding = 24 } },
+                        ce("Text", { style = { fontSize = 18, fontWeight = "bold", color = T.textPrimary, marginBottom = 8 } }, "Info"),
+                        ce("Text", { style = { fontSize = 14, color = T.textSecondary, marginBottom = 20 } }, "This is an information alert. Tap OK to dismiss."),
+                        ce(RN.Button, { title = "OK", color = T.accent, onPress = function() closeAlert("Dismissed info") end })
                     )
                 )
             )
-        )
-    elseif alertType == "custom" then
-        overlay = ce(RN.Modal, { visible = true, transparent = true },
-            ce(Backdrop, {},
-                ce("View", { style = { width = 300, backgroundColor = T.surface, borderRadius = T.radius, overflow = "hidden" } },
-                    ce("View", { style = { backgroundColor = "#E74C3C", padding = 16 } },
-                        ce("Text", { style = { fontSize = 18, fontWeight = "bold", color = "#FFF" } }, "Warning!")
-                    ),
-                    ce("View", { style = { padding = 20 } },
-                        ce("Text", { style = { fontSize = 14, color = T.textSecondary, marginBottom = 20 } }, "This action cannot be undone. Choose wisely."),
-                        ce(RN.Button, { title = "Delete", color = "#E74C3C", onPress = function() closeAlert("Deleted!") end }),
-                        ce("View", { style = { height = 8 } }),
-                        ce(RN.Button, { title = "Archive", color = "#F39C12", onPress = function() closeAlert("Archived") end }),
-                        ce("View", { style = { height = 8 } }),
-                        ce(RN.Button, { title = "Cancel", color = T.textSecondary, onPress = function() closeAlert("Cancelled") end })
+        elseif type == "confirm" then
+            alertContent = ce(RN.Modal, { visible = true, transparent = true, onRequestClose = function() closeAlert() end },
+                ce(Backdrop, {},
+                    ce("View", { style = { width = 280, backgroundColor = T.surface, borderRadius = T.radius, padding = 24 } },
+                        ce("Text", { style = { fontSize = 18, fontWeight = "bold", color = T.textPrimary, marginBottom = 8 } }, "Confirm"),
+                        ce("Text", { style = { fontSize = 14, color = T.textSecondary, marginBottom = 20 } }, "Are you sure you want to proceed?"),
+                        ce("View", { style = { flexDirection = "row", justifyContent = "flex-end", gap = 12 } },
+                            ce(RN.Button, { title = "Cancel", color = T.textSecondary, onPress = function() closeAlert("Cancelled") end }),
+                            ce(RN.Button, { title = "Confirm", color = "#E74C3C", onPress = function() closeAlert("Confirmed!") end })
+                        )
                     )
                 )
             )
-        )
+        elseif type == "custom" then
+            alertContent = ce(RN.Modal, { visible = true, transparent = true, onRequestClose = function() closeAlert() end },
+                ce(Backdrop, {},
+                    ce("View", { style = { width = 300, backgroundColor = T.surface, borderRadius = T.radius, overflow = "hidden" } },
+                        ce("View", { style = { backgroundColor = "#E74C3C", padding = 16 } },
+                            ce("Text", { style = { fontSize = 18, fontWeight = "bold", color = "#FFF" } }, "Warning!")
+                        ),
+                        ce("View", { style = { padding = 20 } },
+                            ce("Text", { style = { fontSize = 14, color = T.textSecondary, marginBottom = 20 } }, "This action cannot be undone. Choose wisely."),
+                            ce(RN.Button, { title = "Delete", color = "#E74C3C", onPress = function() closeAlert("Deleted!") end }),
+                            ce("View", { style = { height = 8 } }),
+                            ce(RN.Button, { title = "Archive", color = "#F39C12", onPress = function() closeAlert("Archived") end }),
+                            ce("View", { style = { height = 8 } }),
+                            ce(RN.Button, { title = "Cancel", color = T.textSecondary, onPress = function() closeAlert("Cancelled") end })
+                        )
+                    )
+                )
+            )
+        end
+
+        if alertContent then
+            pushOverlay(alertContent)
+        end
     end
 
     return ce(DemoPage, {},
         ce(Section, { title = "Alert Dialogs" },
-            ce(RN.Button, { title = "Info Alert (OK)", color = T.accent, onPress = function() setAlertType("info") end }),
+            ce(RN.Button, { title = "Info Alert (OK)", color = T.accent, onPress = function() showAlert("info") end }),
             ce("View", { style = { height = 8 } }),
-            ce(RN.Button, { title = "Confirm Alert (OK / Cancel)", color = "#E67E22", onPress = function() setAlertType("confirm") end }),
+            ce(RN.Button, { title = "Confirm Alert (OK / Cancel)", color = "#E67E22", onPress = function() showAlert("confirm") end }),
             ce("View", { style = { height = 8 } }),
-            ce(RN.Button, { title = "Custom Alert (3 buttons)", color = "#E74C3C", onPress = function() setAlertType("custom") end })
+            ce(RN.Button, { title = "Custom Alert (3 buttons)", color = "#E74C3C", onPress = function() showAlert("custom") end })
         ),
         ce(Section, { title = "Result" },
             ce("Text", { style = { fontSize = 14, color = T.textPrimary } }, result ~= "" and result or "(tap an alert button)")
-        ),
-        overlay
+        )
     )
 end
 

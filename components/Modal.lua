@@ -1,5 +1,6 @@
 -- components/Modal.lua
 -- Function component: overlay backdrop + centered content
+-- Renders at screen level to cover all content including navigation bars
 local React = require("react")
 local createElement = React.createElement
 
@@ -9,35 +10,38 @@ local function Modal(props)
     end
 
     local transparent = props.transparent ~= false
+    -- Support test environment where display may not be available
+    local screenW = display and display.contentWidth or 320
+    local screenH = display and display.contentHeight or 480
 
+    -- Modal renders a full-screen overlay that blocks all interaction below
     return createElement("View", {
         style = {
             position = "absolute",
-            top = 0, left = 0,
-            width = display.contentWidth,
-            height = display.contentHeight,
-            zIndex = 9999,
+            left = 0, top = 0,
+            width = screenW,
+            height = screenH,
+            zIndex = 10000,
         },
     },
-        -- Backdrop
+        -- Backdrop: full screen, intercepts all taps
         createElement("View", {
             style = {
                 position = "absolute",
-                top = 0, left = 0,
-                width = display.contentWidth,
-                height = display.contentHeight,
-                backgroundColor = transparent and "rgba(0,0,0,128)" or "#FFFFFF",
+                left = 0, top = 0,
+                width = screenW,
+                height = screenH,
+                backgroundColor = transparent and "rgba(0,0,0,0.6)" or "#FFFFFF",
             },
-            onPress = function()
-                if props.onRequestClose then
-                    props.onRequestClose()
-                end
-            end,
+            onPress = props.onRequestClose,
         }),
-        -- Content
+        -- Content container: centered
         createElement("View", {
             style = {
-                flex = 1,
+                position = "absolute",
+                left = 0, top = 0,
+                width = screenW,
+                height = screenH,
                 justifyContent = "center",
                 alignItems = "center",
             },

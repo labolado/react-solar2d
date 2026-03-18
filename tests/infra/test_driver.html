@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>React-Solar2D Test Driver</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
+        h1 { color: #333; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 8px; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; border-radius: 4px; border: 1px solid #ccc; }
+        button:hover { background: #f0f0f0; }
+        .primary { background: #007bff; color: white; border-color: #007bff; }
+        .primary:hover { background: #0056b3; }
+        .success { background: #28a745; color: white; }
+        .danger { background: #dc3545; color: white; }
+        pre { background: #f5f5f5; padding: 10px; border-radius: 4px; overflow-x: auto; }
+        .log { max-height: 200px; overflow-y: auto; background: #1e1e1e; color: #d4d4d4; padding: 10px; font-family: monospace; font-size: 12px; }
+        .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+        input[type="text"] { width: 300px; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h1>React-Solar2D Test Driver</h1>
+    <p>Server: <code id="serverStatus">checking...</code></p>
+
+    <div class="section">
+        <h2>1. Server Control</h2>
+        <button onclick="checkStatus()">Check Status</button>
+        <button onclick="getCategories()">Get Categories</button>
+    </div>
+
+    <div class="section">
+        <h2>2. Category Navigation (测试分类切换)</h2>
+        <div id="categories" class="grid"></div>
+    </div>
+
+    <div class="section">
+        <h2>3. Automated Test Sequence (自动测试序列)</h2>
+        <button class="primary" onclick="startAutoTest()">Start Auto Test</button>
+        <button class="danger" onclick="stopAutoTest()">Stop</button>
+        <p>Speed: <input type="range" id="speed" min="500" max="3000" value="1500"> <span id="speedVal">1.5s</span></p>
+    </div>
+
+    <div class="section">
+        <h2>4. Run Unit Tests (运行单元测试)</h2>
+        <button onclick="runTests('all')">All Tests</button>
+        <button onclick="runTests('pressable')">Pressable</button>
+        <button onclick="runTests('renderer')">Renderer</button>
+        <button onclick="runTests('hooks')">Hooks</button>
+    </div>
+
+    <div class="section">
+        <h2>5. Execute Lua Code (执行 Lua 代码)</h2>
+        <input type="text" id="luaCode" placeholder="print('hello')" value="RN.flushUpdates()">
+        <button class="primary" onclick="execLua()">Execute</button>
+    </div>
+
+    <div class="section">
+        <h2>Log</h2>
+        <div id="log" class="log"></div>
+        <button onclick="clearLog()">Clear</button>
+    </div>
+
+    <script>
+        const API = 'http://localhost:9876';
+        let autoTestInterval = null;
+
+        function log(msg) {
+            const el = document.getElementById('log');
+            el.innerHTML += `[${new Date().toLocaleTimeString()}] ${msg}\n`;
+            el.scrollTop = el.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+
+        async function api(path, body = null) {
+            try {
+                const opts = body ? { method: 'POST', body } : {};
+                const res = await fetch(API + path, opts);
+                return await res.json();
+            } catch (e) {
+                log(`ERROR: ${e.message}`);
+                return null;
+            }
+        }
+
+        async function checkStatus() {
+            const data = await api('/status');
+            if (data) {
+                document.getElementById('serverStatus').textContent = 'Connected ✓';
+                document.getElementById('serverStatus').style.color = 'green';
+                log(`Status: running=true, platform=${data.platform}`);
+            } else {
+                document.getElementById('serverStatus').textContent = 'Disconnected ✗';
+                document.getElementById('serverStatus').style.color = 'red';
+            }
+        }
+
+        async function getCategories() {
+            const data = await api('/categories');
+            if (!data) return;
+
+            const container = document.getElementById('categories');
+            container.innerHTML = '';
+
+            data.categories.forEach(cat => {
+                const btn = document.createElement('button');
+                btn.textContent = cat.label;
+                btn.onclick = () => tapCategory(cat.key, cat.label);
+                container.appendChild(btn);
+            });
+
+            log(`Loaded ${data.categories.length} categories`);
+        }
+
+        async function tapCategory(key, label) {
+            log(`Tapping category: ${label} (${key})`);
+            const data = await api('/tap', `category=${encodeURIComponent(key)}`);
+            if (data) {
+                log(`Result: success=${data.success}`);
+            }
+        }
+
+        async function runTests(pattern) {
+            log(`Running tests: ${pattern}...`);
+            const data = await api('/run', `pattern=${pattern}`);
+            if (data) {
+                log(`Tests: ${data.passed} passed, ${data.failed} failed`);
+                if (data.failed > 0) {
+                    log('FAILED!');
+                } else {
+                    log('ALL PASSED!');
+                }
+            }
+        }
+
+        async function execLua() {
+            const code = document.getElementById('luaCode').value;
+            log(`Executing: ${code}`);
+            const data = await api('/exec', `code=${encodeURIComponent(code)}`);
+            if (data) {
+                log(`Result: ${data.result}`);
+            }
+        }
+
+        async function startAutoTest() {
+            if (autoTestInterval) return;
+
+            const categories = (await api('/categories'))?.categories || [];
+            if (categories.length === 0) {
+                log('No categories loaded');
+                return;
+            }
+
+            let index = 0;
+            const speed = parseInt(document.getElementById('speed').value);
+
+            log('Starting auto-test sequence...');
+
+            autoTestInterval = setInterval(() => {
+                const cat = categories[index];
+                tapCategory(cat.key, cat.label);
+                index = (index + 1) % categories.length;
+            }, speed);
+        }
+
+        function stopAutoTest() {
+            if (autoTestInterval) {
+                clearInterval(autoTestInterval);
+                autoTestInterval = null;
+                log('Auto-test stopped');
+            }
+        }
+
+        document.getElementById('speed').oninput = function() {
+            document.getElementById('speedVal').textContent = (this.value / 1000).toFixed(1) + 's';
+        };
+
+        // Init
+        checkStatus();
+        getCategories();
+    </script>
+</body>
+</html>

@@ -148,11 +148,11 @@ local function wireEvents(instance, props)
     if props.onPress then
         instance._onPress = props.onPress
         -- Use 'tap' event — independent of 'touch', doesn't interfere with ScrollView
-        local target = instance._bg or instance._textObj or instance
-        if target == instance then
-            instance.isHitTestable = true
-        end
-        target:addEventListener("tap", function(event)
+        -- Always use the group with isHitTestable for reliable hit detection.
+        -- _bg rects created at 0x0 and resized via path.width/height may not
+        -- update their hit area in all Solar2D versions.
+        instance.isHitTestable = true
+        instance:addEventListener("tap", function(event)
             flashFeedback()
             props.onPress(event)
             return true
@@ -160,10 +160,9 @@ local function wireEvents(instance, props)
     end
     if props.onLongPress then
         instance._onLongPress = props.onLongPress
-        local target = instance._bg or instance._textObj or instance
-        if target == instance then instance.isHitTestable = true end
+        instance.isHitTestable = true
         local longPressTimer = nil
-        target:addEventListener("touch", function(event)
+        instance:addEventListener("touch", function(event)
             if event.phase == "began" then
                 longPressTimer = timer.performWithDelay(500, function()
                     props.onLongPress(event)
@@ -189,7 +188,13 @@ local function applyCommonStyle(instance, style)
     if style.scaleY ~= nil then instance.yScale = resolveValue(style.scaleY) end
     if style.rotation ~= nil then instance.rotation = resolveValue(style.rotation) end
     if style.display == "none" then instance.isVisible = false end
-    if style.zIndex then instance._zIndex = style.zIndex end
+    if style.zIndex then
+        instance._zIndex = style.zIndex
+        -- Bring to front based on zIndex - higher values appear on top
+        if instance._zIndex > 0 and instance.toFront then
+            instance:toFront()
+        end
+    end
     if style.transform then applyTransform(instance, style.transform) end
 end
 
@@ -261,11 +266,12 @@ function M.createInstance(elementType, props)
         group.anchorX, group.anchorY = 0, 0
         group.anchorChildren = true
 
-        -- Background rect (full border or backgroundColor)
-        if style.backgroundColor or style.borderWidth or style.borderColor then
+        local vw = style.width or 0
+        local vh = style.height or 0
+
+        -- Background rect: create if has background/border, OR if has explicit size (for hit testing)
+        if style.backgroundColor or style.borderWidth or style.borderColor or (vw > 0 and vh > 0) then
             local bg
-            local vw = style.width or 0
-            local vh = style.height or 0
             local br = style.borderRadius or 0
             -- Perfect circle: use roundedRect (same as before, reliable positioning)
             local isCircle = br > 0 and vw > 0 and vh > 0 and vw == vh and br >= vw / 2
@@ -296,6 +302,9 @@ function M.createInstance(elementType, props)
             end
 
             group._bg = bg
+            -- Set group dimensions for hit testing (Solar2D groups don't have intrinsic size)
+            group.width = vw
+            group.height = vh
         end
 
         -- Per-side borders
@@ -390,20 +399,64 @@ function M.createInstance(elementType, props)
         local field
         if native and native.newTextField then
             local multiline = props.multiline or false
-            if multiline then
-                field = native.newTextBox(w / 2, h / 2, w - 8, h - 8)
+            -- Use pcall to catch native text field creation errors
+            -- Note: native.newTextField requires screen coordinates, not local
+            local ok, result = pcall(function()
+                -- Position at center of screen initially, will be moved by layout
+                local screenX = display.contentCenterX - (w - 8) / 2
+                local screenY = display.contentCenterY - (h - 8) / 2
+                if multiline then
+                    return native.newTextBox(screenX, screenY, w - 8, h - 8)
+                else
+                    return native.newTextField(screenX, screenY, w - 8, h - 8)
+                end
+            end)
+            if ok then
+                field = result
             else
-                field = native.newTextField(w / 2, h / 2, w - 8, h - 8)
+                print("[HostConfig] TextInput creation failed: " .. tostring(result))
             end
             if field then
-                field.font = native.systemFont
+                -- Set size first
                 field.size = style.fontSize or 14
-                if props.placeholder then field.placeholder = props.placeholder end
-                if props.value then field.text = props.value end
+
+                -- TextBox (multiline) specific settings
+                if multiline then
+                    -- Enable editing for text box
+                    field.isEditable = true
+                    -- Hide default background to show our custom background
+                    field.hasBackground = false
+                    -- Set to true to allow multiple lines
+                    field.isFontSizeScaled = false
+                end
+
+                -- Set placeholder if provided (not supported on textBox, but try anyway)
+                if props.placeholder then
+                    local ok = pcall(function()
+                        field.placeholder = props.placeholder
+                    end)
+                    if not ok then
+                        -- TextBox doesn't support placeholder, ignore error
+                    end
+                end
+
+                -- Set value if provided (may be empty string)
+                if props.value ~= nil then
+                    local ok = pcall(function()
+                        field.text = tostring(props.value)
+                    end)
+                    if not ok then
+                        print("[HostConfig] Warning: failed to set text")
+                    end
+                end
+
+                -- Set text color
                 if style.color then
                     local c = parseColor(style.color)
-                    if field.setTextColor then
-                        field:setTextColor(c[1], c[2], c[3], c[4])
+                    if field.setTextColor and c then
+                        pcall(function()
+                            field:setTextColor(c[1], c[2], c[3], c[4])
+                        end)
                     end
                 end
                 field:addEventListener("userInput", function(event)
@@ -539,6 +592,11 @@ function M.appendChild(parent, child)
         parent:insert(child)
     end
 
+    -- Handle zIndex: bring to front if zIndex > 0
+    if child._zIndex and child._zIndex > 0 and child.toFront then
+        child:toFront()
+    end
+
     -- Manual centering: without Yoga, justifyContent/alignItems don't work.
     -- If the parent View has centering styles and known dimensions, center the child.
     if parent._centerChildren and child.contentWidth then
@@ -669,7 +727,12 @@ function M.updateInstance(instance, oldProps, newProps)
     elseif oldStyle.display == "none" and newStyle.display ~= "none" then
         instance.isVisible = true
     end
-    if newStyle.zIndex then instance._zIndex = newStyle.zIndex end
+    if newStyle.zIndex then
+        instance._zIndex = newStyle.zIndex
+        if instance._zIndex > 0 and instance.toFront then
+            instance:toFront()
+        end
+    end
 
     -- Transform updates
     if newStyle.transform then

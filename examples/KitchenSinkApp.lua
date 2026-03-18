@@ -4,6 +4,7 @@
 local React = require("react")
 local ce = React.createElement
 local useState = React.useState
+local useCallback = React.useCallback
 local Navigation = require("navigation")
 local T = require("examples.kitchen_sink.theme")
 local RN = require("react_solar2d")
@@ -55,6 +56,7 @@ local function ListScreen(props)
                 borderWidth = 1, borderColor = T.border,
             },
             onPress = function()
+                print("[KS] List item tap: " .. s.name)
                 if onSelect then onSelect(s) end
             end,
         },
@@ -90,7 +92,36 @@ end
 -- do NOT wrap in a second NavigationContainer.
 local function KitchenSinkApp()
     local activeCategory, setActiveCategory = useState(1)
-    local activeDemo, setActiveDemo = useState(nil) -- nil = show list, otherwise the demo component
+    local activeDemo, setActiveDemo = useState(nil)
+    -- Global overlay stack - supports multiple modals layered
+    local overlayStack, setOverlayStack = useState({})
+
+    -- Callback for demos to push content to global overlay stack
+    local pushOverlay = useCallback(function(content)
+        setOverlayStack(function(stack)
+            local newStack = {}
+            for _, v in ipairs(stack) do table.insert(newStack, v) end
+            table.insert(newStack, content)
+            return newStack
+        end)
+    end, {})
+
+    -- Pop top overlay from stack
+    local popOverlay = useCallback(function()
+        setOverlayStack(function(stack)
+            if #stack == 0 then return stack end
+            local newStack = {}
+            for i = 1, #stack - 1 do
+                newStack[i] = stack[i]
+            end
+            return newStack
+        end)
+    end, {})
+
+    -- Clear all overlays
+    local clearOverlay = useCallback(function()
+        setOverlayStack({})
+    end, {})
 
     -- Top category bar
     local catButtons = {}
@@ -106,8 +137,10 @@ local function KitchenSinkApp()
                 backgroundColor = isActive and T.accent or T.surface,
             },
             onPress = function()
+                print("[KS] Category tap: " .. cat.label .. " (" .. i .. ")")
                 setActiveCategory(i)
-                setActiveDemo(nil) -- back to list
+                setActiveDemo(nil)
+                clearOverlay() -- clear overlay when switching categories
             end,
         }, ce("Text", {
             style = {
@@ -135,7 +168,6 @@ local function KitchenSinkApp()
     -- Content: either demo list or active demo component
     local content
     if activeDemo then
-        -- Back button + demo component
         local backBtn = ce(RN.Pressable, {
             style = {
                 flexDirection = "row", alignItems = "center",
@@ -145,33 +177,53 @@ local function KitchenSinkApp()
             },
             onPress = function()
                 setActiveDemo(nil)
+                clearOverlay()
             end,
         }, ce("Text", {
             style = { fontSize = 14, color = T.accent },
         }, "← " .. activeDemo.name))
 
         content = ce("View", { style = { flex = 1, backgroundColor = T.bg } },
-            -- Back button on top with zIndex so native display objects can't block it
-            ce("View", { style = { zIndex = 100 } }, backBtn),
+            backBtn,
             ce(activeDemo.component, {
                 navigation = { goBack = function() setActiveDemo(nil) end },
                 route = { name = activeDemo.name, params = {} },
+                pushOverlay = pushOverlay,
+                popOverlay = popOverlay,
+                clearOverlay = clearOverlay,
             })
         )
     else
-        -- Show list for active category
         local cat = CATEGORIES[activeCategory]
-        content = ce(ListScreen, {
-            screens = cat and cat.screens or {},
-            onSelect = function(s)
-                setActiveDemo(s)
-            end,
-        })
+        content = ce("View", { style = { flex = 1 } },
+            ce(ListScreen, {
+                screens = cat and cat.screens or {},
+                onSelect = function(s)
+                    setActiveDemo(s)
+                end,
+            })
+        )
     end
 
+    -- Structure:
+    -- 1. Main content (categoryBar + content)
+    -- 2. Global overlay layer (renders ABOVE everything, including categoryBar)
     return ce("View", { style = { flex = 1, backgroundColor = T.bg } },
-        categoryBar,
-        content
+        -- Main content layer
+        ce("View", { style = { flex = 1 } },
+            categoryBar,
+            content
+        ),
+        -- Global overlay layer - always on top when content exists
+        (#overlayStack > 0) and ce("View", {
+            style = {
+                position = "absolute",
+                top = 0, left = 0,
+                width = display.contentWidth,
+                height = display.contentHeight,
+                zIndex = 99999,
+            },
+        }, overlayStack[#overlayStack]) or nil
     )
 end
 

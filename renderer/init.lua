@@ -67,6 +67,32 @@ local function applyLayout(yogaNode, fiber)
 
     if fiber.stateNode then
         local l, t, w, h = yogaNode:getLayout()
+        -- Check for absolute positioning with explicit coordinates
+        local style = (fiber.props and fiber.props.style) or {}
+        if style.position == "absolute" then
+            -- For absolute positioning, use specified top/left/right/bottom directly
+            -- This allows Modal to position itself at screen origin
+            if style.left ~= nil then l = style.left end
+            if style.top ~= nil then t = style.top end
+            -- If right is specified but not left, calculate left from right
+            if style.right ~= nil and style.left == nil then
+                if style.width then
+                    l = display.contentWidth - style.width - style.right
+                else
+                    -- Stretch to right edge (not supported in this simple fix)
+                    l = 0
+                end
+            end
+            -- If bottom is specified but not top, calculate top from bottom
+            if style.bottom ~= nil and style.top == nil then
+                if style.height then
+                    t = display.contentHeight - style.height - style.bottom
+                else
+                    -- Stretch to bottom edge (not supported in this simple fix)
+                    t = 0
+                end
+            end
+        end
         -- Store layout position separately so translateX/Y can offset from it
         fiber.stateNode._layoutX = l
         fiber.stateNode._layoutY = t
@@ -76,6 +102,32 @@ local function applyLayout(yogaNode, fiber)
         if fiber.stateNode._bg and fiber.stateNode._bg.removeSelf and fiber.stateNode._bg.path then
             fiber.stateNode._bg.path.width = w
             fiber.stateNode._bg.path.height = h
+        end
+        -- TextInput: sync native text field position to layout
+        if fiber.type == "TextInput" and fiber.stateNode._inputField then
+            local field = fiber.stateNode._inputField
+            local pad = 4 -- padding inside the input
+            field.x = l + pad
+            field.y = t + pad
+            -- Update size if changed
+            if w > pad * 2 then field.width = w - pad * 2 end
+            if h > pad * 2 then field.height = h - pad * 2 end
+        end
+        -- ScrollView: update scroll dimensions and touch overlay size
+        if fiber.type == "ScrollView" and fiber.stateNode._contentGroup then
+            fiber.stateNode._scrollW = w
+            fiber.stateNode._scrollH = h
+            -- Update touch overlay rect to match new size
+            if fiber.stateNode.numChildren and fiber.stateNode.numChildren > 0 then
+                for i = 1, fiber.stateNode.numChildren do
+                    local child = fiber.stateNode[i]
+                    if child and child._isTouchOverlay and child.path then
+                        child.path.width = w
+                        child.path.height = h
+                        break
+                    end
+                end
+            end
         end
         -- Text wrapping: if Yoga computed a width, rebuild text with that width
         if fiber.type == "Text" and fiber.stateNode._textObj then

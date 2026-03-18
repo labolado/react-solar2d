@@ -100,24 +100,26 @@ T.describe("View: appendChild centering", function()
     end)
 end)
 
-T.describe("wireEvents: tap on _bg", function()
-    T.it("registers tap on _bg rect, not on group", function()
+T.describe("wireEvents: tap on group", function()
+    T.it("registers tap on group with isHitTestable", function()
         local pressed = false
         local inst = HostConfig.createInstance("View", {
             style = { width = 100, height = 50, backgroundColor = "#FF0000" },
             onPress = function() pressed = true end,
         })
         T.expect(inst._onPress).toBeTruthy()
-        -- Tap should be on _bg
-        T.expect(inst._bg._listeners["tap"]).toBeTruthy()
+        -- Tap should be on group itself (isHitTestable = true)
+        T.expect(inst._listeners["tap"]).toBeTruthy()
+        T.expect(inst.isHitTestable).toBe(true)
     end)
 
-    T.it("registers tap on _textObj for Text", function()
+    T.it("registers tap on group for Text with onPress", function()
         local inst = HostConfig.createInstance("Text", {
             children = "Click me",
             onPress = function() end,
         })
-        T.expect(inst._textObj._listeners["tap"]).toBeTruthy()
+        T.expect(inst._listeners["tap"]).toBeTruthy()
+        T.expect(inst.isHitTestable).toBe(true)
     end)
 end)
 
