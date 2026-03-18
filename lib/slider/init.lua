@@ -7,7 +7,6 @@ local M = {}
 function M.Slider(props)
     local React = require("react")
     local useState = React.useState
-    local useRef = React.useRef
     local useCallback = React.useCallback
 
     local value = props.value or 0
@@ -29,24 +28,18 @@ function M.Slider(props)
     local thumbSize = style.thumbSize or 20
     local trackWidth = style.width or 200
 
-    -- Internal state for dragging
+    -- Internal state
     local isDragging, setIsDragging = useState(false)
-    local localValue, setLocalValue = useState(value)
 
-    -- Sync with external value
-    React.useEffect(function()
-        setLocalValue(value)
-    end, {value})
-
-    -- Calculate position from value
-    local function valueToPosition(v)
-        local ratio = (v - minimumValue) / (maximumValue - minimumValue)
+    -- Calculate thumb position from value
+    local function getThumbPosition()
+        local ratio = (value - minimumValue) / (maximumValue - minimumValue)
         return ratio * (trackWidth - thumbSize)
     end
 
-    -- Calculate value from position
+    -- Calculate value from position (0 to trackWidth)
     local function positionToValue(pos)
-        local ratio = pos / (trackWidth - thumbSize)
+        local ratio = pos / trackWidth
         local v = minimumValue + ratio * (maximumValue - minimumValue)
         -- Apply step if specified
         if step and step > 0 then
@@ -56,36 +49,46 @@ function M.Slider(props)
         return math.max(minimumValue, math.min(maximumValue, v))
     end
 
-    local handlePress = useCallback(function(e)
+    -- Handle tap on track - jump to that position
+    local handleTrackPress = useCallback(function(e)
         if disabled then return end
-        local pos = math.max(0, math.min(trackWidth - thumbSize, e.x - thumbSize / 2))
+        local pos = e.x or (trackWidth / 2)
         local newValue = positionToValue(pos)
-        setLocalValue(newValue)
         if onValueChange then
             onValueChange(newValue)
         end
-        setIsDragging(true)
-    end)
-
-    local handleMove = useCallback(function(e)
-        if not isDragging or disabled then return end
-        local pos = math.max(0, math.min(trackWidth - thumbSize, e.x - thumbSize / 2))
-        local newValue = positionToValue(pos)
-        setLocalValue(newValue)
-        if onValueChange then
-            onValueChange(newValue)
-        end
-    end)
-
-    local handleRelease = useCallback(function()
-        if not isDragging then return end
-        setIsDragging(false)
         if onSlidingComplete then
-            onSlidingComplete(localValue)
+            onSlidingComplete(newValue)
         end
     end)
 
-    local thumbPosition = valueToPosition(localValue)
+    -- Handle decrement
+    local handleDecrement = useCallback(function()
+        if disabled then return end
+        local delta = step or (maximumValue - minimumValue) / 20
+        local newValue = math.max(minimumValue, value - delta)
+        if onValueChange then
+            onValueChange(newValue)
+        end
+        if onSlidingComplete then
+            onSlidingComplete(newValue)
+        end
+    end)
+
+    -- Handle increment
+    local handleIncrement = useCallback(function()
+        if disabled then return end
+        local delta = step or (maximumValue - minimumValue) / 20
+        local newValue = math.min(maximumValue, value + delta)
+        if onValueChange then
+            onValueChange(newValue)
+        end
+        if onSlidingComplete then
+            onSlidingComplete(newValue)
+        end
+    end)
+
+    local thumbPosition = getThumbPosition()
     local filledWidth = thumbPosition + thumbSize / 2
 
     return React.createElement("View", {
@@ -93,62 +96,106 @@ function M.Slider(props)
             width = trackWidth,
             height = math.max(trackHeight, thumbSize) + 10,
             justifyContent = "center",
-            style = style,
         }
     },
-        -- Track background (unfilled)
-        React.createElement("View", {
+        -- Decrement button
+        React.createElement("Pressable", {
             style = {
                 position = "absolute",
-                left = 0,
-                right = 0,
-                height = trackHeight,
-                backgroundColor = maximumTrackTintColor,
-                borderRadius = trackHeight / 2,
-            }
-        }),
-        -- Track fill
-        React.createElement("View", {
-            style = {
-                position = "absolute",
-                left = 0,
-                width = filledWidth,
-                height = trackHeight,
-                backgroundColor = minimumTrackTintColor,
-                borderRadius = trackHeight / 2,
-            }
-        }),
-        -- Touchable area and thumb
+                left = -30,
+                width = 24,
+                height = 24,
+                borderRadius = 12,
+                backgroundColor = disabled and "#CCCCCC" or "#007AFF",
+                justifyContent = "center",
+                alignItems = "center",
+            },
+            onPress = handleDecrement,
+            disabled = disabled,
+        },
+            React.createElement("Text", {
+                style = {
+                    fontSize = 16,
+                    color = "#FFFFFF",
+                    fontWeight = "bold",
+                    textAlign = "center",
+                    lineHeight = 24,
+                }
+            }, "-")
+        ),
+
+        -- Track background (with tap handler)
         React.createElement("Pressable", {
             style = {
                 position = "absolute",
                 left = 0,
                 right = 0,
-                top = 0,
-                bottom = 0,
+                height = trackHeight + 20, -- Larger hit area
+                justifyContent = "center",
             },
-            onPressIn = handlePress,
-            onPress = handleRelease,
+            onPress = handleTrackPress,
+            disabled = disabled,
         },
-            -- Thumb
+            -- Visual track background
+            React.createElement("View", {
+                style = {
+                    width = trackWidth,
+                    height = trackHeight,
+                    backgroundColor = maximumTrackTintColor,
+                    borderRadius = trackHeight / 2,
+                }
+            },
+                -- Track fill
+                React.createElement("View", {
+                    style = {
+                        position = "absolute",
+                        left = 0,
+                        width = filledWidth,
+                        height = trackHeight,
+                        backgroundColor = minimumTrackTintColor,
+                        borderRadius = trackHeight / 2,
+                    }
+                })
+            ),
+            -- Thumb (visual only, positioned over track)
             React.createElement("View", {
                 style = {
                     position = "absolute",
                     left = thumbPosition,
-                    top = (math.max(trackHeight, thumbSize) + 10 - thumbSize) / 2 - (trackHeight + 10) / 2,
                     width = thumbSize,
                     height = thumbSize,
                     borderRadius = thumbSize / 2,
                     backgroundColor = thumbTintColor,
-                    shadowColor = "#000",
-                    shadowOffset = { width = 0, height = 2 },
-                    shadowOpacity = 0.2,
-                    shadowRadius = 2,
-                    elevation = 3,
-                    borderWidth = disabled and 0 or 1,
+                    borderWidth = 1,
                     borderColor = "#DDDDDD",
                 }
             })
+        ),
+
+        -- Increment button
+        React.createElement("Pressable", {
+            style = {
+                position = "absolute",
+                right = -30,
+                width = 24,
+                height = 24,
+                borderRadius = 12,
+                backgroundColor = disabled and "#CCCCCC" or "#007AFF",
+                justifyContent = "center",
+                alignItems = "center",
+            },
+            onPress = handleIncrement,
+            disabled = disabled,
+        },
+            React.createElement("Text", {
+                style = {
+                    fontSize = 16,
+                    color = "#FFFFFF",
+                    fontWeight = "bold",
+                    textAlign = "center",
+                    lineHeight = 24,
+                }
+            }, "+")
         )
     )
 end
