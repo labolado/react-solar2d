@@ -4,6 +4,20 @@ M._tests = {}
 M._passed = 0
 M._failed = 0
 
+-- Optional: load mock_hooks if available
+local mockHooks = nil
+local function loadMockHooks()
+    if mockHooks == nil then
+        local ok, result = pcall(require, "tests.helpers.mock_hooks")
+        if ok then
+            mockHooks = result
+        else
+            mockHooks = false
+        end
+    end
+    return mockHooks ~= false and mockHooks or nil
+end
+
 function M.describe(name, fn)
     print("\n=== " .. name .. " ===")
     fn()
@@ -18,6 +32,44 @@ function M.it(name, fn)
         M._failed = M._failed + 1
         print("  ✗ " .. name .. "\n    " .. tostring(err))
     end
+end
+
+-- Run a test with hooks support
+-- Usage: T.itWithHooks("test name", function(fiber) ... end)
+function M.itWithHooks(name, fn)
+    local mock = loadMockHooks()
+    if not mock then
+        M._failed = M._failed + 1
+        print("  ✗ " .. name .. "\n    mock_hooks.lua not available")
+        return
+    end
+
+    local fiber = mock.createMockFiber()
+    mock.setupHooks(fiber)
+
+    local ok, err = pcall(function()
+        fn(fiber)
+    end)
+
+    mock.cleanupHooks()
+
+    if ok then
+        M._passed = M._passed + 1
+        print("  ✓ " .. name)
+    else
+        M._failed = M._failed + 1
+        print("  ✗ " .. name .. "\n    " .. tostring(err))
+    end
+end
+
+-- Render a component with hooks support
+-- Returns: element, fiber
+function M.renderComponent(componentFn, props)
+    local mock = loadMockHooks()
+    if not mock then
+        error("mock_hooks.lua not available")
+    end
+    return mock.renderComponent(componentFn, props)
 end
 
 function M.expect(val)

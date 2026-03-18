@@ -1,6 +1,6 @@
 -- lib/datetime-picker/init.lua
 -- @react-native-community/datetimepicker implementation for Solar2D
--- Simple, working date/time picker without problematic hooks
+-- Simple, working version without hooks for production stability
 
 local M = {}
 
@@ -30,17 +30,18 @@ local function formatDisplay(timestamp, mode)
 end
 
 -- Parse date from text
-local function tryParse(text, mode)
+local function tryParse(text, mode, currentValue)
     if mode == "date" then
         local y, m, d = text:match("^(%d%d%d%d)%-(%d%d)%-(%d%d)$")
         if y and m and d then
-            return os.time({ year = tonumber(y), month = tonumber(m), day = tonumber(d) })
+            local parts = os.date("*t", currentValue)
+            return os.time({ year = tonumber(y), month = tonumber(m), day = tonumber(d), hour = parts.hour, min = parts.min })
         end
     elseif mode == "time" then
         local h, mi = text:match("^(%d%d):(%d%d)$")
         if h and mi then
-            local now = os.date("*t")
-            return os.time({ year = now.year, month = now.month, day = now.day, hour = tonumber(h), min = tonumber(mi) })
+            local parts = os.date("*t", currentValue)
+            return os.time({ year = parts.year, month = parts.month, day = parts.day, hour = tonumber(h), min = tonumber(mi) })
         end
     else -- datetime
         local y, m, d, h, mi = text:match("^(%d%d%d%d)%-(%d%d)%-(%d%d) (%d%d):(%d%d)$")
@@ -58,7 +59,7 @@ local function getParts(timestamp)
 end
 
 -- Simple picker using text input with +/- buttons
--- NO HOOKS - takes value from props, calls onChange when user interacts
+-- NO HOOKS - pure props-driven for stability
 function M.DateTimePicker(props)
     local React = require("react")
     local ce = React.createElement
@@ -71,10 +72,17 @@ function M.DateTimePicker(props)
     local minimumDate = props.minimumDate
     local maximumDate = props.maximumDate
 
-    local pickerHeight = style.height or 44
-    local displayText = formatDisplay(value, mode)
+    -- Get TextInput safely
+    local TextInput = "View"
+    local ok, rn = pcall(require, "react_solar2d")
+    if ok and rn and rn.TextInput then
+        TextInput = rn.TextInput
+    end
 
-    -- Create handler functions that close over current props
+    local pickerHeight = style.height or 44
+    local displayValue = formatDisplay(value, mode)
+
+    -- Handler functions that close over current props
     local function handleDecrement()
         if disabled then return end
 
@@ -85,7 +93,7 @@ function M.DateTimePicker(props)
             newTs = os.time({ year = year, month = month, day = day - 1, hour = hour, min = min })
         elseif mode == "time" then
             newTs = os.time({ year = year, month = month, day = day, hour = hour, min = min - 1 })
-        else -- datetime
+        else
             newTs = os.time({ year = year, month = month, day = day, hour = hour - 1, min = min })
         end
 
@@ -107,7 +115,7 @@ function M.DateTimePicker(props)
             newTs = os.time({ year = year, month = month, day = day + 1, hour = hour, min = min })
         elseif mode == "time" then
             newTs = os.time({ year = year, month = month, day = day, hour = hour, min = min + 1 })
-        else -- datetime
+        else
             newTs = os.time({ year = year, month = month, day = day, hour = hour + 1, min = min })
         end
 
@@ -122,8 +130,8 @@ function M.DateTimePicker(props)
     local function handleSubmit(e)
         if disabled then return end
 
-        local text = e.text or displayText
-        local newTs = tryParse(text, mode)
+        local text = e.text or displayValue
+        local newTs = tryParse(text, mode, value)
 
         if newTs then
             if minimumDate and newTs < minimumDate then newTs = minimumDate end
@@ -161,8 +169,8 @@ function M.DateTimePicker(props)
             disabled = disabled,
         }, ce("Text", { style = { fontSize = 18, color = "#007AFF" } }, "-")),
 
-        -- Text input for direct editing
-        ce(require("react_solar2d").TextInput, {
+        -- Text input
+        ce(TextInput, {
             style = {
                 flex = 1,
                 fontSize = style.fontSize or 16,
@@ -171,7 +179,7 @@ function M.DateTimePicker(props)
                 height = pickerHeight - 2,
                 padding = 0,
             },
-            defaultValue = displayText,
+            defaultValue = displayValue,
             onSubmitEditing = handleSubmit,
             editable = not disabled,
         }),
@@ -200,16 +208,9 @@ function M.open(params)
     local title = params.title or (mode == "time" and "Select Time" or "Select Date")
 
     if native and native.showAlert then
-        native.showAlert(
-            title,
-            "Current: " .. formatDisplay(value, mode) .. "\n\nUse +/- buttons or edit directly.",
-            {"OK"},
-            function(event)
-                if onChange then
-                    onChange({ type = M.EventType.SET, nativeEvent = { timestamp = value } })
-                end
-            end
-        )
+        native.showAlert(title, "Current: " .. formatDisplay(value, mode), {"OK"}, function(event)
+            if onChange then onChange({ type = M.EventType.SET, nativeEvent = { timestamp = value } }) end
+        end)
     end
 end
 
