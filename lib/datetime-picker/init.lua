@@ -1,6 +1,6 @@
 -- lib/datetime-picker/init.lua
 -- @react-native-community/datetimepicker implementation for Solar2D
--- Date and time picker component
+-- Simple, working date/time picker without problematic hooks
 
 local M = {}
 
@@ -18,32 +18,7 @@ M.EventType = {
     DISMISSED = "dismissed",
 }
 
--- Create wheel picker data
-local function createWheelData(min, max, pad)
-    local data = {}
-    for i = min, max do
-        local s = tostring(i)
-        if pad and i < 10 then
-            s = "0" .. s
-        end
-        table.insert(data, s)
-    end
-    return data
-end
-
--- Get current date parts
-local function getDateParts(timestamp)
-    local t = os.date("*t", timestamp)
-    return {
-        year = t.year,
-        month = t.month,
-        day = t.day,
-        hour = t.hour,
-        min = t.min,
-    }
-end
-
--- Format for display
+-- Format timestamp for display
 local function formatDisplay(timestamp, mode)
     if mode == "time" then
         return os.date("%H:%M", timestamp)
@@ -54,21 +29,38 @@ local function formatDisplay(timestamp, mode)
     end
 end
 
--- Build timestamp from parts
-local function buildTimestamp(parts)
-    return os.time({
-        year = parts.year,
-        month = parts.month,
-        day = parts.day,
-        hour = parts.hour or 0,
-        min = parts.min or 0,
-    })
+-- Parse date from text
+local function tryParse(text, mode)
+    if mode == "date" then
+        local y, m, d = text:match("^(%d%d%d%d)%-(%d%d)%-(%d%d)$")
+        if y and m and d then
+            return os.time({ year = tonumber(y), month = tonumber(m), day = tonumber(d) })
+        end
+    elseif mode == "time" then
+        local h, mi = text:match("^(%d%d):(%d%d)$")
+        if h and mi then
+            local now = os.date("*t")
+            return os.time({ year = now.year, month = now.month, day = now.day, hour = tonumber(h), min = tonumber(mi) })
+        end
+    else -- datetime
+        local y, m, d, h, mi = text:match("^(%d%d%d%d)%-(%d%d)%-(%d%d) (%d%d):(%d%d)$")
+        if y and m and d and h and mi then
+            return os.time({ year = tonumber(y), month = tonumber(m), day = tonumber(d), hour = tonumber(h), min = tonumber(mi) })
+        end
+    end
+    return nil
 end
 
--- Simple picker using text input with increment/decrement buttons
+-- Get date parts for adjustment
+local function getParts(timestamp)
+    local t = os.date("*t", timestamp)
+    return t.year, t.month, t.day, t.hour, t.min
+end
+
+-- Simple picker using text input with +/- buttons
+-- NO HOOKS - takes value from props, calls onChange when user interacts
 function M.DateTimePicker(props)
     local React = require("react")
-    local useState = React.useState
     local ce = React.createElement
 
     local value = props.value or os.time()
@@ -76,99 +68,72 @@ function M.DateTimePicker(props)
     local onChange = props.onChange
     local disabled = props.disabled or false
     local style = props.style or {}
-
     local minimumDate = props.minimumDate
     local maximumDate = props.maximumDate
 
-    -- Local state for editing
-    local displayValue = formatDisplay(value, mode)
-    local inputText, setInputText = useState(displayValue)
+    local pickerHeight = style.height or 44
+    local displayText = formatDisplay(value, mode)
 
-    -- Update input when value prop changes
-    React.useEffect(function()
-        setInputText(formatDisplay(value, mode))
-    end, {value, mode})
+    -- Create handler functions that close over current props
+    local function handleDecrement()
+        if disabled then return end
 
-    -- Parse and set value
-    local function tryParseAndSet(text)
-        local parts = getDateParts(value)
-        local valid = false
+        local year, month, day, hour, min = getParts(value)
+        local newTs
 
         if mode == "date" then
-            -- Try YYYY-MM-DD
-            local y, m, d = text:match("^(%d%d%d%d)%-(%d%d)%-(%d%d)$")
-            if y and m and d then
-                parts.year = tonumber(y)
-                parts.month = tonumber(m)
-                parts.day = tonumber(d)
-                valid = true
-            end
+            newTs = os.time({ year = year, month = month, day = day - 1, hour = hour, min = min })
         elseif mode == "time" then
-            -- Try HH:MM
-            local h, mi = text:match("^(%d%d):(%d%d)$")
-            if h and mi then
-                parts.hour = tonumber(h)
-                parts.min = tonumber(mi)
-                valid = true
-            end
-        else
-            -- Try YYYY-MM-DD HH:MM
-            local y, m, d, h, mi = text:match("^(%d%d%d%d)%-(%d%d)%-(%d%d) (%d%d):(%d%d)$")
-            if y and m and d and h and mi then
-                parts.year = tonumber(y)
-                parts.month = tonumber(m)
-                parts.day = tonumber(d)
-                parts.hour = tonumber(h)
-                parts.min = tonumber(mi)
-                valid = true
-            end
+            newTs = os.time({ year = year, month = month, day = day, hour = hour, min = min - 1 })
+        else -- datetime
+            newTs = os.time({ year = year, month = month, day = day, hour = hour - 1, min = min })
         end
 
-        if valid then
-            local newTs = buildTimestamp(parts)
-            -- Check bounds
-            if minimumDate and newTs < minimumDate then
-                newTs = minimumDate
-            end
-            if maximumDate and newTs > maximumDate then
-                newTs = maximumDate
-            end
-
-            if onChange then
-                onChange({
-                    type = M.EventType.SET,
-                    nativeEvent = { timestamp = newTs },
-                })
-            end
-            setInputText(formatDisplay(newTs, mode))
-        else
-            -- Invalid format, reset to current
-            setInputText(formatDisplay(value, mode))
-        end
-    end
-
-    -- Increment/decrement helpers
-    local function adjustDate(field, delta)
-        local parts = getDateParts(value)
-        parts[field] = parts[field] + delta
-        local newTs = buildTimestamp(parts)
-
-        if minimumDate and newTs < minimumDate then
-            newTs = minimumDate
-        end
-        if maximumDate and newTs > maximumDate then
-            newTs = maximumDate
-        end
+        if minimumDate and newTs < minimumDate then newTs = minimumDate end
+        if maximumDate and newTs > maximumDate then newTs = maximumDate end
 
         if onChange then
-            onChange({
-                type = M.EventType.SET,
-                nativeEvent = { timestamp = newTs },
-            })
+            onChange({ type = M.EventType.SET, nativeEvent = { timestamp = newTs } })
         end
     end
 
-    local pickerHeight = style.height or 44
+    local function handleIncrement()
+        if disabled then return end
+
+        local year, month, day, hour, min = getParts(value)
+        local newTs
+
+        if mode == "date" then
+            newTs = os.time({ year = year, month = month, day = day + 1, hour = hour, min = min })
+        elseif mode == "time" then
+            newTs = os.time({ year = year, month = month, day = day, hour = hour, min = min + 1 })
+        else -- datetime
+            newTs = os.time({ year = year, month = month, day = day, hour = hour + 1, min = min })
+        end
+
+        if minimumDate and newTs < minimumDate then newTs = minimumDate end
+        if maximumDate and newTs > maximumDate then newTs = maximumDate end
+
+        if onChange then
+            onChange({ type = M.EventType.SET, nativeEvent = { timestamp = newTs } })
+        end
+    end
+
+    local function handleSubmit(e)
+        if disabled then return end
+
+        local text = e.text or displayText
+        local newTs = tryParse(text, mode)
+
+        if newTs then
+            if minimumDate and newTs < minimumDate then newTs = minimumDate end
+            if maximumDate and newTs > maximumDate then newTs = maximumDate end
+
+            if onChange then
+                onChange({ type = M.EventType.SET, nativeEvent = { timestamp = newTs } })
+            end
+        end
+    end
 
     return ce("View", {
         style = {
@@ -192,17 +157,8 @@ function M.DateTimePicker(props)
                 borderRightWidth = 1,
                 borderColor = "#EEEEEE",
             },
-            onPress = function()
-                if disabled then return end
-                if mode == "date" then
-                    adjustDate("day", -1)
-                elseif mode == "time" then
-                    adjustDate("min", -1)
-                else
-                    adjustDate("hour", -1)
-                end
-            end,
-            activeOpacity = 0.7,
+            onPress = handleDecrement,
+            disabled = disabled,
         }, ce("Text", { style = { fontSize = 18, color = "#007AFF" } }, "-")),
 
         -- Text input for direct editing
@@ -215,15 +171,9 @@ function M.DateTimePicker(props)
                 height = pickerHeight - 2,
                 padding = 0,
             },
-            value = inputText,
-            onChangeText = function(text)
-                setInputText(text)
-            end,
-            onEndEditing = function()
-                tryParseAndSet(inputText)
-            end,
+            defaultValue = displayText,
+            onSubmitEditing = handleSubmit,
             editable = not disabled,
-            returnKeyType = "done",
         }),
 
         -- Increment button
@@ -236,17 +186,8 @@ function M.DateTimePicker(props)
                 borderLeftWidth = 1,
                 borderColor = "#EEEEEE",
             },
-            onPress = function()
-                if disabled then return end
-                if mode == "date" then
-                    adjustDate("day", 1)
-                elseif mode == "time" then
-                    adjustDate("min", 1)
-                else
-                    adjustDate("hour", 1)
-                end
-            end,
-            activeOpacity = 0.7,
+            onPress = handleIncrement,
+            disabled = disabled,
         }, ce("Text", { style = { fontSize = 18, color = "#007AFF" } }, "+"))
     )
 end
@@ -258,19 +199,14 @@ function M.open(params)
     local onChange = params.onChange
     local title = params.title or (mode == "time" and "Select Time" or "Select Date")
 
-    local current = formatDisplay(value, mode)
-
     if native and native.showAlert then
         native.showAlert(
             title,
-            "Current: " .. current .. "\n\nUse +/- buttons or edit directly.",
+            "Current: " .. formatDisplay(value, mode) .. "\n\nUse +/- buttons or edit directly.",
             {"OK"},
             function(event)
                 if onChange then
-                    onChange({
-                        type = M.EventType.SET,
-                        nativeEvent = { timestamp = value },
-                    })
+                    onChange({ type = M.EventType.SET, nativeEvent = { timestamp = value } })
                 end
             end
         )
