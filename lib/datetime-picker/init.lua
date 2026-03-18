@@ -1,6 +1,6 @@
 -- lib/datetime-picker/init.lua
 -- @react-native-community/datetimepicker implementation for Solar2D
--- Simple, working version without hooks for production stability
+-- Simple, working version
 
 local M = {}
 
@@ -58,8 +58,6 @@ local function getParts(timestamp)
     return t.year, t.month, t.day, t.hour, t.min
 end
 
--- Simple picker using text input with +/- buttons
--- NO HOOKS - pure props-driven for stability
 function M.DateTimePicker(props)
     local React = require("react")
     local ce = React.createElement
@@ -72,23 +70,14 @@ function M.DateTimePicker(props)
     local minimumDate = props.minimumDate
     local maximumDate = props.maximumDate
 
-    -- Get TextInput safely
-    local TextInput = "View"
-    local ok, rn = pcall(require, "react_solar2d")
-    if ok and rn and rn.TextInput then
-        TextInput = rn.TextInput
-    end
-
-    local pickerHeight = style.height or 44
+    local pickerHeight = 44
     local displayValue = formatDisplay(value, mode)
 
-    -- Handler functions that close over current props
+    -- Handlers
     local function handleDecrement()
         if disabled then return end
-
         local year, month, day, hour, min = getParts(value)
         local newTs
-
         if mode == "date" then
             newTs = os.time({ year = year, month = month, day = day - 1, hour = hour, min = min })
         elseif mode == "time" then
@@ -96,10 +85,8 @@ function M.DateTimePicker(props)
         else
             newTs = os.time({ year = year, month = month, day = day, hour = hour - 1, min = min })
         end
-
         if minimumDate and newTs < minimumDate then newTs = minimumDate end
         if maximumDate and newTs > maximumDate then newTs = maximumDate end
-
         if onChange then
             onChange({ type = M.EventType.SET, nativeEvent = { timestamp = newTs } })
         end
@@ -107,10 +94,8 @@ function M.DateTimePicker(props)
 
     local function handleIncrement()
         if disabled then return end
-
         local year, month, day, hour, min = getParts(value)
         local newTs
-
         if mode == "date" then
             newTs = os.time({ year = year, month = month, day = day + 1, hour = hour, min = min })
         elseif mode == "time" then
@@ -118,10 +103,8 @@ function M.DateTimePicker(props)
         else
             newTs = os.time({ year = year, month = month, day = day, hour = hour + 1, min = min })
         end
-
         if minimumDate and newTs < minimumDate then newTs = minimumDate end
         if maximumDate and newTs > maximumDate then newTs = maximumDate end
-
         if onChange then
             onChange({ type = M.EventType.SET, nativeEvent = { timestamp = newTs } })
         end
@@ -129,58 +112,72 @@ function M.DateTimePicker(props)
 
     local function handleSubmit(e)
         if disabled then return end
-
         local text = e.text or displayValue
         local newTs = tryParse(text, mode, value)
-
         if newTs then
             if minimumDate and newTs < minimumDate then newTs = minimumDate end
             if maximumDate and newTs > maximumDate then newTs = maximumDate end
-
             if onChange then
                 onChange({ type = M.EventType.SET, nativeEvent = { timestamp = newTs } })
             end
         end
     end
 
+    -- Get TextInput safely
+    local TextInput = "View"
+    local ok, rn = pcall(require, "react_solar2d")
+    if ok and rn and rn.TextInput then
+        TextInput = rn.TextInput
+    end
+
+    -- Fixed width layout
     return ce("View", {
         style = {
-            backgroundColor = style.backgroundColor or "#FFFFFF",
-            borderWidth = style.borderWidth or 1,
-            borderColor = style.borderColor or "#CCCCCC",
-            borderRadius = style.borderRadius or 4,
-            opacity = disabled and 0.5 or 1,
+            width = 220,
             height = pickerHeight,
-            flexDirection = "row",
-            alignItems = "center",
         }
     },
         -- Decrement button
         ce("Pressable", {
             style = {
-                width = 36,
-                height = pickerHeight - 2,
-                justifyContent = "center",
-                alignItems = "center",
-                borderRightWidth = 1,
-                borderColor = "#EEEEEE",
+                position = "absolute",
+                left = 0,
+                top = 0,
+                width = 40,
+                height = pickerHeight,
             },
             onPress = handleDecrement,
-            disabled = disabled,
-        }, ce("Text", { style = { fontSize = 18, color = "#007AFF" } }, "-")),
+        },
+            ce("Text", {
+                style = {
+                    fontSize = 24,
+                    color = disabled and "#999999" or "#007AFF",
+                    textAlign = "center",
+                    textAlignVertical = "center",
+                    height = pickerHeight,
+                    lineHeight = pickerHeight,
+                }
+            }, "-")
+        ),
 
-        -- Text input (controlled component - value always reflects props)
+        -- Value display (center)
         ce(TextInput, {
             style = {
-                flex = 1,
-                fontSize = style.fontSize or 16,
+                position = "absolute",
+                left = 40,
+                top = 0,
+                width = 140,
+                height = pickerHeight,
+                fontSize = 16,
                 color = style.color or "#333333",
                 textAlign = "center",
-                height = pickerHeight - 2,
-                padding = 0,
+                backgroundColor = style.backgroundColor or "#FFFFFF",
+                borderWidth = 1,
+                borderColor = style.borderColor or "#CCCCCC",
+                borderRadius = 4,
             },
             value = displayValue,
-            onChangeText = function() end, -- Required for controlled component
+            onChangeText = function() end,
             onSubmitEditing = handleSubmit,
             editable = not disabled,
         }),
@@ -188,20 +185,29 @@ function M.DateTimePicker(props)
         -- Increment button
         ce("Pressable", {
             style = {
-                width = 36,
-                height = pickerHeight - 2,
-                justifyContent = "center",
-                alignItems = "center",
-                borderLeftWidth = 1,
-                borderColor = "#EEEEEE",
+                position = "absolute",
+                left = 185,
+                top = 0,
+                width = 40,
+                height = pickerHeight,
             },
             onPress = handleIncrement,
-            disabled = disabled,
-        }, ce("Text", { style = { fontSize = 18, color = "#007AFF" } }, "+"))
+        },
+            ce("Text", {
+                style = {
+                    fontSize = 24,
+                    color = disabled and "#999999" or "#007AFF",
+                    textAlign = "center",
+                    textAlignVertical = "center",
+                    height = pickerHeight,
+                    lineHeight = pickerHeight,
+                }
+            }, "+")
+        )
     )
 end
 
--- Open native date picker (imperative API)
+-- Open native date picker
 function M.open(params)
     local mode = params.mode or "date"
     local value = params.value or os.time()
