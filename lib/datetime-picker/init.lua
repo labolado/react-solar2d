@@ -169,7 +169,7 @@ function M.DateTimePicker(props)
             disabled = disabled,
         }, ce("Text", { style = { fontSize = 18, color = "#007AFF" } }, "-")),
 
-        -- Text input
+        -- Text input (controlled component - value always reflects props)
         ce(TextInput, {
             style = {
                 flex = 1,
@@ -179,7 +179,8 @@ function M.DateTimePicker(props)
                 height = pickerHeight - 2,
                 padding = 0,
             },
-            defaultValue = displayValue,
+            value = displayValue,
+            onChangeText = function() end, -- Required for controlled component
             onSubmitEditing = handleSubmit,
             editable = not disabled,
         }),
