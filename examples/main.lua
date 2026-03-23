@@ -162,7 +162,16 @@ timer.performWithDelay(500, function()
         -- Register callbacks for remote control
         testServer.onCategoryTap(function(category)
             print("[TEST_SERVER] Category tapped: " .. category)
-            -- Dispatch event to KitchenSink if active
+            -- Dispatch event to KitchenSink
+            local event = { name = "kitchensink_navigate", category = category }
+            Runtime:dispatchEvent(event)
+        end)
+
+        testServer.onNavigate(function(route)
+            print("[TEST_SERVER] Navigate to: " .. route)
+            -- Dispatch event to KitchenSink
+            local event = { name = "kitchensink_navigate", route = route }
+            Runtime:dispatchEvent(event)
         end)
     else
         print("[TEST_SERVER] Not started: " .. tostring(testServer))

@@ -118,6 +118,7 @@ local function addBorderSide(group, side, width, color, viewW, viewH)
 end
 
 local function wireEvents(instance, props)
+    -- Note: ref callbacks are handled by the reconciler (commitWork), not here
     -- Determine feedback style
     local feedbackType = props._touchFeedback -- "opacity" or nil
     local activeOpacity = props._activeOpacity or 0.4
@@ -148,13 +149,11 @@ local function wireEvents(instance, props)
     if props.onPress then
         instance._onPress = props.onPress
         -- Use 'tap' event — independent of 'touch', doesn't interfere with ScrollView
-        -- Always use the group with isHitTestable for reliable hit detection.
-        -- _bg rects created at 0x0 and resized via path.width/height may not
-        -- update their hit area in all Solar2D versions.
+        -- Reference instance._onPress (not props.onPress) so updateInstance can refresh it
         instance.isHitTestable = true
         instance:addEventListener("tap", function(event)
             flashFeedback()
-            props.onPress(event)
+            if instance._onPress then instance._onPress(event) end
             return true
         end)
     end
@@ -169,6 +168,79 @@ local function wireEvents(instance, props)
                 end)
             elseif event.phase == "ended" or event.phase == "cancelled" then
                 if longPressTimer then timer.cancel(longPressTimer); longPressTimer = nil end
+            end
+            return true
+        end)
+    end
+
+    -- Touch event handlers for drag functionality (Slider, etc.)
+    if props.onTouchStart or props.onTouchMove or props.onTouchEnd then
+        instance.isHitTestable = true
+        instance:addEventListener("touch", function(event)
+            local phase = event.phase
+            if phase == "began" and props.onTouchStart then
+                props.onTouchStart(event)
+                if instance._parentScrollView then
+                    instance._parentScrollView:takeFocus(event)
+                end
+            elseif phase == "moved" and props.onTouchMove then
+                props.onTouchMove(event)
+            elseif (phase == "ended" or phase == "cancelled") and props.onTouchEnd then
+                props.onTouchEnd(event)
+            end
+            return true
+        end)
+    end
+
+    -- Drag gesture support (higher-level API for components like Slider)
+    -- Callbacks stored on instance so updateInstance can refresh them
+    if props.onDragStart or props.onDrag or props.onDragEnd then
+        instance.isHitTestable = true
+        instance._onDragStart = props.onDragStart
+        instance._onDrag = props.onDrag
+        instance._onDragEnd = props.onDragEnd
+        local isDragging = false
+        local dragStartX, dragStartY = 0, 0
+
+        instance:addEventListener("touch", function(event)
+            local phase = event.phase
+            local globalX, globalY = event.x, event.y
+
+            if phase == "began" then
+                isDragging = true
+                dragStartX = globalX
+                dragStartY = globalY
+                display.getCurrentStage():setFocus(event.target)
+                if instance._onDragStart then
+                    instance._onDragStart({
+                        x = globalX, y = globalY,
+                        target = event.target,
+                        startX = dragStartX, startY = dragStartY
+                    })
+                end
+                if instance._parentScrollView then
+                    instance._parentScrollView:takeFocus(event)
+                end
+            elseif phase == "moved" and isDragging then
+                if instance._onDrag then
+                    instance._onDrag({
+                        x = globalX, y = globalY,
+                        target = event.target,
+                        startX = dragStartX, startY = dragStartY,
+                        deltaX = globalX - dragStartX,
+                        deltaY = globalY - dragStartY
+                    })
+                end
+            elseif (phase == "ended" or phase == "cancelled") and isDragging then
+                isDragging = false
+                display.getCurrentStage():setFocus(nil)
+                if instance._onDragEnd then
+                    instance._onDragEnd({
+                        x = globalX, y = globalY,
+                        target = event.target,
+                        startX = dragStartX, startY = dragStartY
+                    })
+                end
             end
             return true
         end)
@@ -587,9 +659,15 @@ function M.appendChild(parent, child)
     if parent._contentGroup then
         -- ScrollView: insert into content group
         parent._contentGroup:insert(child)
+        -- Mark child with parent ScrollView reference for takeFocus support
+        child._parentScrollView = parent
         if parent._invalidateContentSize then parent._invalidateContentSize() end
     else
         parent:insert(child)
+        -- Propagate _parentScrollView reference to nested children
+        if parent._parentScrollView then
+            child._parentScrollView = parent._parentScrollView
+        end
     end
 
     -- Handle zIndex: bring to front if zIndex > 0
@@ -624,11 +702,23 @@ function M.insertBefore(parent, child, beforeChild)
     for i = 1, target.numChildren do
         if target[i] == beforeChild then
             target:insert(i, child)
+            -- Propagate _parentScrollView reference
+            if parent._contentGroup then
+                child._parentScrollView = parent
+            elseif parent._parentScrollView then
+                child._parentScrollView = parent._parentScrollView
+            end
             if parent._invalidateContentSize then parent._invalidateContentSize() end
             return
         end
     end
     target:insert(child)
+    -- Propagate _parentScrollView reference
+    if parent._contentGroup then
+        child._parentScrollView = parent
+    elseif parent._parentScrollView then
+        child._parentScrollView = parent._parentScrollView
+    end
     if parent._invalidateContentSize then parent._invalidateContentSize() end
 end
 
@@ -740,6 +830,12 @@ function M.updateInstance(instance, oldProps, newProps)
     elseif oldStyle.transform and not newStyle.transform then
         applyTransform(instance, nil) -- reset
     end
+
+    -- Refresh event callbacks so touch listeners use latest closures
+    if newProps.onDragStart then instance._onDragStart = newProps.onDragStart end
+    if newProps.onDrag then instance._onDrag = newProps.onDrag end
+    if newProps.onDragEnd then instance._onDragEnd = newProps.onDragEnd end
+    if newProps.onPress then instance._onPress = newProps.onPress end
 
     -- Re-subscribe animated values if they changed
     if instance._animSubscriptions then

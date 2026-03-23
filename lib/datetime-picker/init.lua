@@ -1,6 +1,6 @@
 -- lib/datetime-picker/init.lua
 -- @react-native-community/datetimepicker implementation for Solar2D
--- Simple, working version
+-- Fixed: working version with proper controls
 
 local M = {}
 
@@ -60,6 +60,8 @@ end
 
 function M.DateTimePicker(props)
     local React = require("react")
+    local useState = React.useState
+    local useCallback = React.useCallback
     local ce = React.createElement
 
     local value = props.value or os.time()
@@ -73,8 +75,19 @@ function M.DateTimePicker(props)
     local pickerHeight = 44
     local displayValue = formatDisplay(value, mode)
 
+    -- Local state for editing
+    local editValue, setEditValue = useState(displayValue)
+    local isEditing, setIsEditing = useState(false)
+
+    -- Update edit value when prop changes
+    React.useEffect(function()
+        if not isEditing then
+            setEditValue(formatDisplay(value, mode))
+        end
+    end, {value, mode})
+
     -- Handlers
-    local function handleDecrement()
+    local handleDecrement = useCallback(function()
         if disabled then return end
         local year, month, day, hour, min = getParts(value)
         local newTs
@@ -90,9 +103,9 @@ function M.DateTimePicker(props)
         if onChange then
             onChange({ type = M.EventType.SET, nativeEvent = { timestamp = newTs } })
         end
-    end
+    end, {disabled, value, mode, minimumDate, maximumDate, onChange})
 
-    local function handleIncrement()
+    local handleIncrement = useCallback(function()
         if disabled then return end
         local year, month, day, hour, min = getParts(value)
         local newTs
@@ -108,11 +121,21 @@ function M.DateTimePicker(props)
         if onChange then
             onChange({ type = M.EventType.SET, nativeEvent = { timestamp = newTs } })
         end
-    end
+    end, {disabled, value, mode, minimumDate, maximumDate, onChange})
 
-    local function handleSubmit(e)
+    local handleEditStart = useCallback(function()
         if disabled then return end
-        local text = e.text or displayValue
+        setIsEditing(true)
+        setEditValue(formatDisplay(value, mode))
+    end, {disabled, value, mode})
+
+    local handleEditChange = useCallback(function(e)
+        setEditValue(e.text or "")
+    end, {})
+
+    local handleEditSubmit = useCallback(function(e)
+        setIsEditing(false)
+        local text = e.text or editValue
         local newTs = tryParse(text, mode, value)
         if newTs then
             if minimumDate and newTs < minimumDate then newTs = minimumDate end
@@ -120,94 +143,170 @@ function M.DateTimePicker(props)
             if onChange then
                 onChange({ type = M.EventType.SET, nativeEvent = { timestamp = newTs } })
             end
+        else
+            -- Revert on invalid input
+            setEditValue(formatDisplay(value, mode))
         end
-    end
+    end, {editValue, mode, value, minimumDate, maximumDate, onChange})
 
-    -- Get TextInput safely
-    local TextInput = "View"
-    local ok, rn = pcall(require, "react_solar2d")
-    if ok and rn and rn.TextInput then
-        TextInput = rn.TextInput
-    end
+    local handleEditCancel = useCallback(function()
+        setIsEditing(false)
+        setEditValue(formatDisplay(value, mode))
+    end, {value, mode})
 
-    -- Fixed width layout
-    return ce("View", {
-        style = {
-            width = 220,
-            height = pickerHeight,
-        }
-    },
-        -- Decrement button
-        ce("Pressable", {
+    -- Container width
+    local containerWidth = style.width or 220
+
+    -- Use View for display mode, TextInput for edit mode
+    if isEditing then
+        -- Edit mode with native text input
+        return ce("View", {
             style = {
-                position = "absolute",
-                left = 0,
-                top = 0,
-                width = 40,
+                width = containerWidth,
                 height = pickerHeight,
-            },
-            onPress = handleDecrement,
+                flexDirection = "row",
+                alignItems = "center",
+            }
         },
-            ce("Text", {
+            -- Decrement button
+            ce("View", {
                 style = {
-                    fontSize = 24,
-                    color = disabled and "#999999" or "#007AFF",
-                    textAlign = "center",
-                    textAlignVertical = "center",
+                    width = 40,
                     height = pickerHeight,
-                    lineHeight = pickerHeight,
-                }
-            }, "-")
-        ),
-
-        -- Value display (center)
-        ce(TextInput, {
-            style = {
-                position = "absolute",
-                left = 40,
-                top = 0,
-                width = 140,
-                height = pickerHeight,
-                fontSize = 16,
-                color = style.color or "#333333",
-                textAlign = "center",
-                backgroundColor = style.backgroundColor or "#FFFFFF",
-                borderWidth = 1,
-                borderColor = style.borderColor or "#CCCCCC",
-                borderRadius = 4,
+                    backgroundColor = "transparent",
+                },
+                onPress = handleDecrement,
             },
-            value = displayValue,
-            onChangeText = function() end,
-            onSubmitEditing = handleSubmit,
-            editable = not disabled,
-        }),
+                ce("Text", {
+                    style = {
+                        fontSize = 24,
+                        color = disabled and "#999999" or "#007AFF",
+                        textAlign = "center",
+                        textAlignVertical = "center",
+                        lineHeight = pickerHeight,
+                    }
+                }, "-")
+            ),
 
-        -- Increment button
-        ce("Pressable", {
-            style = {
-                position = "absolute",
-                left = 185,
-                top = 0,
-                width = 40,
-                height = pickerHeight,
-            },
-            onPress = handleIncrement,
-        },
-            ce("Text", {
+            -- TextInput for editing
+            ce("TextInput", {
                 style = {
-                    fontSize = 24,
-                    color = disabled and "#999999" or "#007AFF",
+                    flex = 1,
+                    height = pickerHeight - 4,
+                    fontSize = 16,
+                    color = style.color or "#333333",
                     textAlign = "center",
-                    textAlignVertical = "center",
+                    backgroundColor = "#FFFFFF",
+                    borderWidth = 2,
+                    borderColor = "#007AFF",
+                    borderRadius = 4,
+                },
+                value = editValue,
+                onChangeText = handleEditChange,
+                onSubmitEditing = handleEditSubmit,
+                onBlur = handleEditCancel,
+                autoFocus = true,
+                editable = not disabled,
+                keyboardType = mode == "time" and "numbers-and-punctuation" or "default",
+            }),
+
+            -- Increment button
+            ce("View", {
+                style = {
+                    width = 40,
                     height = pickerHeight,
-                    lineHeight = pickerHeight,
-                }
-            }, "+")
+                    backgroundColor = "transparent",
+                },
+                onPress = handleIncrement,
+            },
+                ce("Text", {
+                    style = {
+                        fontSize = 24,
+                        color = disabled and "#999999" or "#007AFF",
+                        textAlign = "center",
+                        textAlignVertical = "center",
+                        lineHeight = pickerHeight,
+                    }
+                }, "+")
+            )
         )
-    )
+    else
+        -- Display mode
+        return ce("View", {
+            style = {
+                width = containerWidth,
+                height = pickerHeight,
+                flexDirection = "row",
+                alignItems = "center",
+            }
+        },
+            -- Decrement button
+            ce("View", {
+                style = {
+                    width = 40,
+                    height = pickerHeight,
+                    backgroundColor = "transparent",
+                },
+                onPress = handleDecrement,
+            },
+                ce("Text", {
+                    style = {
+                        fontSize = 24,
+                        color = disabled and "#999999" or "#007AFF",
+                        textAlign = "center",
+                        textAlignVertical = "center",
+                        lineHeight = pickerHeight,
+                    }
+                }, "-")
+            ),
+
+            -- Value display (tap to edit)
+            ce("View", {
+                style = {
+                    flex = 1,
+                    height = pickerHeight - 4,
+                    backgroundColor = style.backgroundColor or "#FFFFFF",
+                    borderWidth = 1,
+                    borderColor = style.borderColor or "#CCCCCC",
+                    borderRadius = 4,
+                    justifyContent = "center",
+                    alignItems = "center",
+                },
+                onPress = handleEditStart,
+            },
+                ce("Text", {
+                    style = {
+                        fontSize = 16,
+                        color = style.color or "#333333",
+                        textAlign = "center",
+                    }
+                }, displayValue)
+            ),
+
+            -- Increment button
+            ce("View", {
+                style = {
+                    width = 40,
+                    height = pickerHeight,
+                    backgroundColor = "transparent",
+                },
+                onPress = handleIncrement,
+            },
+                ce("Text", {
+                    style = {
+                        fontSize = 24,
+                        color = disabled and "#999999" or "#007AFF",
+                        textAlign = "center",
+                        textAlignVertical = "center",
+                        lineHeight = pickerHeight,
+                    }
+                }, "+")
+            )
+        )
+    end
 end
 
--- Open native date picker
+-- Open native date picker dialog
 function M.open(params)
     local mode = params.mode or "date"
     local value = params.value or os.time()

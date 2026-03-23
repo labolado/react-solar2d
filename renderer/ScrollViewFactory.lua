@@ -27,6 +27,15 @@ local function createScrollView(props, style, applyCommonStyle)
     clipContainer._scrollX = 0
     clipContainer._contentH = 0
     clipContainer._contentW = 0
+    clipContainer._isScrollView = true  -- Mark as ScrollView for child identification
+
+    -- takeFocus: called by child components to steal touch focus for dragging
+    clipContainer.takeFocus = function(self, event)
+        -- Stop scrolling when a child takes focus (e.g., Slider thumb)
+        isDragging = false
+        startY = nil
+        startX = nil
+    end
 
     local function fireOnScroll()
         if props.onScroll then
@@ -74,6 +83,26 @@ local function createScrollView(props, style, applyCommonStyle)
     local startY, startX, startScrollY, startScrollX
     local isDragging = false
     local DRAG_THRESHOLD = 5
+    local activeDragChild = nil  -- child with _onDragHandler that is handling the touch
+
+    -- Find a drag-capable child under the touch point
+    local function findDragChild(grp, ex, ey)
+        if not grp or not grp.numChildren then return nil end
+        for i = grp.numChildren, 1, -1 do
+            local child = grp[i]
+            if child and child.isVisible ~= false then
+                local cb = child.contentBounds
+                if cb and ex >= cb.xMin and ex <= cb.xMax and ey >= cb.yMin and ey <= cb.yMax then
+                    if child._onDragHandler then
+                        return child
+                    end
+                    local found = findDragChild(child, ex, ey)
+                    if found then return found end
+                end
+            end
+        end
+        return nil
+    end
 
     -- Touch listener on the overlay rect — NO setFocus needed.
     touchOverlay:addEventListener("touch", function(event)
@@ -84,10 +113,24 @@ local function createScrollView(props, style, applyCommonStyle)
             startScrollY = clipContainer._scrollY
             startScrollX = clipContainer._scrollX
             isDragging = false
+            activeDragChild = nil
             clipContainer._pullingToRefresh = false
+
+            -- Check if touch is over a drag-capable child (e.g. Slider)
+            local dragChild = findDragChild(contentGroup, event.x, event.y)
+            if dragChild then
+                activeDragChild = dragChild
+                dragChild._onDragHandler(event)
+                return true
+            end
             return true
 
         elseif event.phase == "moved" then
+            -- If a drag child is active, forward all events to it
+            if activeDragChild then
+                activeDragChild._onDragHandler(event)
+                return true
+            end
             if not startY then return true end
             local dy = math.abs(event.y - startY)
             local dx = math.abs(event.x - startX)
@@ -131,6 +174,13 @@ local function createScrollView(props, style, applyCommonStyle)
             return true
 
         elseif event.phase == "ended" or event.phase == "cancelled" then
+            -- Forward to drag child if active
+            if activeDragChild then
+                activeDragChild._onDragHandler(event)
+                activeDragChild = nil
+                isDragging = false
+                return true
+            end
             if not isDragging and startX then
                 -- Tap: find pressable child
                 -- Touch coordinates and contentBounds are both screen coordinates

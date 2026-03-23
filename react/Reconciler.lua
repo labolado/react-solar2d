@@ -83,6 +83,7 @@ function M.create(hostConfig)
                         tag = "host"
                     end
                     newFiber = FiberNode.createFiber(tag, elementType, element.key, element.props)
+                    newFiber.ref = element.ref
                     newFiber.stateNode = old.stateNode
                     newFiber.alternate = old
                     newFiber._hooks = old._hooks
@@ -98,6 +99,7 @@ function M.create(hostConfig)
                         tag = "host"
                     end
                     newFiber = FiberNode.createFiber(tag, elementType, element.key, element.props)
+                    newFiber.ref = element.ref
                     newFiber.effectTag = "PLACEMENT"
                     if old then
                         old.effectTag = "DELETION"
@@ -233,6 +235,11 @@ function M.create(hostConfig)
                 local oldText = fiber.alternate and fiber.alternate.props.text or ""
                 hostConfig.updateTextInstance(fiber.stateNode, oldText, fiber.props.text)
             end
+        end
+
+        -- Invoke ref callback with the host instance (after create or update)
+        if fiber.ref and type(fiber.ref) == "function" and fiber.stateNode then
+            fiber.ref(fiber.stateNode)
         end
 
         fiber.effectTag = nil

@@ -74,6 +74,9 @@ local function applyLayout(yogaNode, fiber)
             -- This allows Modal to position itself at screen origin
             if style.left ~= nil then l = style.left end
             if style.top ~= nil then t = style.top end
+            -- Use explicit pixel dimensions from style (Yoga may compute differently)
+            if type(style.width) == "number" then w = style.width end
+            if type(style.height) == "number" then h = style.height end
             -- If right is specified but not left, calculate left from right
             if style.right ~= nil and style.left == nil then
                 if style.width then

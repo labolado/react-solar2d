@@ -89,13 +89,23 @@ local function processPendingScreenshots()
             pending.captureRequested = true
             timer.performWithDelay(50, function()
                 -- Use display.capture on the stage (main display group)
-                -- Note: Files are saved to Documents directory by default in Solar2D
                 local stage = display.getCurrentStage()
-                display.capture(stage, {
-                    filename = pending.filename,
-                    saveToPhotoLibrary = false,
-                    captureOffscreenAreas = false,
-                })
+                print("[TEST_SERVER] Capturing stage to: " .. pending.filename)
+                print("[TEST_SERVER] Stage type: " .. tostring(stage and stage._type or "nil"))
+
+                -- Ensure directory exists
+                local tmpDir = system.pathForFile("", system.TemporaryDirectory)
+                print("[TEST_SERVER] Temp dir: " .. tostring(tmpDir))
+
+                -- Try captureScreen instead of capture for full screen
+                local ok, err = pcall(function()
+                    display.captureScreen({
+                        filename = pending.filename,
+                        baseDir = system.TemporaryDirectory,
+                        saveToPhotoLibrary = false,
+                    })
+                end)
+                print("[TEST_SERVER] captureScreen result: " .. tostring(ok) .. " err: " .. tostring(err))
             end)
             -- Wait for next poll to check file (skip rest of loop)
         else
@@ -118,8 +128,19 @@ local function processPendingScreenshots()
                 os.remove(pending.path)
 
                 table.remove(pendingScreenshots, i)
-            elseif (system.getTimer() - pending.startTime) > 5000 then
-                -- Timeout after 5 seconds
+            elseif (system.getTimer() - pending.startTime) > 10000 then
+                -- Timeout after 10 seconds
+                print("[TEST_SERVER] Screenshot timeout, checking file: " .. tostring(pending.path))
+                -- List directory contents for debugging
+                local dir = system.pathForFile("", system.TemporaryDirectory)
+                if dir then
+                    local handle = io.popen("ls -la '" .. dir .. "' 2>/dev/null | tail -5")
+                    if handle then
+                        local result = handle:read("*a")
+                        handle:close()
+                        print("[TEST_SERVER] Dir contents: " .. tostring(result))
+                    end
+                end
                 local response = httpResponse(jsonEncode({
                     success = false,
                     error = "Screenshot capture timeout"
@@ -229,11 +250,53 @@ local function handleClient(client)
         else
             response = httpResponse(jsonEncode({ error = "Missing route" }), "400 Bad Request")
         end
+    elseif method == "POST" and path == "/drag" then
+        -- Simulate drag gesture on Slider at specific coordinates
+        local x = tonumber(body:match("x=(%d+)")) or 0
+        local y = tonumber(body:match("y=(%d+)")) or 0
+        local dx = tonumber(body:match("dx=(%-?%d+)")) or 50  -- default drag right 50px
+        local dy = tonumber(body:match("dy=(%-?%d+)")) or 0
+
+        -- Dispatch touch events to simulate drag
+        timer.performWithDelay(0, function()
+            -- Fire custom event that Slider can listen for (via Runtime)
+            local event = {
+                name = "test_drag",
+                x = x,
+                y = y,
+                dx = dx,
+                dy = dy,
+                phase = "began"
+            }
+            Runtime:dispatchEvent(event)
+
+            -- After short delay, dispatch moved and ended
+            timer.performWithDelay(50, function()
+                event.phase = "moved"
+                event.x = x + dx
+                event.y = y + dy
+                Runtime:dispatchEvent(event)
+            end)
+
+            timer.performWithDelay(100, function()
+                event.phase = "ended"
+                Runtime:dispatchEvent(event)
+            end)
+        end)
+
+        response = httpResponse(jsonEncode({
+            success = true,
+            action = "drag",
+            start = {x = x, y = y},
+            delta = {dx = dx, dy = dy},
+            end_pos = {x = x + dx, y = y + dy}
+        }))
     elseif method == "GET" and path == "/screenshot" then
         -- Async screenshot capture - stores client for deferred response
         local filename = "screenshot_" .. os.time() .. ".png"
-        -- Note: display.capture saves to Documents directory by default
-        local screenshotPath = system.pathForFile(filename, system.DocumentsDirectory)
+        -- Use TemporaryDirectory for better cross-platform compatibility
+        local screenshotPath = system.pathForFile(filename, system.TemporaryDirectory)
+        print("[TEST_SERVER] Screenshot path: " .. tostring(screenshotPath))
 
         -- Store pending request first
         table.insert(pendingScreenshots, {

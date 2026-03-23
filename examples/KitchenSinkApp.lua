@@ -96,6 +96,59 @@ local function KitchenSinkApp()
     -- Global overlay stack - supports multiple modals layered
     local overlayStack, setOverlayStack = useState({})
 
+    -- Listen for external navigation events from test server
+    -- Store pending route navigation when category changes
+    local pendingRouteRef = React.useRef(nil)
+
+    React.useEffect(function()
+        local function onExternalNavigate(event)
+            local route = event.route
+            local category = event.category
+            print("[KitchenSink] External navigate: route=" .. tostring(route) .. ", category=" .. tostring(category))
+
+            if category then
+                -- Find category index
+                for i, cat in ipairs(CATEGORIES) do
+                    if cat.key == category then
+                        setActiveCategory(i)
+                        -- If there's a route, store it for after category update
+                        if route then
+                            pendingRouteRef.current = route
+                        end
+                        return
+                    end
+                end
+            end
+
+            if route then
+                -- Find demo by name in ALL categories (not just current)
+                for _, cat in ipairs(CATEGORIES) do
+                    if cat.screens then
+                        for _, screen in ipairs(cat.screens) do
+                            if screen.name == route then
+                                -- Switch to correct category first
+                                for i, c in ipairs(CATEGORIES) do
+                                    if c.key == cat.key then
+                                        setActiveCategory(i)
+                                        break
+                                    end
+                                end
+                                setActiveDemo(screen)
+                                return
+                            end
+                        end
+                    end
+                end
+                print("[KitchenSink] Route not found: " .. route)
+            end
+        end
+
+        Runtime:addEventListener("kitchensink_navigate", onExternalNavigate)
+        return function()
+            Runtime:removeEventListener("kitchensink_navigate", onExternalNavigate)
+        end
+    end, {})  -- Empty deps - handler doesn't depend on activeCategory
+
     -- Callback for demos to push content to global overlay stack
     local pushOverlay = useCallback(function(content)
         setOverlayStack(function(stack)
