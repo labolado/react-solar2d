@@ -45,6 +45,7 @@
 - **实现复杂度**: 高
 - **项目价值**: ⭐⭐⭐⭐⭐ 物理引擎交互、拖拽、滑动
 - **依赖**: 许多其他库的基础依赖
+- **状态**: ✅ Pan/Tap/LongPress 已移植，KitchenSink 提供示例
 
 ### 5. react-native-reanimated
 - **GitHub Stars**: ~8k

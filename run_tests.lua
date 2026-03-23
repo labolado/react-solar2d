@@ -29,6 +29,7 @@ local testFiles = {
     "tests/components/test_window_calc.lua",
     "tests/components/test_pressable.lua",
     "tests/components/test_modal.lua",
+    "tests/lib/test_gesture_handler.lua",
     "tests/react/test_context.lua",
     "tests/navigation/test_state.lua",
     "tests/navigation/test_stack.lua",

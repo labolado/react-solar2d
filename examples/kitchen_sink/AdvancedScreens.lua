@@ -8,6 +8,7 @@ local T = require("examples.kitchen_sink.theme")
 local RN = require("react_solar2d")
 local Animated = require("animated")
 local Hooks = require("hooks.useTimer")
+local GestureHandler = require("lib.gesture-handler")
 local Section = T.Section
 local DemoPage = T.DemoPage
 
@@ -244,6 +245,136 @@ local function AccordionDemo()
 end
 
 -- ═══════════════════════════════════════════════════════════════════════════
+-- 6. GestureDemo — Pan/Tap/LongPress handlers
+-- ═══════════════════════════════════════════════════════════════════════════
+local function GestureDemo()
+    local dragBaseRef = useRef({ x = 0, y = 0 })
+    local dragPos, setDragPos = useState({ x = 0, y = 0 })
+    local dragLabel, setDragLabel = useState("拖拽我 🔧")
+    local tapCount, setTapCount = useState(0)
+    local longPressActive, setLongPressActive = useState(false)
+
+    local function resolvedTranslation(nativeEvent)
+        local base = dragBaseRef.current
+        local dx = (nativeEvent and nativeEvent.translationX) or 0
+        local dy = (nativeEvent and nativeEvent.translationY) or 0
+        return base.x + dx, base.y + dy
+    end
+
+    local function handlePanEvent(event)
+        local x, y = resolvedTranslation(event.nativeEvent)
+        setDragPos({ x = x, y = y })
+    end
+
+    local function handlePanState(event)
+        local state = event.state
+        if state == GestureHandler.State.BEGAN then
+            setDragLabel("开始拖拽")
+        elseif state == GestureHandler.State.ACTIVE then
+            setDragLabel("拖拽中…")
+        elseif state == GestureHandler.State.END then
+            local x, y = resolvedTranslation(event.nativeEvent)
+            dragBaseRef.current = { x = x, y = y }
+            setDragPos({ x = x, y = y })
+            setDragLabel("拖拽完成 ✅")
+        elseif state == GestureHandler.State.FAILED or state == GestureHandler.State.CANCELLED then
+            setDragPos({ x = dragBaseRef.current.x, y = dragBaseRef.current.y })
+            setDragLabel("拖拽被取消")
+        end
+    end
+
+    local function handleTap()
+        setTapCount(function(prev) return prev + 1 end)
+    end
+
+    local function handleLongPressState(event)
+        if event.state == GestureHandler.State.ACTIVE then
+            setLongPressActive(true)
+        elseif event.state == GestureHandler.State.END
+            or event.state == GestureHandler.State.FAILED
+            or event.state == GestureHandler.State.CANCELLED then
+            setLongPressActive(false)
+        end
+    end
+
+    return ce(DemoPage, {},
+        ce(Section, { title = "PanGestureHandler - 拖拽卡片" },
+            ce("View", { style = { height = 170, justifyContent = "center", alignItems = "center" } },
+                ce(GestureHandler.PanGestureHandler, {
+                    style = { width = "100%", height = 170 },
+                    minDist = 5,
+                    onGestureEvent = handlePanEvent,
+                    onHandlerStateChange = handlePanState,
+                },
+                    ce("View", {
+                        style = {
+                            width = 160,
+                            height = 110,
+                            borderRadius = 18,
+                            backgroundColor = "#4F46E5",
+                            justifyContent = "center",
+                            alignItems = "center",
+                            shadowColor = "#00000040",
+                            shadowOpacity = 0.3,
+                            shadowRadius = 8,
+                            transform = {
+                                { translateX = dragPos.x },
+                                { translateY = dragPos.y },
+                            },
+                        }
+                    },
+                        ce("Text", { style = { fontSize = 14, color = "#FFFFFF", textAlign = "center", paddingHorizontal = 12 } }, dragLabel),
+                        ce("Text", { style = { fontSize = 11, color = "#CBD5F5", marginTop = 8 } }, "拖拽距离 X=" .. math.floor(dragPos.x) .. " Y=" .. math.floor(dragPos.y))
+                    )
+                )
+            )
+        ),
+        ce(Section, { title = "TapGestureHandler - 轻触计数" },
+            ce(GestureHandler.TapGestureHandler, {
+                maxDist = 12,
+                onActivated = handleTap,
+            },
+                ce("View", {
+                    style = {
+                        padding = 20,
+                        borderRadius = 12,
+                        borderWidth = 1,
+                        borderColor = T.border,
+                        backgroundColor = T.surface,
+                        alignItems = "center",
+                    }
+                },
+                    ce("Text", { style = { fontSize = 16, color = T.textPrimary } }, "点击我"),
+                    ce("Text", { style = { fontSize = 12, color = T.textSecondary, marginTop = 4 } }, "TapGestureHandler.onActivated")
+                )
+            ),
+            ce("Text", { style = { marginTop = 8, fontSize = 14, color = T.textPrimary } }, "累计点击次数：" .. tapCount)
+        ),
+        ce(Section, { title = "LongPressGestureHandler - 长按操作" },
+            ce(GestureHandler.LongPressGestureHandler, {
+                minDurationMs = 600,
+                maxDist = 12,
+                onHandlerStateChange = handleLongPressState,
+            },
+                ce("View", {
+                    style = {
+                        padding = 18,
+                        borderRadius = 12,
+                        borderWidth = 1,
+                        borderColor = longPressActive and "#F59E0B" or T.border,
+                        backgroundColor = longPressActive and "#FDE68A" or T.surface,
+                        alignItems = "center",
+                    }
+                },
+                    ce("Text", { style = { fontSize = 15, color = T.textPrimary } }, longPressActive and "长按已触发" or "按住 0.6 秒触发"),
+                    ce("Text", { style = { fontSize = 12, color = T.textSecondary, marginTop = 4 } }, "state=" .. tostring(longPressActive and "ACTIVE" or "待触发"))
+                )
+            )
+        )
+    )
+end
+
+-- ═══════════════════════════════════════════════════════════════════════════
 -- 4. DropdownDemo — dropdown selector / picker
 -- ═══════════════════════════════════════════════════════════════════════════
 local function DropdownDemo()
@@ -451,4 +582,5 @@ return {
     { name = "Accordion", component = AccordionDemo, description = "Collapsible FAQ sections, expand/collapse", icon = "A" },
     { name = "Dropdown",  component = DropdownDemo,  description = "Dropdown selector/picker component",      icon = "D" },
     { name = "Card",      component = CardDemo,      description = "Card layouts, social, stats, list",        icon = "C" },
+    { name = "Gesture Handler", component = GestureDemo, description = "Pan/Tap/LongPress 手势示例", icon = "G" },
 }
