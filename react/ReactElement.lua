@@ -42,6 +42,15 @@ function M.isValidElement(object)
     return type(object) == "table" and object["$$typeof"] == REACT_ELEMENT_TYPE
 end
 
+-- forwardRef: create a component that forwards ref to its child
+function M.forwardRef(render)
+    local forwardRefComponent = {
+        _isForwardRef = true,
+        render = render,
+    }
+    return forwardRefComponent
+end
+
 M.REACT_ELEMENT_TYPE = REACT_ELEMENT_TYPE
 
 return M

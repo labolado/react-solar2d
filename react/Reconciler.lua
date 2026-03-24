@@ -79,6 +79,8 @@ function M.create(hostConfig)
                         tag = "function"
                     elseif type(elementType) == "table" and elementType._isProvider then
                         tag = "function"  -- Provider handled in performUnitOfWork
+                    elseif type(elementType) == "table" and elementType._isForwardRef then
+                        tag = "function"  -- forwardRef handled in performUnitOfWork
                     else
                         tag = "host"
                     end
@@ -95,6 +97,8 @@ function M.create(hostConfig)
                         tag = "function"
                     elseif type(elementType) == "table" and elementType._isProvider then
                         tag = "function"  -- Provider handled in performUnitOfWork
+                    elseif type(elementType) == "table" and elementType._isForwardRef then
+                        tag = "function"  -- forwardRef handled in performUnitOfWork
                     else
                         tag = "host"
                     end
@@ -154,6 +158,11 @@ function M.create(hostConfig)
                 fiber._contextValues = parentCtx
                 Hooks._finishHooks()
                 reconcileChildren(fiber, fiber.props.children)
+            elseif type(elementType) == "table" and elementType._isForwardRef then
+                -- forwardRef component — pass ref to render function
+                local children = elementType.render(fiber.props, fiber.ref)
+                Hooks._finishHooks()
+                reconcileChildren(fiber, children)
             else
                 local children = fiber.type(fiber.props)
                 Hooks._finishHooks()
@@ -186,6 +195,19 @@ function M.create(hostConfig)
     end
 
     local function commitDeletion(fiber, parentInstance)
+        -- Cleanup store subscriptions first
+        if fiber._storeCleanups then
+            for _, cleanup in pairs(fiber._storeCleanups) do
+                if type(cleanup) == "function" then cleanup() end
+            end
+            fiber._storeCleanups = nil
+        end
+        
+        -- Cleanup ref
+        if fiber.ref and type(fiber.ref) == "table" then
+            fiber.ref.current = nil
+        end
+        
         if fiber.tag == "host" or fiber.tag == "text" then
             if fiber.stateNode then
                 hostConfig.removeChild(parentInstance, fiber.stateNode)
@@ -237,9 +259,13 @@ function M.create(hostConfig)
             end
         end
 
-        -- Invoke ref callback with the host instance (after create or update)
-        if fiber.ref and type(fiber.ref) == "function" and fiber.stateNode then
-            fiber.ref(fiber.stateNode)
+        -- Invoke ref callback or set ref.current (after create or update)
+        if fiber.ref and fiber.stateNode then
+            if type(fiber.ref) == "function" then
+                fiber.ref(fiber.stateNode)
+            elseif type(fiber.ref) == "table" then
+                fiber.ref.current = fiber.stateNode
+            end
         end
 
         fiber.effectTag = nil

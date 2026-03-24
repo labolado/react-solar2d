@@ -20,6 +20,11 @@ RN.useContext = React.useContext
 RN.useReducer = React.useReducer
 RN.createContext = React.createContext
 RN.Fragment = React.Fragment
+RN.forwardRef = React.forwardRef
+RN.useId = React.useId
+RN.useImperativeHandle = React.useImperativeHandle
+RN.useDebugValue = React.useDebugValue
+RN.useSyncExternalStore = React.useSyncExternalStore
 
 -- Renderer
 RN.render = ReactSolar2D.render
@@ -43,11 +48,15 @@ RN.Button = Components.Button
 RN.TouchableOpacity = Components.TouchableOpacity
 RN.ScrollView = Components.ScrollView
 RN.FlatList = Components.FlatList
+RN.SectionList = Components.SectionList
 RN.TextInput = Components.TextInput
 RN.Modal = Components.Modal
 RN.Switch = Components.Switch
 RN.Pressable = Components.Pressable
 RN.ActivityIndicator = Components.ActivityIndicator
+RN.RefreshControl = Components.RefreshControl
+RN.KeyboardAvoidingView = Components.KeyboardAvoidingView
+RN.SafeAreaView = Components.SafeAreaView
 
 -- Navigation
 local Navigation = require("navigation")

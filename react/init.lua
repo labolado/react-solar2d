@@ -7,6 +7,7 @@ local React = {}
 -- Core
 React.createElement = ReactElement.createElement
 React.isValidElement = ReactElement.isValidElement
+React.forwardRef = ReactElement.forwardRef
 
 -- Hooks
 React.useState = Hooks.useState
@@ -18,6 +19,10 @@ React.useMemo = Hooks.useMemo
 React.useCallback = Hooks.useCallback
 React.useContext = Hooks.useContext
 React.createContext = Hooks.createContext
+React.useId = Hooks.useId
+React.useImperativeHandle = Hooks.useImperativeHandle
+React.useDebugValue = Hooks.useDebugValue
+React.useSyncExternalStore = Hooks.useSyncExternalStore
 
 -- Fragment (represented as special type)
 React.Fragment = "$$react.fragment"

@@ -163,6 +163,108 @@ function M.useLayoutEffect(callback, deps)
     M.useEffect(callback, deps)
 end
 
+-- useId: generate unique IDs for accessibility and form associations
+local idCounter = 0
+
+function M.useId()
+    local idx = getHook()
+    local hooks = currentFiber._hooks
+    
+    if hooks[idx] == nil then
+        idCounter = idCounter + 1
+        -- Generate stable ID per component mount (global counter)
+        -- Format: "r:id-{counter}"
+        hooks[idx] = "r:id-" .. tostring(idCounter)
+    end
+    
+    return hooks[idx]
+end
+
+-- useImperativeHandle: customize the instance value exposed via ref
+function M.useImperativeHandle(ref, createHandle, deps)
+    local idx = getHook()
+    local hooks = currentFiber._hooks
+    
+    local shouldUpdate = hooks[idx] == nil or depsChanged(hooks[idx].deps, deps)
+    
+    if shouldUpdate then
+        local handle = createHandle()
+        hooks[idx] = { handle = handle, deps = deps }
+        
+        -- Attach to ref.current if provided (standard React ref behavior)
+        if ref and type(ref) == "table" then
+            ref.current = handle
+        end
+    end
+end
+
+-- useDebugValue: display a label for custom hooks in debugging
+function M.useDebugValue(value, formatFn)
+    -- In Solar2D environment, print for debugging
+    -- In production, this could be a no-op
+    local displayValue = value
+    if formatFn and type(formatFn) == "function" then
+        displayValue = formatFn(value)
+    end
+    -- Only print in debug mode (check for global DEBUG flag)
+    if _G.DEBUG then
+        print("[useDebugValue] " .. tostring(displayValue))
+    end
+end
+
+-- useSyncExternalStore: subscribe to an external store
+function M.useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
+    local idx = getHook()
+    local hooks = currentFiber._hooks
+    local fiber = currentFiber
+    
+    -- Initialize hook state on first render
+    if hooks[idx] == nil then
+        local snapshot = getSnapshot()
+        hooks[idx] = {
+            snapshot = snapshot,
+            unsubscribe = nil,
+            subscribe = nil, -- Track subscribe function reference
+        }
+    end
+    
+    local hook = hooks[idx]
+    
+    -- Only resubscribe if subscribe function changed (not on every render)
+    if hooks[idx] == nil or hook.subscribe ~= subscribe then
+        -- Unsubscribe from previous subscription if any
+        if hook.unsubscribe then
+            hook.unsubscribe()
+        end
+        
+        -- Create wrapper that schedules update when store changes
+        local function handleStoreChange()
+            local newSnapshot = getSnapshot()
+            if newSnapshot ~= hook.snapshot then
+                hook.snapshot = newSnapshot
+                if fiber._scheduleUpdate then
+                    fiber._scheduleUpdate(fiber)
+                end
+            end
+        end
+        
+        hook.subscribe = subscribe
+        hook.unsubscribe = subscribe(handleStoreChange)
+    end
+    
+    -- Get current snapshot
+    hook.snapshot = getSnapshot()
+    
+    -- Cleanup subscription when component unmounts
+    -- This is handled via a special cleanup mechanism in the reconciler
+    if not fiber._storeCleanups then
+        fiber._storeCleanups = {}
+    end
+    fiber._storeCleanups[idx] = hook.unsubscribe
+    
+    return hook.snapshot
+end
+
 -- Context (basic implementation)
 local contextCounter = 0
 
