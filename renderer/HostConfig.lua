@@ -68,22 +68,50 @@ local function buildGradientPaint(props)
         colors = { "#FFFFFF", "#000000" }
     end
 
-    local paint = { type = "gradient" }
-    local maxColors = math.min(#colors, 4)
-    for i = 1, maxColors do
-        local c = parseColor(colors[i])
-        paint["color" .. i] = c
+    -- Solar2D only supports 2-color gradients
+    -- Parse colors - Solar2D gradient colors are {r, g, b} (no alpha channel in paint)
+    local c1 = parseColor(colors[1])
+    local c2 = parseColor(colors[2] or colors[1])
+    
+    -- Solar2D gradient colors should be {r, g, b} in 0-1 range
+    local function makeGradientColor(c)
+        return { c[1] or 1, c[2] or 1, c[3] or 1 }
     end
-    if not paint.color2 then paint.color2 = paint.color1 end
+    
+    local paint = {
+        type = "gradient",
+        color1 = makeGradientColor(c1),
+        color2 = makeGradientColor(c2),
+    }
 
+    -- Calculate direction from start/end points
     local startX, startY = normalizePoint(props and props.start, 0.5, 0)
     local endX, endY = normalizePoint(props and props["end"], 0.5, 1)
-    local dx = (endX or 0) - (startX or 0)
-    local dy = (endY or 0) - (startY or 0)
+    local dx = (endX or 0.5) - (startX or 0.5)
+    local dy = (endY or 1) - (startY or 0)
+    
     if dx == 0 and dy == 0 then
         dy = 1
     end
-    paint.rotation = math.deg(math.atan2(dy, dx))
+    
+    -- Map to Solar2D direction strings for common cases
+    -- Use a tolerance for floating point comparison
+    local tolerance = 0.01
+    
+    if math.abs(dx) < tolerance and dy > tolerance then
+        paint.direction = "down"
+    elseif math.abs(dx) < tolerance and dy < -tolerance then
+        paint.direction = "up"
+    elseif dx > tolerance and math.abs(dy) < tolerance then
+        paint.direction = "right"
+    elseif dx < -tolerance and math.abs(dy) < tolerance then
+        paint.direction = "left"
+    else
+        -- For diagonal gradients, default to down
+        -- Solar2D doesn't support arbitrary angles with string directions
+        paint.direction = "down"
+    end
+    
     return paint
 end
 

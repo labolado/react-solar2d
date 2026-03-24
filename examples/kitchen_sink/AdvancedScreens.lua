@@ -1,9 +1,13 @@
 -- examples/kitchen_sink/AdvancedScreens.lua
--- Demos: Badge, ProgressBar, Accordion, Dropdown, Card patterns
+-- Demos: Badge, ProgressBar, Accordion, Dropdown, Card patterns, Hooks
 local React = require("react")
 local ce = React.createElement
 local useState = React.useState
 local useRef = React.useRef
+local useId = React.useId
+local useSyncExternalStore = React.useSyncExternalStore
+local forwardRef = React.forwardRef
+local useImperativeHandle = React.useImperativeHandle
 local T = require("examples.kitchen_sink.theme")
 local RN = require("react_solar2d")
 local Animated = require("animated")
@@ -576,6 +580,357 @@ local function CardDemo()
     )
 end
 
+-- ═══════════════════════════════════════════════════════════════════════════
+-- 7. UseIdDemo — Unique ID generation
+-- ═══════════════════════════════════════════════════════════════════════════
+local function UseIdDemo()
+    -- useId must be called at top level (not in loops)
+    local id1 = useId()
+    local id2 = useId()
+    local id3 = useId()
+    local id4 = useId()
+    local id5 = useId()
+    local ids = { id1, id2, id3, id4, id5 }
+    
+    -- For form inputs
+    local formId1 = useId()
+    local formId2 = useId()
+    local formId3 = useId()
+    
+    return ce(DemoPage, {},
+        ce(Section, { title = "useId Hook" },
+            ce("Text", { 
+                style = { fontSize = 14, color = T.textSecondary, marginBottom = 16 } 
+            }, "Generates unique IDs for accessibility and form labels. IDs are stable across re-renders."),
+            
+            ce("View", { style = { gap = 12 } },
+                (function()
+                    local items = {}
+                    for i, id in ipairs(ids) do
+                        items[i] = ce("View", {
+                            key = id,
+                            style = {
+                                backgroundColor = T.surface,
+                                borderRadius = T.radiusSmall,
+                                padding = 12,
+                                borderWidth = 1,
+                                borderColor = T.border,
+                            },
+                        },
+                            ce("Text", { style = { fontSize = 12, color = T.textSecondary } }, "Item " .. i),
+                            ce("Text", { 
+                                style = { 
+                                    fontSize = 11, 
+                                    color = T.accent,
+                                    fontFamily = "monospace",
+                                    marginTop = 4
+                                } 
+                            }, "ID: " .. id:sub(1, 20) .. "...")
+                        )
+                    end
+                    return items
+                end)()
+            )
+        ),
+        ce(Section, { title = "Use Case: Form Labels" },
+            ce("View", { style = { gap = 16 } },
+                ce("View", { key = formId1 },
+                    ce("Text", { 
+                        style = { fontSize = 12, color = T.textSecondary, marginBottom = 4 } 
+                    }, "Label for " .. formId1:sub(-6)),
+                    ce(RN.TextInput, {
+                        placeholder = "Input 1",
+                        style = {
+                            backgroundColor = T.surface,
+                            borderWidth = 1,
+                            borderColor = T.border,
+                            borderRadius = T.radiusSmall,
+                            padding = 10,
+                            fontSize = 14,
+                        },
+                    })
+                ),
+                ce("View", { key = formId2 },
+                    ce("Text", { 
+                        style = { fontSize = 12, color = T.textSecondary, marginBottom = 4 } 
+                    }, "Label for " .. formId2:sub(-6)),
+                    ce(RN.TextInput, {
+                        placeholder = "Input 2",
+                        style = {
+                            backgroundColor = T.surface,
+                            borderWidth = 1,
+                            borderColor = T.border,
+                            borderRadius = T.radiusSmall,
+                            padding = 10,
+                            fontSize = 14,
+                        },
+                    })
+                ),
+                ce("View", { key = formId3 },
+                    ce("Text", { 
+                        style = { fontSize = 12, color = T.textSecondary, marginBottom = 4 } 
+                    }, "Label for " .. formId3:sub(-6)),
+                    ce(RN.TextInput, {
+                        placeholder = "Input 3",
+                        style = {
+                            backgroundColor = T.surface,
+                            borderWidth = 1,
+                            borderColor = T.border,
+                            borderRadius = T.radiusSmall,
+                            padding = 10,
+                            fontSize = 14,
+                        },
+                    })
+                )
+            )
+        )
+    )
+end
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- 8. ImperativeHandleDemo — forwardRef + useImperativeHandle
+-- ═══════════════════════════════════════════════════════════════════════════
+local function ImperativeHandleDemo()
+    -- Custom input component with internal state and exposed methods
+    local FancyInput = forwardRef(function(props, ref)
+        local internalValue, setInternalValue = useState("")
+        local isFocused, setIsFocused = useState(false)
+        
+        useImperativeHandle(ref, function()
+            return {
+                focus = function()
+                    setIsFocused(true)
+                end,
+                blur = function()
+                    setIsFocused(false)
+                end,
+                clear = function()
+                    setInternalValue("")
+                end,
+                getValue = function()
+                    return internalValue
+                end,
+                setValue = function(v)
+                    setInternalValue(v)
+                end,
+            }
+        end, { internalValue, isFocused })
+        
+        return ce("View", {},
+            ce(RN.TextInput, {
+                placeholder = props.placeholder or "Type...",
+                value = internalValue,
+                onChangeText = setInternalValue,
+                style = {
+                    backgroundColor = isFocused and "#E3F2FD" or T.surface,
+                    borderWidth = 2,
+                    borderColor = isFocused and T.accent or T.border,
+                    borderRadius = T.radiusSmall,
+                    padding = 12,
+                    fontSize = 16,
+                },
+            })
+        )
+    end)
+    
+    local inputRef = useRef()
+    local status, setStatus = useState("Click buttons to interact")
+    
+    return ce(DemoPage, {},
+        ce(Section, { title = "forwardRef + useImperativeHandle" },
+            ce("Text", { 
+                style = { fontSize = 14, color = T.textSecondary, marginBottom = 16 } 
+            }, "Parent component controls child via ref. Expose custom methods like focus(), clear(), getValue()."),
+            
+            ce(FancyInput, {
+                ref = inputRef,
+                placeholder = "Controlled by parent buttons...",
+            }),
+            
+            ce("Text", { 
+                style = { fontSize = 12, color = T.textSecondary, marginTop = 12, marginBottom = 12 } 
+            }, status),
+            
+            ce("View", { style = { flexDirection = "row", gap = 8, flexWrap = "wrap" } },
+                ce(RN.Button, {
+                    title = "Focus",
+                    color = "#3498DB",
+                    onPress = function()
+                        if inputRef.current then
+                            inputRef.current.focus()
+                            setStatus("Focus called")
+                        end
+                    end,
+                }),
+                ce(RN.Button, {
+                    title = "Blur",
+                    color = "#F39C12",
+                    onPress = function()
+                        if inputRef.current then
+                            inputRef.current.blur()
+                            setStatus("Blur called")
+                        end
+                    end,
+                }),
+                ce(RN.Button, {
+                    title = "Clear",
+                    color = "#E74C3C",
+                    onPress = function()
+                        if inputRef.current then
+                            inputRef.current.clear()
+                            setStatus("Clear called")
+                        end
+                    end,
+                }),
+                ce(RN.Button, {
+                    title = "Set 'Hello'",
+                    color = "#2ECC71",
+                    onPress = function()
+                        if inputRef.current then
+                            inputRef.current.setValue("Hello!")
+                            setStatus("setValue('Hello!') called")
+                        end
+                    end,
+                }),
+                ce(RN.Button, {
+                    title = "Get Value",
+                    color = T.accent,
+                    onPress = function()
+                        if inputRef.current then
+                            local value = inputRef.current.getValue()
+                            setStatus("getValue() = '" .. (value or "") .. "'")
+                        end
+                    end,
+                })
+            )
+        )
+    )
+end
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- 9. SyncExternalStoreDemo — useSyncExternalStore
+-- ═══════════════════════════════════════════════════════════════════════════
+local function SyncExternalStoreDemo()
+    -- Simple external store
+    local store = {
+        data = { count = 0, message = "Initial" },
+        listeners = {},
+        
+        subscribe = function(self, callback)
+            table.insert(self.listeners, callback)
+            return function()
+                for i, cb in ipairs(self.listeners) do
+                    if cb == callback then
+                        table.remove(self.listeners, i)
+                        break
+                    end
+                end
+            end
+        end,
+        
+        getSnapshot = function(self)
+            return self.data
+        end,
+        
+        setCount = function(self, value)
+            self.data.count = value
+            self:notify()
+        end,
+        
+        setMessage = function(self, msg)
+            self.data.message = msg
+            self:notify()
+        end,
+        
+        notify = function(self)
+            for _, cb in ipairs(self.listeners) do
+                cb()
+            end
+        end,
+    }
+    
+    -- Component using useSyncExternalStore
+    local function StoreDisplay()
+        local snapshot = useSyncExternalStore(
+            function(callback) return store:subscribe(callback) end,
+            function() return store:getSnapshot() end
+        )
+        
+        return ce("View", {
+            style = {
+                backgroundColor = T.surface,
+                borderRadius = T.radius,
+                padding = T.pad,
+                marginBottom = T.gap,
+            },
+        },
+            ce("Text", { style = { fontSize = 14, color = T.textPrimary, fontWeight = "bold" } },
+                "Store Data (useSyncExternalStore)"),
+            ce("Text", { style = { fontSize = 16, color = T.accent, marginTop = 8 } },
+                "Count: " .. snapshot.count),
+            ce("Text", { style = { fontSize = 14, color = T.textPrimary, marginTop = 4 } },
+                "Message: " .. snapshot.message)
+        )
+    end
+    
+    -- Counter that updates store
+    local function StoreUpdater()
+        return ce("View", { style = { gap = 8 } },
+            ce("Text", { style = { fontSize = 12, color = T.textSecondary } },
+                "These buttons update the external store:"),
+            ce("View", { style = { flexDirection = "row", gap = 8 } },
+                ce(RN.Button, {
+                    title = "Increment",
+                    color = T.accent,
+                    onPress = function()
+                        store:setCount(store.data.count + 1)
+                    end,
+                }),
+                ce(RN.Button, {
+                    title = "Decrement",
+                    color = "#E74C3C",
+                    onPress = function()
+                        store:setCount(store.data.count - 1)
+                    end,
+                })
+            ),
+            ce(RN.TextInput, {
+                placeholder = "Type message to update store...",
+                onChangeText = function(text)
+                    store:setMessage(text)
+                end,
+                style = {
+                    backgroundColor = T.surface,
+                    borderWidth = 1,
+                    borderColor = T.border,
+                    borderRadius = T.radiusSmall,
+                    padding = 10,
+                    fontSize = 14,
+                    marginTop = 8,
+                },
+            })
+        )
+    end
+    
+    return ce(DemoPage, {},
+        ce(Section, { title = "useSyncExternalStore Hook" },
+            ce("Text", { 
+                style = { fontSize = 14, color = T.textSecondary, marginBottom = 16 } 
+            }, "Subscribe to external data stores. Components re-render when store updates."),
+            
+            ce(StoreDisplay),
+            ce(StoreUpdater)
+        ),
+        ce(Section, { title = "Multiple Subscribers" },
+            ce("Text", { 
+                style = { fontSize = 12, color = T.textSecondary, marginBottom = 12 } 
+            }, "Both displays below share the same store subscription:"),
+            ce(StoreDisplay),
+            ce(StoreDisplay)
+        )
+    )
+end
+
 return {
     { name = "Badge",     component = BadgeDemo,     description = "Number badges, status tags, chips",       icon = "B" },
     { name = "Progress",  component = ProgressDemo,  description = "Progress bars, auto-animate, sizes",      icon = "P" },
@@ -583,4 +938,7 @@ return {
     { name = "Dropdown",  component = DropdownDemo,  description = "Dropdown selector/picker component",      icon = "D" },
     { name = "Card",      component = CardDemo,      description = "Card layouts, social, stats, list",        icon = "C" },
     { name = "Gesture Handler", component = GestureDemo, description = "Pan/Tap/LongPress 手势示例", icon = "G" },
+    { name = "useId",     component = UseIdDemo,     description = "Generate unique stable IDs", icon = "I" },
+    { name = "useImperativeHandle", component = ImperativeHandleDemo, description = "Expose methods via ref", icon = "R" },
+    { name = "useSyncExternalStore", component = SyncExternalStoreDemo, description = "Subscribe to external stores", icon = "E" },
 }

@@ -405,9 +405,118 @@ local function ActivityIndicatorDemo()
     )
 end
 
+-- 5. KeyboardAvoidingViewDemo
+local function KeyboardAvoidingViewDemo()
+    local text1, setText1 = useState("")
+    local text2, setText2 = useState("")
+    local text3, setText3 = useState("")
+    local behavior, setBehavior = useState("padding")
+    
+    return ce(DemoPage, {},
+        ce(Section, { title = "Behavior Mode: " .. behavior },
+            ce("View", { style = { flexDirection = "row", gap = 8 } },
+                ce(RN.Button, { 
+                    title = "padding", 
+                    color = behavior == "padding" and T.accent or T.textSecondary,
+                    onPress = function() setBehavior("padding") end 
+                }),
+                ce(RN.Button, { 
+                    title = "position", 
+                    color = behavior == "position" and T.accent or T.textSecondary,
+                    onPress = function() setBehavior("position") end 
+                }),
+                ce(RN.Button, { 
+                    title = "height", 
+                    color = behavior == "height" and T.accent or T.textSecondary,
+                    onPress = function() setBehavior("height") end 
+                })
+            )
+        ),
+        ce(RN.KeyboardAvoidingView, {
+            behavior = behavior,
+            style = { flex = 1 },
+        },
+            ce("ScrollView", { style = { flex = 1 } },
+                ce("View", { style = { padding = T.pad, gap = 16 } },
+                    ce("Text", { 
+                        style = { fontSize = 14, color = T.textSecondary, marginBottom = 8 } 
+                    }, "Tap the text inputs below. The view will adjust when keyboard appears."),
+                    
+                    -- Input 1
+                    ce("View", {},
+                        ce("Text", { style = { fontSize = 12, color = T.textSecondary, marginBottom = 4 } }, "Username"),
+                        ce(RN.TextInput, {
+                            placeholder = "Enter username...",
+                            value = text1,
+                            onChangeText = setText1,
+                            style = {
+                                backgroundColor = T.surface,
+                                borderWidth = 1,
+                                borderColor = T.border,
+                                borderRadius = T.radiusSmall,
+                                padding = 12,
+                                fontSize = 16,
+                                color = T.textPrimary,
+                            },
+                        })
+                    ),
+                    
+                    -- Input 2
+                    ce("View", {},
+                        ce("Text", { style = { fontSize = 12, color = T.textSecondary, marginBottom = 4 } }, "Email"),
+                        ce(RN.TextInput, {
+                            placeholder = "Enter email...",
+                            value = text2,
+                            onChangeText = setText2,
+                            style = {
+                                backgroundColor = T.surface,
+                                borderWidth = 1,
+                                borderColor = T.border,
+                                borderRadius = T.radiusSmall,
+                                padding = 12,
+                                fontSize = 16,
+                                color = T.textPrimary,
+                            },
+                        })
+                    ),
+                    
+                    -- Input 3 (multiline)
+                    ce("View", {},
+                        ce("Text", { style = { fontSize = 12, color = T.textSecondary, marginBottom = 4 } }, "Bio (multiline)"),
+                        ce(RN.TextInput, {
+                            placeholder = "Tell us about yourself...",
+                            value = text3,
+                            onChangeText = setText3,
+                            multiline = true,
+                            style = {
+                                backgroundColor = T.surface,
+                                borderWidth = 1,
+                                borderColor = T.border,
+                                borderRadius = T.radiusSmall,
+                                padding = 12,
+                                fontSize = 16,
+                                color = T.textPrimary,
+                                height = 100,
+                            },
+                        })
+                    ),
+                    
+                    -- Spacer to push content up
+                    ce("View", { style = { height = 200 } }),
+                    
+                    ce("Text", { 
+                        style = { fontSize = 12, color = T.textSecondary, textAlign = "center" } 
+                    }, "Scroll down and tap the last input to test keyboard avoiding")
+                )
+            )
+        )
+    )
+end
+
 return {
     { name = "TextInput",  component = TextInputDemo,  description = "Single/multi-line, controlled input", icon = "T" },
     { name = "Switch",     component = SwitchDemo,     description = "Toggle switches, custom colors",      icon = "S" },
     { name = "Modal",      component = ModalDemo,      description = "Overlay dialog, open/close",          icon = "M" },
     { name = "Indicator",  component = ActivityIndicatorDemo, description = "Loading spinner, size/color/useTimeout", icon = "A" },
+    { name = "KeyboardAV", component = KeyboardAvoidingViewDemo, description = "Keyboard avoiding behavior modes", icon = "K" },
 }

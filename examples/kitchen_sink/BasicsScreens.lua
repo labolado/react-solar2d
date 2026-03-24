@@ -5,7 +5,6 @@ local useState = React.useState
 local T = require("examples.kitchen_sink.theme")
 local RN = require("react_solar2d")
 local LinearGradient = require("lib.linear-gradient")
-local LinearGradient = require("lib.linear-gradient")
 local Section = T.Section
 local DemoPage = T.DemoPage
 
@@ -135,10 +134,10 @@ end
 local function TextDemo()
     return ce(DemoPage, {},
         ce(Section, { title = "Font Sizes" },
-            ce("Text", { style = { fontSize = 12, color = T.textPrimary } }, "fontSize: 12"),
-            ce("Text", { style = { fontSize = 18, color = T.textPrimary } }, "fontSize: 18"),
-            ce("Text", { style = { fontSize = 24, color = T.textPrimary } }, "fontSize: 24"),
-            ce("Text", { style = { fontSize = 36, color = T.textPrimary } }, "fontSize: 36")
+            ce("Text", { style = { fontSize = 12, color = T.textPrimary } }, "fontSize = 12"),
+            ce("Text", { style = { fontSize = 18, color = T.textPrimary } }, "fontSize = 18"),
+            ce("Text", { style = { fontSize = 24, color = T.textPrimary } }, "fontSize = 24"),
+            ce("Text", { style = { fontSize = 36, color = T.textPrimary } }, "fontSize = 36")
         ),
         ce(Section, { title = "Font Weight" },
             ce("Text", { style = { fontSize = 18, color = T.textPrimary } }, "Normal weight"),

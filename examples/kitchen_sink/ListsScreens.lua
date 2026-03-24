@@ -164,8 +164,151 @@ local function FlatListVirtualDemo()
     )
 end
 
+-- 4. SectionListDemo — Grouped list (contacts by letter)
+local function SectionListDemo()
+    local sections = {
+        { title = "A", data = { { name = "Alice" }, { name = "Anna" }, { name = "Andrew" } } },
+        { title = "B", data = { { name = "Bob" }, { name = "Ben" } } },
+        { title = "C", data = { { name = "Carol" }, { name = "Chris" }, { name = "Cathy" } } },
+        { title = "D", data = { { name = "David" }, { name = "Dan" } } },
+        { title = "E", data = { { name = "Emma" }, { name = "Eric" }, { name = "Eve" } } },
+        { title = "F", data = { { name = "Frank" } } },
+        { title = "G", data = { { name = "Grace" }, { name = "George" } } },
+    }
+
+    return ce("View", { style = { flex = 1, backgroundColor = T.bg } },
+        ce("View", {
+            style = { padding = T.pad, backgroundColor = T.surface, borderBottomWidth = 1, borderColor = T.border },
+        },
+            ce("Text", { style = { fontSize = 14, color = T.accent, fontWeight = "bold" } },
+                "Sectioned: " .. #sections .. " sections, contacts by letter")
+        ),
+        ce(RN.SectionList, {
+            sections = sections,
+            keyExtractor = function(item, index) return item.name .. index end,
+            renderSectionHeader = function(info)
+                return ce("View", {
+                    style = {
+                        backgroundColor = T.accent,
+                        paddingHorizontal = T.pad,
+                        paddingVertical = 8,
+                    },
+                }, ce("Text", { 
+                    style = { fontSize = 14, color = "#FFF", fontWeight = "bold" } 
+                }, info.section.title))
+            end,
+            renderItem = function(info)
+                return ce("View", {
+                    style = {
+                        padding = T.pad,
+                        backgroundColor = info.index % 2 == 0 and T.bg or T.surface,
+                        borderBottomWidth = 1,
+                        borderBottomColor = T.border,
+                    },
+                }, ce("Text", { 
+                    style = { fontSize = 16, color = T.textPrimary } 
+                }, info.item.name))
+            end,
+            ItemSeparatorComponent = function()
+                return ce("View", { style = { height = 1, backgroundColor = T.border } })
+            end,
+        })
+    )
+end
+
+-- 5. RefreshControlDemo — Pull to refresh list
+local function RefreshControlDemo()
+    local refreshing, setRefreshing = useState(false)
+    local items, setItems = useState({})
+    
+    -- Initialize items
+    if #items == 0 then
+        local initialItems = {}
+        for i = 1, 10 do
+            initialItems[i] = { id = tostring(i), title = "Item " .. i, time = os.date("%H:%M:%S") }
+        end
+        setItems(initialItems)
+    end
+
+    local function onRefresh()
+        setRefreshing(true)
+        -- Simulate network request
+        timer.performWithDelay(1500, function()
+            local newItems = {}
+            for i = 1, 10 do
+                newItems[i] = { 
+                    id = tostring(i), 
+                    title = "Refreshed Item " .. i, 
+                    time = os.date("%H:%M:%S")
+                }
+            end
+            setItems(newItems)
+            setRefreshing(false)
+        end)
+    end
+
+    return ce("View", { style = { flex = 1, backgroundColor = T.bg } },
+        ce("View", {
+            style = { padding = T.pad, backgroundColor = T.surface, borderBottomWidth = 1, borderColor = T.border },
+        },
+            ce("Text", { style = { fontSize = 14, color = T.accent, fontWeight = "bold" } },
+                "Pull-to-Refresh Demo"),
+            ce("Text", { style = { fontSize = 12, color = T.textSecondary } },
+                "Drag down to refresh the list")
+        ),
+        ce("ScrollView", {
+            style = { flex = 1 },
+            contentContainerStyle = { padding = T.pad },
+            refreshing = refreshing,
+            onRefresh = onRefresh,
+        },
+            -- RefreshControl as child (Solar2D specific pattern)
+            ce(RN.RefreshControl, {
+                refreshing = refreshing,
+                onRefresh = onRefresh,
+                tintColor = T.accent,
+                title = "Loading...",
+            }),
+            -- List items
+            ce("View", {},
+                ce("Text", { 
+                    style = { fontSize = 12, color = T.textSecondary, marginBottom = 8 } 
+                }, "Last refresh: " .. (items[1] and items[1].time or "-")),
+                ce("View", {},
+                    (function()
+                        local children = {}
+                        for i, item in ipairs(items) do
+                            children[i] = ce("View", {
+                                key = item.id,
+                                style = {
+                                    padding = T.pad,
+                                    backgroundColor = i % 2 == 0 and T.surface or T.bg,
+                                    borderRadius = T.radiusSmall,
+                                    marginBottom = 8,
+                                    borderWidth = 1,
+                                    borderColor = T.border,
+                                },
+                            },
+                                ce("Text", { 
+                                    style = { fontSize = 16, color = T.textPrimary, fontWeight = "bold" } 
+                                }, item.title),
+                                ce("Text", { 
+                                    style = { fontSize = 12, color = T.textSecondary } 
+                                }, "Updated at: " .. item.time)
+                            )
+                        end
+                        return children
+                    end)()
+                )
+            )
+        )
+    )
+end
+
 return {
     { name = "ScrollView",     component = ScrollViewDemo,     description = "Vertical + horizontal, onScroll", icon = "S" },
     { name = "FlatList",       component = FlatListBasicDemo,  description = "Header, footer, separator, empty", icon = "F" },
     { name = "VirtualList",    component = FlatListVirtualDemo, description = "1000+ items, windowed rendering", icon = "V" },
+    { name = "SectionList",    component = SectionListDemo,    description = "Grouped contacts by letter", icon = "L" },
+    { name = "RefreshControl", component = RefreshControlDemo, description = "Pull-to-refresh list", icon = "R" },
 }

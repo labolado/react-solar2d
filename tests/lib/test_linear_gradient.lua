@@ -29,9 +29,12 @@ T.describe("lib/linear-gradient", function()
         local fill = inst._bg.fill
         T.expect(fill).toBeTruthy()
         T.expect(fill.type).toBe("gradient")
-        T.expect(fill.color1[1]).toBe(1)
-        T.expect(fill.color2[2]).toBe(1)
-        T.expect(fill.color3[3]).toBe(1)
+        -- Solar2D only supports 2-color gradients, first and second colors are used
+        -- Gradient colors are {r, g, b} without alpha
+        T.expect(fill.color1[1]).toBe(1)  -- #FF0000 -> R=1
+        T.expect(fill.color2[2]).toBe(1)  -- #00FF00 -> G=1
+        -- color3 is not supported in Solar2D, only color1 and color2 exist
+        T.expect(fill.color3).toBeNil()
     end)
 
     T.it("updates gradient when colors change", function()
