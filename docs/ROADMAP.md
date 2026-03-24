@@ -86,31 +86,40 @@
 
 ## Phase 3: Nice-to-Have (P2)
 
-### 11. @react-native-community/datetimepicker
+### 11. react-native-linear-gradient
+**Purpose**: 渐变背景/按钮
+**Solar2D映射**: `display.newRect` + gradient fill（`type="gradient"`）
+**API对齐**: `<LinearGradient colors start end locations>`
+**复杂度**: ⭐⭐
+**价值**: ⭐⭐⭐ 美观背景、卡片、按钮
+**状态**: ✅ 已实现（lib/linear-gradient + KitchenSink 示例）
+
+### 12. @react-native-community/datetimepicker
 **Purpose**: 日期时间选择器
 **Solar2D映射**: `native.showAlert` 或自定义 UI
 **复杂度**: ⭐⭐⭐
 **价值**: ⭐⭐⭐
+**状态**: ✅ 已实现（自定义 UI + KitchenSink 示例）
 
-### 12. react-native-permissions
+### 13. react-native-permissions
 **Purpose**: 权限管理
 **Solar2D映射**: Solar2D permissions API
 **复杂度**: ⭐⭐
 **价值**: ⭐⭐
 
-### 13. react-native-share
+### 14. react-native-share
 **Purpose**: 内容分享
 **Solar2D映射**: `native.showPopup`
 **复杂度**: ⭐⭐
 **价值**: ⭐⭐
 
-### 14. react-native-webview
+### 15. react-native-webview
 **Purpose**: 嵌入网页
 **Solar2D映射**: `native.newWebView`
 **复杂度**: ⭐⭐⭐
 **价值**: ⭐⭐
 
-### 15. @react-native-clipboard/clipboard
+### 16. @react-native-clipboard/clipboard
 **Purpose**: 剪贴板
 **Solar2D映射**: Solar2D clipboard API
 **复杂度**: ⭐

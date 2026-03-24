@@ -4,6 +4,8 @@ local ce = React.createElement
 local useState = React.useState
 local T = require("examples.kitchen_sink.theme")
 local RN = require("react_solar2d")
+local LinearGradient = require("lib.linear-gradient")
+local LinearGradient = require("lib.linear-gradient")
 local Section = T.Section
 local DemoPage = T.DemoPage
 
@@ -41,6 +43,89 @@ local function ViewDemo()
                 ce("View", { style = { width = 44, height = 44, backgroundColor = "teal", borderRadius = 8 } }),
                 ce("View", { style = { width = 44, height = 44, backgroundColor = "coral", borderRadius = 8 } }),
                 ce("View", { style = { width = 44, height = 44, backgroundColor = "indigo", borderRadius = 8 } })
+            )
+        )
+    )
+end
+
+-- 7. LinearGradientDemo
+local function LinearGradientDemo()
+    local function GradientCard(cfg)
+        return ce(LinearGradient, {
+            colors = cfg.colors,
+            start = cfg.start,
+            ["end"] = cfg["end"],
+            style = {
+                width = 300,
+                height = cfg.height or 90,
+                borderRadius = T.radius,
+                marginBottom = 12,
+            }
+        },
+            ce("View", {
+                style = {
+                    flex = 1,
+                    padding = 18,
+                    justifyContent = "center",
+                }
+            },
+                ce("Text", { style = { fontSize = 16, color = "#FFFFFF", fontWeight = "bold" } }, cfg.title),
+                cfg.subtitle and ce("Text", { style = { fontSize = 12, color = "#FFFFFF", marginTop = 6 } }, cfg.subtitle) or nil
+            )
+        )
+    end
+
+    return ce(DemoPage, {},
+        ce(Section, { title = "Basic gradients" },
+            GradientCard({
+                title = "Top → Bottom",
+                subtitle = "colors = ['#FF6B6B', '#FFD93D']",
+                colors = { "#FF6B6B", "#FFD93D" },
+                start = { x = 0.5, y = 0 },
+                ["end"] = { x = 0.5, y = 1 },
+            }),
+            GradientCard({
+                title = "Left → Right",
+                subtitle = "start={0,0.5} end={1,0.5}",
+                colors = { "#4FACFE", "#00F2FE" },
+                start = { x = 0, y = 0.5 },
+                ["end"] = { x = 1, y = 0.5 },
+            }),
+            GradientCard({
+                title = "Diagonal",
+                subtitle = "Three colors",
+                colors = { "#845EC2", "#FF9671", "#FFC75F" },
+                start = { x = 0, y = 0 },
+                ["end"] = { x = 1, y = 1 },
+            })
+        ),
+        ce(Section, { title = "Gradient badge row" },
+            ce("View", { style = { flexDirection = "row", gap = 12, flexWrap = "wrap" } },
+                ce(LinearGradient, {
+                    colors = { "#00B09B", "#96C93D" },
+                    style = { paddingHorizontal = 16, paddingVertical = 10, borderRadius = 999 },
+                }, ce("Text", { style = { color = "#FFFFFF", fontSize = 12, fontWeight = "bold" } }, "Online")),
+                ce(LinearGradient, {
+                    colors = { "#FF512F", "#DD2476" },
+                    style = { paddingHorizontal = 16, paddingVertical = 10, borderRadius = 999 },
+                }, ce("Text", { style = { color = "#FFFFFF", fontSize = 12, fontWeight = "bold" } }, "Live")),
+                ce(LinearGradient, {
+                    colors = { "#1FA2FF", "#12D8FA", "#A6FFCB" },
+                    style = { paddingHorizontal = 16, paddingVertical = 10, borderRadius = 999 },
+                }, ce("Text", { style = { color = "#FFFFFF", fontSize = 12, fontWeight = "bold" } }, "Pro"))
+            )
+        ),
+        ce(Section, { title = "Background overlay" },
+            ce(LinearGradient, {
+                colors = { "#000000AA", "#00000000" },
+                start = { x = 0.5, y = 1 },
+                ["end"] = { x = 0.5, y = 0 },
+                style = { width = 300, height = 120, borderRadius = T.radius, justifyContent = "flex-end" },
+            },
+                ce("View", { style = { padding = 16 } },
+                    ce("Text", { style = { fontSize = 14, color = "#FFFFFF", fontWeight = "bold" } }, "Overlay title"),
+                    ce("Text", { style = { fontSize = 12, color = "#FFFFFF" } }, "Use gradients for readable overlays")
+                )
             )
         )
     )
@@ -227,4 +312,5 @@ return {
     { name = "Button",    component = ButtonDemo,    description = "Colors, onPress counter",           icon = "B" },
     { name = "Pressable", component = PressableDemo, description = "Press and long-press feedback",     icon = "P" },
     { name = "Touchable", component = TouchableOpacityDemo, description = "ActiveOpacity comparison",   icon = "O" },
+    { name = "LinearGradient", component = LinearGradientDemo, description = "react-native-linear-gradient", icon = "G" },
 }

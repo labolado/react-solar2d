@@ -37,6 +37,66 @@ local function parseColor(color)
     return named[color:lower()] or {1, 1, 1, 1}
 end
 
+local function normalizePoint(value, defaultX, defaultY)
+    if type(value) == "table" then
+        if value.x or value.y then
+            local x = value.x
+            local y = value.y
+            if x == nil and value[1] ~= nil then x = value[1] end
+            if y == nil and value[2] ~= nil then y = value[2] end
+            return x or defaultX, y or defaultY
+        elseif value[1] or value[2] then
+            return value[1] or defaultX, value[2] or defaultY
+        end
+    end
+    return defaultX, defaultY
+end
+
+local function buildGradientPaint(props)
+    local colors = {}
+    if props and type(props.colors) == "table" then
+        colors = props.colors
+    elseif props and props.colors then
+        colors = { props.colors }
+    else
+        colors = { "#FFFFFF", "#000000" }
+    end
+
+    if #colors == 1 then
+        colors[2] = colors[1]
+    elseif #colors == 0 then
+        colors = { "#FFFFFF", "#000000" }
+    end
+
+    local paint = { type = "gradient" }
+    local maxColors = math.min(#colors, 4)
+    for i = 1, maxColors do
+        local c = parseColor(colors[i])
+        paint["color" .. i] = c
+    end
+    if not paint.color2 then paint.color2 = paint.color1 end
+
+    local startX, startY = normalizePoint(props and props.start, 0.5, 0)
+    local endX, endY = normalizePoint(props and props["end"], 0.5, 1)
+    local dx = (endX or 0) - (startX or 0)
+    local dy = (endY or 0) - (startY or 0)
+    if dx == 0 and dy == 0 then
+        dy = 1
+    end
+    paint.rotation = math.deg(math.atan2(dy, dx))
+    return paint
+end
+
+local function applyLinearGradientFill(instance, props)
+    if not instance or not instance._bg then return end
+    instance._bg.fill = buildGradientPaint(props or instance._gradientProps or {})
+    instance._gradientProps = {
+        colors = props and props.colors,
+        start = props and props.start,
+        ["end"] = props and props["end"],
+    }
+end
+
 -- Resolve font from style properties
 local function resolveFont(style)
     if style.fontFamily then
@@ -404,6 +464,38 @@ function M.createInstance(elementType, props)
             group._justifyContent = style.justifyContent
         end
 
+        applyCommonStyle(group, style)
+        wireEvents(group, props)
+        if isAnimated then subscribeAnimatedValues(group, style) end
+        return group
+
+    elseif elementType == "LinearGradient" then
+        local group = display.newGroup()
+        group.anchorX, group.anchorY = 0, 0
+        group.anchorChildren = true
+        group._isLinearGradient = true
+
+        local vw = style.width or 1
+        local vh = style.height or 1
+        local br = style.borderRadius or 0
+        local bg
+        if br > 0 then
+            bg = display.newRoundedRect(group, 0, 0, vw, vh, br)
+        else
+            bg = display.newRect(group, 0, 0, vw, vh)
+        end
+        bg.anchorX, bg.anchorY = 0, 0
+        group._bg = bg
+
+        if style.borderWidth then
+            bg.strokeWidth = style.borderWidth
+            if style.borderColor then
+                local borderColor = parseColor(style.borderColor)
+                bg:setStrokeColor(borderColor[1], borderColor[2], borderColor[3], borderColor[4])
+            end
+        end
+
+        applyLinearGradientFill(group, props)
         applyCommonStyle(group, style)
         wireEvents(group, props)
         if isAnimated then subscribeAnimatedValues(group, style) end
@@ -836,6 +928,16 @@ function M.updateInstance(instance, oldProps, newProps)
     if newProps.onDrag then instance._onDrag = newProps.onDrag end
     if newProps.onDragEnd then instance._onDragEnd = newProps.onDragEnd end
     if newProps.onPress then instance._onPress = newProps.onPress end
+
+    -- LinearGradient: update fill when props change
+    if instance._isLinearGradient then
+        local gradientChanged = (oldProps.colors ~= newProps.colors)
+            or (oldProps.start ~= newProps.start)
+            or (oldProps["end"] ~= newProps["end"])
+        if gradientChanged then
+            applyLinearGradientFill(instance, newProps)
+        end
+    end
 
     -- Re-subscribe animated values if they changed
     if instance._animSubscriptions then
