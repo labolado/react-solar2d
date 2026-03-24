@@ -20,13 +20,23 @@ function M.createElement(type, config, ...)
 
     local childCount = select("#", ...)
     if childCount == 1 then
-        props.children = select(1, ...)
+        local child = select(1, ...)
+        if child ~= nil then
+            props.children = child
+        end
     elseif childCount > 1 then
         local children = {}
         for i = 1, childCount do
-            children[i] = select(i, ...)
+            local child = select(i, ...)
+            if child ~= nil and child ~= false then
+                children[#children + 1] = child
+            end
         end
-        props.children = children
+        if #children == 1 then
+            props.children = children[1]
+        elseif #children > 1 then
+            props.children = children
+        end
     end
 
     return {

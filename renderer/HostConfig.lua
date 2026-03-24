@@ -416,7 +416,7 @@ function M.createInstance(elementType, props)
         -- Background rect: create if has background/border, OR if has explicit size (for hit testing)
         if style.backgroundColor or style.borderWidth or style.borderColor or (vw > 0 and vh > 0) then
             local bg
-            local br = style.borderRadius or 0
+            local br = tonumber(style.borderRadius) or 0
             -- Perfect circle: use roundedRect (same as before, reliable positioning)
             local isCircle = br > 0 and vw > 0 and vh > 0 and vw == vh and br >= vw / 2
             if isCircle then
@@ -446,7 +446,7 @@ function M.createInstance(elementType, props)
             end
 
             group._bg = bg
-            group._borderRadius = style.borderRadius or 0
+            group._borderRadius = tonumber(style.borderRadius) or 0
             -- Set group dimensions for hit testing (Solar2D groups don't have intrinsic size)
             group.width = vw
             group.height = vh
@@ -490,7 +490,7 @@ function M.createInstance(elementType, props)
 
         local vw = style.width or 1
         local vh = style.height or 1
-        local br = style.borderRadius or 0
+        local br = tonumber(style.borderRadius) or 0
         local bg
         if br > 0 then
             bg = display.newRoundedRect(group, 0, 0, vw, vh, br)
@@ -558,8 +558,9 @@ function M.createInstance(elementType, props)
 
         -- Background box
         local bg
-        if style.borderRadius and style.borderRadius > 0 then
-            bg = display.newRoundedRect(group, 0, 0, w, h, style.borderRadius)
+        local br = tonumber(style.borderRadius) or 0
+        if br > 0 then
+            bg = display.newRoundedRect(group, 0, 0, w, h, br)
         else
             bg = display.newRect(group, 0, 0, w, h)
         end
@@ -689,10 +690,11 @@ function M.createInstance(elementType, props)
             local bg = display.newRect(group, 0, 0, w, h)
             bg.anchorX, bg.anchorY = 0, 0
             bg:setFillColor(0.93, 0.93, 0.95)
-            if style.borderRadius and style.borderRadius > 0 then
+            local br = tonumber(style.borderRadius) or 0
+            if br > 0 then
                 -- Use rounded rect instead
                 bg:removeSelf()
-                bg = display.newRoundedRect(group, 0, 0, w, h, style.borderRadius)
+                bg = display.newRoundedRect(group, 0, 0, w, h, br)
                 bg.anchorX, bg.anchorY = 0, 0
                 bg:setFillColor(0.93, 0.93, 0.95)
             end

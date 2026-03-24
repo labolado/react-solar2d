@@ -33,15 +33,29 @@ function M.create(hostConfig)
         if type(children) ~= "table" or children["$$typeof"] then
             return { children }
         end
-        if #children > 0 then
+        -- Use raw length check that handles nil holes in arrays
+        -- (Lua's # operator is unreliable with nil holes, so check rawget)
+        local len = rawget(children, 1) ~= nil and #children or 0
+        if len == 0 then
+            -- Check if it's a sparse array (nil holes, e.g. {nil, elem, elem})
+            for i = 1, 64 do
+                if rawget(children, i) ~= nil then len = i end
+            end
+        end
+        if len > 0 then
             local result = {}
-            for _, child in ipairs(children) do
-                if type(child) == "table" and #child > 0 and not child["$$typeof"] then
-                    for _, c in ipairs(child) do
-                        result[#result + 1] = c
+            for i = 1, len do
+                local child = rawget(children, i)
+                if child ~= nil then
+                    if type(child) == "table" and not child["$$typeof"] and rawget(child, 1) ~= nil then
+                        for j = 1, #child do
+                            if child[j] ~= nil then
+                                result[#result + 1] = child[j]
+                            end
+                        end
+                    else
+                        result[#result + 1] = child
                     end
-                else
-                    result[#result + 1] = child
                 end
             end
             return result

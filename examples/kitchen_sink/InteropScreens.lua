@@ -7,13 +7,71 @@ local useRef = React.useRef
 local T = require("examples.kitchen_sink.theme")
 local RN = require("react_solar2d")
 
+local Section = T.Section
+local DemoPage = T.DemoPage
+
 local function ReactInSolar2DDemo(props)
-    return ce("View", { style = { flex = 1 } },
-        ce("Text", {}, "ReactInSolar Demo"))
+    return ce(DemoPage, {},
+        ce(Section, { title = "React in Solar2D" },
+            ce("Text", { style = { fontSize = 13, color = T.textSecondary, marginBottom = 12 } },
+                "Embed a React-Solar2D component tree inside an existing Solar2D scene. The host app creates a display group, then calls ReactSolar2D.render() to mount React components into it."),
+            ce("View", { style = { backgroundColor = T.surface, borderRadius = T.radiusSmall, padding = 12, marginBottom = 8 } },
+                ce("Text", { style = { fontSize = 12, color = T.accent, fontWeight = "bold", marginBottom = 4 } }, "Pattern"),
+                ce("Text", { style = { fontSize = 11, color = T.textSecondary } }, "local group = display.newGroup()\nReactSolar2D.render(element, group)")
+            )
+        ),
+        ce(Section, { title = "Live Example" },
+            ce("Text", { style = { fontSize = 13, color = T.textSecondary, marginBottom = 8 } },
+                "This entire Kitchen Sink app is a React tree rendered inside Solar2D:"),
+            ce("View", { style = { flexDirection = "row", gap = 8 } },
+                ce("View", { style = { flex = 1, backgroundColor = "#2ECC71", borderRadius = 6, padding = 10, alignItems = "center" } },
+                    ce("Text", { style = { fontSize = 24, color = "#FFF" } }, "42"),
+                    ce("Text", { style = { fontSize = 10, color = "#FFF" } }, "Components")
+                ),
+                ce("View", { style = { flex = 1, backgroundColor = T.accent, borderRadius = 6, padding = 10, alignItems = "center" } },
+                    ce("Text", { style = { fontSize = 24, color = "#FFF" } }, "9"),
+                    ce("Text", { style = { fontSize = 10, color = "#FFF" } }, "Categories")
+                ),
+                ce("View", { style = { flex = 1, backgroundColor = "#9B59B6", borderRadius = 6, padding = 10, alignItems = "center" } },
+                    ce("Text", { style = { fontSize = 24, color = "#FFF" } }, "60"),
+                    ce("Text", { style = { fontSize = 10, color = "#FFF" } }, "FPS")
+                )
+            )
+        )
+    )
 end
 
 local function Solar2DInReactDemo()
-    return ce("View", {}, ce("Text", {}, "Solar2D Demo"))
+    return ce(DemoPage, {},
+        ce(Section, { title = "Solar2D in React" },
+            ce("Text", { style = { fontSize = 13, color = T.textSecondary, marginBottom = 12 } },
+                "Use native Solar2D display objects (physics bodies, particle emitters, sprites) alongside React-managed UI. The React layout handles positioning while Solar2D handles rendering."),
+            ce("View", { style = { backgroundColor = T.surface, borderRadius = T.radiusSmall, padding = 12, marginBottom = 8 } },
+                ce("Text", { style = { fontSize = 12, color = T.accent, fontWeight = "bold", marginBottom = 4 } }, "Pattern"),
+                ce("Text", { style = { fontSize = 11, color = T.textSecondary } }, "ce(\"View\", { onLayout = function(g)\n  -- insert native Solar2D objects\n  local circle = display.newCircle(g, ...)\nend })")
+            )
+        ),
+        ce(Section, { title = "Use Cases" },
+            ce("View", { style = { gap = 8 } },
+                ce("View", { style = { flexDirection = "row", alignItems = "center", gap = 8 } },
+                    ce("View", { style = { width = 8, height = 8, borderRadius = 4, backgroundColor = "#2ECC71" } }),
+                    ce("Text", { style = { fontSize = 13, color = T.textPrimary } }, "Physics simulations with UI overlays")
+                ),
+                ce("View", { style = { flexDirection = "row", alignItems = "center", gap = 8 } },
+                    ce("View", { style = { width = 8, height = 8, borderRadius = 4, backgroundColor = T.accent } }),
+                    ce("Text", { style = { fontSize = 13, color = T.textPrimary } }, "Particle effects in React layouts")
+                ),
+                ce("View", { style = { flexDirection = "row", alignItems = "center", gap = 8 } },
+                    ce("View", { style = { width = 8, height = 8, borderRadius = 4, backgroundColor = "#F39C12" } }),
+                    ce("Text", { style = { fontSize = 13, color = T.textPrimary } }, "Sprite animations with managed state")
+                ),
+                ce("View", { style = { flexDirection = "row", alignItems = "center", gap = 8 } },
+                    ce("View", { style = { width = 8, height = 8, borderRadius = 4, backgroundColor = "#9B59B6" } }),
+                    ce("Text", { style = { fontSize = 13, color = T.textPrimary } }, "Custom shader effects on React components")
+                )
+            )
+        )
+    )
 end
 
 local AsyncStorage = require("lib.async-storage")
