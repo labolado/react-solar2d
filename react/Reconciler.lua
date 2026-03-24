@@ -5,6 +5,16 @@ local Hooks = require("react.Hooks")
 
 local M = {}
 
+-- Check if a value is callable (function or table with __call metamethod)
+local function isCallable(v)
+    if type(v) == "function" then return true end
+    if type(v) == "table" then
+        local mt = getmetatable(v)
+        return mt and type(mt.__call) == "function"
+    end
+    return false
+end
+
 function M.create(hostConfig)
     local reconciler = {}
     local rootFiber = nil
@@ -75,7 +85,7 @@ function M.create(hostConfig)
 
                 if old and old.type == elementType then
                     local tag
-                    if type(elementType) == "function" then
+                    if isCallable(elementType) then
                         tag = "function"
                     elseif type(elementType) == "table" and elementType._isProvider then
                         tag = "function"  -- Provider handled in performUnitOfWork
@@ -93,7 +103,7 @@ function M.create(hostConfig)
                     oldChildren[key] = nil
                 else
                     local tag
-                    if type(elementType) == "function" then
+                    if isCallable(elementType) then
                         tag = "function"
                     elseif type(elementType) == "table" and elementType._isProvider then
                         tag = "function"  -- Provider handled in performUnitOfWork

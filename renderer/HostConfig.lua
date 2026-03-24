@@ -84,34 +84,18 @@ local function buildGradientPaint(props)
         color2 = makeGradientColor(c2),
     }
 
-    -- Calculate direction from start/end points
+    -- Calculate rotation from start/end points
+    -- Solar2D gradient uses `rotation` (degrees), NOT `direction` strings
+    -- 0° = left-to-right, 90° = top-to-bottom, etc.
     local startX, startY = normalizePoint(props and props.start, 0.5, 0)
     local endX, endY = normalizePoint(props and props["end"], 0.5, 1)
     local dx = (endX or 0.5) - (startX or 0.5)
     local dy = (endY or 1) - (startY or 0)
-    
     if dx == 0 and dy == 0 then
         dy = 1
     end
-    
-    -- Map to Solar2D direction strings for common cases
-    -- Use a tolerance for floating point comparison
-    local tolerance = 0.01
-    
-    if math.abs(dx) < tolerance and dy > tolerance then
-        paint.direction = "down"
-    elseif math.abs(dx) < tolerance and dy < -tolerance then
-        paint.direction = "up"
-    elseif dx > tolerance and math.abs(dy) < tolerance then
-        paint.direction = "right"
-    elseif dx < -tolerance and math.abs(dy) < tolerance then
-        paint.direction = "left"
-    else
-        -- For diagonal gradients, default to down
-        -- Solar2D doesn't support arbitrary angles with string directions
-        paint.direction = "down"
-    end
-    
+    paint.rotation = math.deg(math.atan2(dy, dx))
+
     return paint
 end
 
