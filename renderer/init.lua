@@ -102,9 +102,16 @@ local function applyLayout(yogaNode, fiber)
         fiber.stateNode.x = l + (fiber.stateNode._translateX or 0)
         fiber.stateNode.y = t + (fiber.stateNode._translateY or 0)
         -- Update size for bg rect if present (guard against removed objects)
+        -- When style has explicit width/height, skip Yoga's value — updateInstance
+        -- already set the correct size and fiber.props.style may be stale during
+        -- the same commit cycle (e.g. ProgressBar fill width changes per frame).
         if fiber.stateNode._bg and fiber.stateNode._bg.removeSelf and fiber.stateNode._bg.path then
-            fiber.stateNode._bg.path.width = w
-            fiber.stateNode._bg.path.height = h
+            if w > 0 and not style.width then
+                fiber.stateNode._bg.path.width = w
+            end
+            if h > 0 and not style.height then
+                fiber.stateNode._bg.path.height = h
+            end
         end
         -- TextInput: sync native text field position to layout
         if fiber.type == "TextInput" and fiber.stateNode._inputField then

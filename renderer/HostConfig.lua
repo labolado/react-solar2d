@@ -410,8 +410,8 @@ function M.createInstance(elementType, props)
         group.anchorX, group.anchorY = 0, 0
         group.anchorChildren = true
 
-        local vw = style.width or 0
-        local vh = style.height or 0
+        local vw = type(style.width) == "number" and style.width or 0
+        local vh = type(style.height) == "number" and style.height or 0
 
         -- Background rect: create if has background/border, OR if has explicit size (for hit testing)
         if style.backgroundColor or style.borderWidth or style.borderColor or (vw > 0 and vh > 0) then
@@ -446,6 +446,7 @@ function M.createInstance(elementType, props)
             end
 
             group._bg = bg
+            group._borderRadius = style.borderRadius or 0
             -- Set group dimensions for hit testing (Solar2D groups don't have intrinsic size)
             group.width = vw
             group.height = vh

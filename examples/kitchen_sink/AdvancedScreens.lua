@@ -120,28 +120,39 @@ local function ProgressDemo()
         end)
     end, running and 50 or false)
 
+    -- Track width = screen width minus DemoPage padding (16) on each side
+    local trackW = (display and display.contentWidth or 320) - T.pad * 2
+
     local function ProgressBar(props)
         local pct = math.min(1, math.max(0, props.value or 0))
+        local h = props.height or 8
+        local r = h / 2
+        -- Key includes width to force roundedRect recreation (path.width resize is unreliable)
+        local fillChild = nil
+        if pct > 0 then
+            local fillW = math.max(1, math.floor(pct * trackW))
+            fillChild = ce("View", {
+                key = "fill-" .. fillW,
+                style = {
+                    width = fillW,
+                    height = h,
+                    borderRadius = r,
+                    backgroundColor = props.color or T.accent,
+                },
+            })
+        end
         return ce("View", {
             style = {
-                height = props.height or 8,
+                height = h,
                 backgroundColor = T.border,
-                borderRadius = (props.height or 8) / 2,
-                overflow = "hidden",
+                borderRadius = r,
             },
-        }, ce("View", {
-            style = {
-                width = pct * (props.width or 250),
-                height = props.height or 8,
-                backgroundColor = props.color or T.accent,
-                borderRadius = (props.height or 8) / 2,
-            },
-        }))
+        }, fillChild)
     end
 
     return ce(DemoPage, {},
         ce(Section, { title = "Manual Progress" },
-            ProgressBar({ value = progress, width = 260 }),
+            ProgressBar({ value = progress }),
             ce("Text", { style = { fontSize = 12, color = T.textSecondary, marginTop = 4 } }, math.floor(progress * 100) .. "%"),
             ce("View", { style = { flexDirection = "row", gap = 8, marginTop = 8 } },
                 ce(RN.Button, { title = "0%", color = T.textSecondary, onPress = function() setProgress(0) end }),
@@ -152,7 +163,7 @@ local function ProgressDemo()
             )
         ),
         ce(Section, { title = "Auto-Animated Progress" },
-            ProgressBar({ value = autoProgress, width = 260, color = "#2ECC71", height = 12 }),
+            ProgressBar({ value = autoProgress, color = "#2ECC71", height = 12 }),
             ce("Text", { style = { fontSize = 12, color = T.textSecondary, marginTop = 4 } }, math.floor(autoProgress * 100) .. "%"),
             ce("View", { style = { flexDirection = "row", gap = 8, marginTop = 8 } },
                 ce(RN.Button, {
@@ -167,18 +178,18 @@ local function ProgressDemo()
         ),
         ce(Section, { title = "Color Variants" },
             ce("View", { style = { gap = 8 } },
-                ProgressBar({ value = 0.8, color = "#2ECC71", width = 260 }),
-                ProgressBar({ value = 0.6, color = "#3498DB", width = 260 }),
-                ProgressBar({ value = 0.4, color = "#F39C12", width = 260 }),
-                ProgressBar({ value = 0.2, color = "#E74C3C", width = 260 })
+                ProgressBar({ value = 0.8, color = "#2ECC71" }),
+                ProgressBar({ value = 0.6, color = "#3498DB" }),
+                ProgressBar({ value = 0.4, color = "#F39C12" }),
+                ProgressBar({ value = 0.2, color = "#E74C3C" })
             )
         ),
         ce(Section, { title = "Sizes" },
             ce("View", { style = { gap = 8 } },
-                ProgressBar({ value = 0.7, height = 4, width = 260 }),
-                ProgressBar({ value = 0.7, height = 8, width = 260 }),
-                ProgressBar({ value = 0.7, height = 16, width = 260 }),
-                ProgressBar({ value = 0.7, height = 24, width = 260 })
+                ProgressBar({ value = 0.7, height = 4 }),
+                ProgressBar({ value = 0.7, height = 8 }),
+                ProgressBar({ value = 0.7, height = 16 }),
+                ProgressBar({ value = 0.7, height = 24 })
             )
         )
     )

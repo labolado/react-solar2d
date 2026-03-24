@@ -215,6 +215,52 @@ local function handleClient(client)
         else
             response = httpResponse(jsonEncode({ error = "Missing code" }), "400 Bad Request")
         end
+    elseif method == "POST" and path == "/tap-button" then
+        -- Find a button by its text label and tap it
+        -- Usage: POST /tap-button  title=Start
+        local title = body:match("title=([^&]+)")
+        if title then
+            title = title:gsub("%%(%x%x)", function(h) return string.char(tonumber(h, 16)) end)
+            timer.performWithDelay(1, function()
+                -- Breadth-first search through display tree
+                local queue = {}
+                for i = 1, display.currentStage.numChildren do
+                    queue[#queue+1] = display.currentStage[i]
+                end
+                local idx = 1
+                while idx <= #queue and idx <= 2000 do
+                    local node = queue[idx]
+                    idx = idx + 1
+                    if node then
+                        -- Check if this node's _textObj matches
+                        if node._textObj and node._textObj.text == title then
+                            -- Text found — tap its parent (the Button View with _onPress)
+                            local target = node.parent
+                            if target and target._onPress then
+                                target._onPress({name="tap", target=target})
+                                print("[TAP-BUTTON] Tapped parent._onPress for: " .. title)
+                                return
+                            elseif node._onPress then
+                                node._onPress({name="tap", target=node})
+                                print("[TAP-BUTTON] Tapped node._onPress for: " .. title)
+                                return
+                            end
+                            -- No handler on this match — continue searching for another
+                        end
+                        -- Enqueue children
+                        if node.numChildren then
+                            for i = 1, node.numChildren do
+                                if node[i] then queue[#queue+1] = node[i] end
+                            end
+                        end
+                    end
+                end
+                print("[TAP-BUTTON] '" .. title .. "' not found (searched " .. (idx-1) .. " nodes)")
+            end)
+            response = httpResponse(jsonEncode({ success = true, title = title }))
+        else
+            response = httpResponse(jsonEncode({ error = "Missing title" }), "400 Bad Request")
+        end
     elseif method == "GET" and path == "/categories" then
         local categories = {
             { key = "Basics", label = "基础" },
