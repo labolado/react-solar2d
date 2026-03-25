@@ -87,13 +87,15 @@ local function Column(props)
             alignItems = "center",
         }
     },
-        -- Previous value (tap to decrement)
+        -- Previous value (tap to decrement) — needs backgroundColor for hit area
         ce("View", {
             style = {
                 width = width,
                 height = itemH,
                 justifyContent = "center",
                 alignItems = "center",
+                backgroundColor = "#1E1E2E",
+                borderRadius = 4,
             },
             onPress = handleUp,
         },
@@ -118,13 +120,15 @@ local function Column(props)
             }, formatter(value))
         ),
 
-        -- Next value (tap to increment)
+        -- Next value (tap to increment) — needs backgroundColor for hit area
         ce("View", {
             style = {
                 width = width,
                 height = itemH,
                 justifyContent = "center",
                 alignItems = "center",
+                backgroundColor = "#1E1E2E",
+                borderRadius = 4,
             },
             onPress = handleDown,
         },
