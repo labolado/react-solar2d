@@ -10,6 +10,9 @@ local callbacks = {}
 -- Pending screenshot requests
 local pendingScreenshots = {}
 
+-- Auto-sweep state
+local sweep = nil
+
 -- JSON encode
 local function jsonEncode(obj)
     if type(obj) == "table" then
@@ -88,24 +91,14 @@ local function processPendingScreenshots()
         if not pending.captureRequested then
             pending.captureRequested = true
             timer.performWithDelay(50, function()
-                -- Use display.capture on the stage (main display group)
-                local stage = display.getCurrentStage()
-                print("[TEST_SERVER] Capturing stage to: " .. pending.filename)
-                print("[TEST_SERVER] Stage type: " .. tostring(stage and stage._type or "nil"))
-
-                -- Ensure directory exists
-                local tmpDir = system.pathForFile("", system.TemporaryDirectory)
-                print("[TEST_SERVER] Temp dir: " .. tostring(tmpDir))
-
-                -- Try captureScreen instead of capture for full screen
+                -- display.save works reliably; captureScreen does not
                 local ok, err = pcall(function()
-                    display.captureScreen({
+                    display.save(display.currentStage, {
                         filename = pending.filename,
                         baseDir = system.TemporaryDirectory,
-                        saveToPhotoLibrary = false,
                     })
                 end)
-                print("[TEST_SERVER] captureScreen result: " .. tostring(ok) .. " err: " .. tostring(err))
+                print("[TEST_SERVER] display.save: " .. tostring(ok) .. (err and " err=" .. tostring(err) or ""))
             end)
             -- Wait for next poll to check file (skip rest of loop)
         else
@@ -338,13 +331,12 @@ local function handleClient(client)
             end_pos = {x = x + dx, y = y + dy}
         }))
     elseif method == "GET" and path == "/screenshot" then
-        -- Async screenshot capture - stores client for deferred response
-        local filename = "screenshot_" .. os.time() .. ".png"
-        -- Use TemporaryDirectory for better cross-platform compatibility
+        -- Screenshot: saves to TemporaryDirectory, returns {path, filename}
+        local label = body and body:match("label=([^&]+)") or ("shot_" .. os.time())
+        label = label:gsub("%%(%x%x)", function(h) return string.char(tonumber(h, 16)) end)
+        local filename = label .. ".png"
         local screenshotPath = system.pathForFile(filename, system.TemporaryDirectory)
-        print("[TEST_SERVER] Screenshot path: " .. tostring(screenshotPath))
 
-        -- Store pending request first
         table.insert(pendingScreenshots, {
             client = client,
             path = screenshotPath,
@@ -352,9 +344,130 @@ local function handleClient(client)
             startTime = system.getTimer(),
             captureRequested = false
         })
+        return  -- response sent asynchronously by processPendingScreenshots
 
-        -- Return immediately - response will be sent when screenshot is ready
-        return
+    elseif method == "GET" and path == "/pages" then
+        -- Full page manifest: all categories and their demo screens
+        local manifest = {
+            { category = "Basics",    pages = { "View","Text","Image","Button","Pressable","Touchable","LinearGradient" } },
+            { category = "Forms",     pages = { "TextInput","Switch","Modal","Indicator","KeyboardAV" } },
+            { category = "Lists",     pages = { "ScrollView","FlatList","VirtualList","SectionList" } },
+            { category = "Nav",       pages = { "StackNav","Headers","DrawerNav" } },
+            { category = "Animation", pages = { "Timing","Spring","Sequence","Parallel","Loop" } },
+            { category = "Overlay",   pages = { "Alert","ActionSheet","Toast","Popover" } },
+            { category = "Layout",    pages = { "Flexbox","Responsive","SafeArea","SafeAreaView","Spacing" } },
+            { category = "Advanced",  pages = { "Badge","Progress","Accordion","Dropdown","Card","Gesture Handler","useId","useImperativeHandle","useSyncExternalStore" } },
+            { category = "Interop",   pages = { "ReactInSolar","Solar2DInReact","AsyncStorage","VectorIcons","Slider","DeviceInfo","DateTimePicker" } },
+        }
+        response = httpResponse(jsonEncode({ pages = manifest }))
+
+    elseif method == "POST" and path == "/autotest/start" then
+        -- Start automated full-sweep: navigate every page, screenshot each one
+        if sweep and sweep.running then
+            response = httpResponse(jsonEncode({ error = "Already running" }), "409 Conflict")
+        else
+            local delay = tonumber(body and body:match("delay=(%d+)")) or 1500
+            sweep = { running = true, current = nil, completed = 0, total = 0,
+                      results = {}, startTime = system.getTimer() }
+
+            -- Build flat list of all (category, page) pairs
+            local queue = {}
+            local manifest = {
+                { cat="Basics",    pages={"View","Text","Image","Button","Pressable","Touchable","LinearGradient"} },
+                { cat="Forms",     pages={"TextInput","Switch","Modal","Indicator","KeyboardAV"} },
+                { cat="Lists",     pages={"ScrollView","FlatList","VirtualList","SectionList"} },
+                { cat="Nav",       pages={"StackNav","Headers","DrawerNav"} },
+                { cat="Animation", pages={"Timing","Spring","Sequence","Parallel","Loop"} },
+                { cat="Overlay",   pages={"Alert","ActionSheet","Toast","Popover"} },
+                { cat="Layout",    pages={"Flexbox","Responsive","SafeArea","SafeAreaView","Spacing"} },
+                { cat="Advanced",  pages={"Badge","Progress","Accordion","Dropdown","Card"} },
+                { cat="Interop",   pages={"ReactInSolar","Solar2DInReact","AsyncStorage","VectorIcons","Slider","DeviceInfo","DateTimePicker"} },
+            }
+            for _, c in ipairs(manifest) do
+                for _, p in ipairs(c.pages) do
+                    queue[#queue+1] = { category = c.cat, page = p }
+                end
+            end
+            sweep.total = #queue
+
+            -- State machine: navigate → wait → screenshot → next
+            local step = 1
+            local function runNext()
+                if not sweep or not sweep.running then return end
+                if step > #queue then
+                    sweep.running = false
+                    sweep.completedAt = system.getTimer()
+                    print("[AUTOTEST] Complete: " .. sweep.completed .. "/" .. sweep.total)
+                    return
+                end
+                local item = queue[step]
+                step = step + 1
+                sweep.current = item.category .. "/" .. item.page
+
+                -- Navigate
+                if callbacks.onNavigate then
+                    callbacks.onNavigate(item.page)
+                end
+
+                -- Wait for render, then screenshot
+                timer.performWithDelay(delay, function()
+                    local filename = "autotest_" .. item.category .. "_" .. item.page:gsub("%s+","_") .. ".png"
+                    local fpath = system.pathForFile(filename, system.TemporaryDirectory)
+                    local ok, err = pcall(function()
+                        display.save(display.currentStage, {
+                            filename = filename,
+                            baseDir = system.TemporaryDirectory,
+                        })
+                    end)
+                    sweep.results[#sweep.results+1] = {
+                        category = item.category,
+                        page = item.page,
+                        file = fpath,
+                        ok = ok,
+                        err = err and tostring(err) or nil,
+                    }
+                    sweep.completed = sweep.completed + 1
+                    print("[AUTOTEST] " .. sweep.completed .. "/" .. sweep.total .. " " .. sweep.current)
+
+                    -- Next page
+                    timer.performWithDelay(50, runNext)
+                end)
+            end
+
+            timer.performWithDelay(500, runNext)
+            response = httpResponse(jsonEncode({ started = true, total = sweep.total, delay = delay }))
+        end
+
+    elseif method == "GET" and path == "/autotest/status" then
+        if not sweep then
+            response = httpResponse(jsonEncode({ running = false, completed = 0, total = 0 }))
+        else
+            local elapsed = sweep.completedAt and (sweep.completedAt - sweep.startTime) or (system.getTimer() - sweep.startTime)
+            response = httpResponse(jsonEncode({
+                running = sweep.running,
+                current = sweep.current,
+                completed = sweep.completed,
+                total = sweep.total,
+                elapsed_ms = math.floor(elapsed),
+            }))
+        end
+
+    elseif method == "GET" and path == "/autotest/results" then
+        if not sweep then
+            response = httpResponse(jsonEncode({ results = {}, completed = 0 }))
+        else
+            response = httpResponse(jsonEncode({
+                completed = sweep.completed,
+                total = sweep.total,
+                running = sweep.running,
+                results = sweep.results,
+            }))
+        end
+
+    elseif method == "POST" and path == "/autotest/stop" then
+        if sweep then sweep.running = false end
+        response = httpResponse(jsonEncode({ stopped = true }))
+
     else
         response = httpResponse(jsonEncode({ error = "Not found" }), "404 Not Found")
     end

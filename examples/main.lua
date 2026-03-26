@@ -157,22 +157,44 @@ RN.startAutoFlush()
 timer.performWithDelay(500, function()
     local ok, testServer = pcall(require, "tests.infra.test_server")
     if ok then
-        testServer.start(9876)
+        local started = testServer.start(9876)
 
         -- Register callbacks for remote control
         testServer.onCategoryTap(function(category)
             print("[TEST_SERVER] Category tapped: " .. category)
-            -- Dispatch event to KitchenSink
             local event = { name = "kitchensink_navigate", category = category }
             Runtime:dispatchEvent(event)
         end)
 
         testServer.onNavigate(function(route)
             print("[TEST_SERVER] Navigate to: " .. route)
-            -- Dispatch event to KitchenSink
             local event = { name = "kitchensink_navigate", route = route }
             Runtime:dispatchEvent(event)
         end)
+
+        -- Test mode indicator overlay
+        if started then
+            local badge = display.newGroup()
+            local badgeBg = display.newRoundedRect(badge, 0, 0, 62, 18, 4)
+            badgeBg:setFillColor(1, 0.5, 0, 0.85) -- orange
+            badgeBg.anchorX, badgeBg.anchorY = 0, 0
+            local badgeText = display.newText({
+                parent = badge,
+                text = "TEST",
+                x = 31, y = 9,
+                font = native.systemFontBold,
+                fontSize = 10,
+            })
+            badgeText:setFillColor(1, 1, 1)
+            badge.x = display.contentWidth - 70
+            badge.y = 4
+            -- Keep on top
+            timer.performWithDelay(2000, function()
+                if badge.parent then
+                    badge.parent:insert(badge)
+                end
+            end, 0)
+        end
     else
         print("[TEST_SERVER] Not started: " .. tostring(testServer))
     end

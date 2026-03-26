@@ -84,6 +84,9 @@ local function createScrollView(props, style, applyCommonStyle)
     local isDragging = false
     local DRAG_THRESHOLD = 5
     local activeDragChild = nil  -- child with _onDragHandler that is handling the touch
+    local activeScrollChild = nil  -- nested ScrollView that is handling scroll
+    local activeScrollChildStartY = nil
+    local activeScrollChildStartX = nil
 
     -- Find a drag-capable child under the touch point
     local function findDragChild(grp, ex, ey)
@@ -104,6 +107,44 @@ local function createScrollView(props, style, applyCommonStyle)
         return nil
     end
 
+    -- Find deepest nested ScrollView under touch point (same scroll direction)
+    local function findScrollChild(grp, ex, ey)
+        if not grp or not grp.numChildren then return nil end
+        for i = grp.numChildren, 1, -1 do
+            local child = grp[i]
+            if child and child.isVisible ~= false then
+                local cb = child.contentBounds
+                -- Fallback bounds from position + scroll dimensions
+                local inBounds = false
+                if cb then
+                    inBounds = ex >= cb.xMin and ex <= cb.xMax and ey >= cb.yMin and ey <= cb.yMax
+                elseif child._scrollW and child._scrollH then
+                    local ax = child.anchorX or 0
+                    local ay = child.anchorY or 0
+                    local xMin = (child.x or 0) - (child._scrollW * ax)
+                    local yMin = (child.y or 0) - (child._scrollH * ay)
+                    inBounds = ex >= xMin and ex <= xMin + child._scrollW
+                          and ey >= yMin and ey <= yMin + child._scrollH
+                end
+                if inBounds then
+                    -- Recurse first to find the deepest nested ScrollView
+                    if child._contentGroup then
+                        local deeper = findScrollChild(child._contentGroup, ex, ey)
+                        if deeper then return deeper end
+                    elseif child.numChildren then
+                        local deeper = findScrollChild(child, ex, ey)
+                        if deeper then return deeper end
+                    end
+                    -- Check if this child IS a nested ScrollView in the same direction
+                    if child._isScrollView and (child._horizontal or false) == horizontal then
+                        return child
+                    end
+                end
+            end
+        end
+        return nil
+    end
+
     -- Touch listener on the overlay rect — NO setFocus needed.
     touchOverlay:addEventListener("touch", function(event)
         if event.phase == "began" then
@@ -114,14 +155,27 @@ local function createScrollView(props, style, applyCommonStyle)
             startScrollX = clipContainer._scrollX
             isDragging = false
             activeDragChild = nil
+            activeScrollChild = nil
             clipContainer._pullingToRefresh = false
 
-            -- Check if touch is over a drag-capable child (e.g. Slider)
+            -- Priority 1: drag-capable child (e.g. Slider)
             local dragChild = findDragChild(contentGroup, event.x, event.y)
             if dragChild then
                 activeDragChild = dragChild
                 dragChild._onDragHandler(event)
                 return true
+            end
+
+            -- Priority 2: nested ScrollView in same scroll direction
+            local scrollChild = findScrollChild(contentGroup, event.x, event.y)
+            if scrollChild then
+                activeScrollChild = scrollChild
+                activeScrollChildStartY = scrollChild._scrollY or 0
+                activeScrollChildStartX = scrollChild._scrollX or 0
+                -- Recalc nested content size
+                if scrollChild._invalidateContentSize then
+                    scrollChild._invalidateContentSize()
+                end
             end
             return true
 
@@ -129,6 +183,38 @@ local function createScrollView(props, style, applyCommonStyle)
             -- If a drag child is active, forward all events to it
             if activeDragChild then
                 activeDragChild._onDragHandler(event)
+                return true
+            end
+            -- Forward scroll to nested ScrollView
+            if activeScrollChild and startY then
+                local dy = math.abs(event.y - startY)
+                local dx = math.abs(event.x - startX)
+                if not isDragging and ((horizontal and dx > DRAG_THRESHOLD) or (not horizontal and dy > DRAG_THRESHOLD)) then
+                    isDragging = true
+                end
+                if isDragging then
+                    local sc = activeScrollChild
+                    local cg = sc._contentGroup
+                    if cg then
+                        if horizontal then
+                            local ddx = event.x - startX
+                            local newSX = activeScrollChildStartX + ddx
+                            local maxS = math.max(0, (sc._contentW or 0) - (sc._scrollW or 0))
+                            if newSX > 0 then newSX = newSX * 0.4 end
+                            if newSX < -maxS then newSX = -maxS + (newSX + maxS) * 0.4 end
+                            sc._scrollX = newSX
+                            cg.x = newSX
+                        else
+                            local ddy = event.y - startY
+                            local newSY = activeScrollChildStartY + ddy
+                            local maxS = math.max(0, (sc._contentH or 0) - (sc._scrollH or 0))
+                            if newSY > 0 then newSY = newSY * 0.4 end
+                            if newSY < -maxS then newSY = -maxS + (newSY + maxS) * 0.4 end
+                            sc._scrollY = newSY
+                            cg.y = newSY
+                        end
+                    end
+                end
                 return true
             end
             if not startY then return true end
@@ -178,6 +264,25 @@ local function createScrollView(props, style, applyCommonStyle)
             if activeDragChild then
                 activeDragChild._onDragHandler(event)
                 activeDragChild = nil
+                isDragging = false
+                return true
+            end
+            -- Snap-back nested ScrollView from overscroll
+            if activeScrollChild then
+                local sc = activeScrollChild
+                local cg = sc._contentGroup
+                if cg then
+                    if horizontal then
+                        local maxS = math.max(0, (sc._contentW or 0) - (sc._scrollW or 0))
+                        if sc._scrollX > 0 then sc._scrollX = 0; cg.x = 0
+                        elseif sc._scrollX < -maxS then sc._scrollX = -maxS; cg.x = -maxS end
+                    else
+                        local maxS = math.max(0, (sc._contentH or 0) - (sc._scrollH or 0))
+                        if sc._scrollY > 0 then sc._scrollY = 0; cg.y = 0
+                        elseif sc._scrollY < -maxS then sc._scrollY = -maxS; cg.y = -maxS end
+                    end
+                end
+                activeScrollChild = nil
                 isDragging = false
                 return true
             end
