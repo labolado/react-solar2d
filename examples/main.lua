@@ -159,17 +159,38 @@ timer.performWithDelay(500, function()
     if ok then
         local started = testServer.start(9876)
 
-        -- Register callbacks for remote control
-        testServer.onCategoryTap(function(category)
-            print("[TEST_SERVER] Category tapped: " .. category)
-            local event = { name = "kitchensink_navigate", category = category }
-            Runtime:dispatchEvent(event)
+        -- App-specific routes (Kitchen Sink navigation)
+        testServer.route("POST", "/navigate", function(params)
+            local route = params.route
+            if route then
+                print("[TEST_SERVER] Navigate to: " .. route)
+                Runtime:dispatchEvent({ name = "kitchensink_navigate", route = route })
+                return testServer.ok({success=true, route=route})
+            end
+            return testServer.err("Missing route")
         end)
 
-        testServer.onNavigate(function(route)
-            print("[TEST_SERVER] Navigate to: " .. route)
-            local event = { name = "kitchensink_navigate", route = route }
-            Runtime:dispatchEvent(event)
+        testServer.route("POST", "/tap-category", function(params)
+            local category = params.category
+            if category then
+                Runtime:dispatchEvent({ name = "kitchensink_navigate", category = category })
+                return testServer.ok({success=true, category=category})
+            end
+            return testServer.err("Missing category")
+        end)
+
+        testServer.route("GET", "/pages", function()
+            return testServer.ok({ pages = {
+                {category="Basics",    pages={"View","Text","Image","Button","Pressable","Touchable","LinearGradient"}},
+                {category="Forms",     pages={"TextInput","Switch","Modal","Indicator","KeyboardAV"}},
+                {category="Lists",     pages={"ScrollView","FlatList","VirtualList","SectionList"}},
+                {category="Nav",       pages={"StackNav","Headers","DrawerNav"}},
+                {category="Animation", pages={"Timing","Spring","Sequence","Parallel","Loop"}},
+                {category="Overlay",   pages={"Alert","ActionSheet","Toast","Popover"}},
+                {category="Layout",    pages={"Flexbox","Responsive","SafeArea","SafeAreaView","Spacing"}},
+                {category="Advanced",  pages={"Badge","Progress","Accordion","Dropdown","Card","Gesture Handler","useId","useImperativeHandle","useSyncExternalStore"}},
+                {category="Interop",   pages={"ReactInSolar","Solar2DInReact","AsyncStorage","VectorIcons","Slider","DeviceInfo","DateTimePicker"}},
+            }})
         end)
 
         -- Test mode indicator overlay

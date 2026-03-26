@@ -1,482 +1,555 @@
--- test_server.lua — HTTP test server for Solar2D
--- Uses coroutines for concurrent client handling
+-- test_server.lua — Generic Solar2D UI automation & testing server
+-- Drop into any Solar2D project: require("test_server").start(9876)
+--
+-- API:
+--   GET  /status                     — server info
+--   GET  /screenshot?label=name      — full-screen screenshot (async, returns base64 PNG)
+--   POST /tap       {x,y}           — tap at screen coordinates
+--   POST /tap-text  {text,index}    — find element by text and tap it (index: nth match, default 1)
+--   POST /longpress {x,y,ms}        — long press at coordinates (default 500ms)
+--   POST /drag      {x,y,dx,dy,ms}  — drag gesture from (x,y) by (dx,dy) over ms
+--   POST /scroll    {x,y,dx,dy}     — scroll wheel event at (x,y)
+--   POST /input     {text}           — send key events (type text into focused field)
+--   GET  /tree?depth=N               — display hierarchy dump (default depth 8)
+--   GET  /find?text=X&prop=Y        — find elements matching criteria
+--   POST /exec      {code}           — execute arbitrary Lua code
+--   POST /wait      {text,timeout}   — wait until element with text appears (polls)
+--
+-- App-specific routes: use M.route(method, path, handler) to register custom endpoints.
 
 local M = {}
 
 local socket = require("socket")
 local server = nil
-local callbacks = {}
-
--- Pending screenshot requests
+local customRoutes = {}
 local pendingScreenshots = {}
 
--- Auto-sweep state
-local sweep = nil
+----------------------------------------------------------------
+-- Helpers
+----------------------------------------------------------------
 
--- JSON encode
 local function jsonEncode(obj)
     if type(obj) == "table" then
         local isArray = #obj > 0
         if isArray then
             local items = {}
-            for _, v in ipairs(obj) do
-                table.insert(items, jsonEncode(v))
-            end
+            for _, v in ipairs(obj) do items[#items+1] = jsonEncode(v) end
             return "[" .. table.concat(items, ",") .. "]"
         else
             local items = {}
             for k, v in pairs(obj) do
-                table.insert(items, string.format('"%s":%s', k, jsonEncode(v)))
+                items[#items+1] = string.format('"%s":%s', k, jsonEncode(v))
             end
             return "{" .. table.concat(items, ",") .. "}"
         end
     elseif type(obj) == "string" then
-        return string.format('"%s"', obj:gsub('"', '\\"'):gsub("\n", "\\n"))
-    elseif type(obj) == "number" then
-        return tostring(obj)
-    elseif type(obj) == "boolean" then
-        return obj and "true" or "false"
-    elseif obj == nil then
-        return "null"
+        return '"' .. obj:gsub('\\','\\\\'):gsub('"','\\"'):gsub('\n','\\n'):gsub('\r','\\r') .. '"'
+    elseif type(obj) == "number" then return tostring(obj)
+    elseif type(obj) == "boolean" then return obj and "true" or "false"
     end
     return "null"
 end
+M.jsonEncode = jsonEncode
 
--- HTTP response
 local function httpResponse(body, status, contentType)
     status = status or "200 OK"
     contentType = contentType or "application/json"
-    return string.format("HTTP/1.1 %s\r\nContent-Type: %s\r\nContent-Length: %d\r\nConnection: close\r\nAccess-Control-Allow-Origin: *\r\n\r\n%s",
+    return string.format(
+        "HTTP/1.1 %s\r\nContent-Type: %s\r\nContent-Length: %d\r\nConnection: close\r\nAccess-Control-Allow-Origin: *\r\n\r\n%s",
         status, contentType, #body, body)
 end
+M.httpResponse = httpResponse
 
--- Read HTTP request from client
-local function readRequest(client)
-    client:settimeout(5)
+local function ok(data) return httpResponse(jsonEncode(data)) end
+local function err(msg, code) return httpResponse(jsonEncode({error=msg}), code or "400 Bad Request") end
 
-    local buffer = ""
-    while true do
-        local line, err = client:receive("*l")
-        if not line then
-            return nil, err
-        end
-        if line == "" then
-            -- End of headers
-            break
-        end
-        buffer = buffer .. line .. "\r\n"
-    end
-
-    -- Parse content length
-    local contentLength = tonumber(buffer:match("Content%-Length:%s*(%d+)")) or 0
-
-    -- Read body if any
-    local body = ""
-    if contentLength > 0 then
-        body, err = client:receive(contentLength)
-        if not body then
-            return nil, err
-        end
-    end
-
-    return buffer, body
+local function urlDecode(s)
+    return s and s:gsub("%%(%x%x)", function(h) return string.char(tonumber(h,16)) end) or ""
 end
 
--- Handle screenshot completion
+local function parseBody(body)
+    local params = {}
+    if not body or body == "" then return params end
+    for k, v in body:gmatch("([^&=]+)=([^&]*)") do
+        params[urlDecode(k)] = urlDecode(v)
+    end
+    return params
+end
+
+local function parseQuery(path)
+    local base, qs = path:match("^([^?]+)%??(.*)")
+    return base or path, parseBody(qs)
+end
+
+----------------------------------------------------------------
+-- Display tree utilities
+----------------------------------------------------------------
+
+-- BFS search: find display objects by text content
+local function findByText(searchText, maxResults)
+    maxResults = maxResults or 10
+    local results = {}
+    local queue = {}
+    for i = 1, display.currentStage.numChildren do
+        queue[#queue+1] = display.currentStage[i]
+    end
+    local idx = 1
+    while idx <= #queue and idx <= 5000 do
+        local node = queue[idx]; idx = idx + 1
+        if node then
+            -- Check text property (display.newText) or _textObj (framework Text component)
+            local txt = node.text or (node._textObj and node._textObj.text)
+            if txt and txt:find(searchText, 1, true) then
+                local b = node.contentBounds
+                results[#results+1] = {
+                    text = txt,
+                    x = b and math.floor((b.xMin + b.xMax)/2) or 0,
+                    y = b and math.floor((b.yMin + b.yMax)/2) or 0,
+                    bounds = b and {xMin=math.floor(b.xMin), yMin=math.floor(b.yMin),
+                                    xMax=math.floor(b.xMax), yMax=math.floor(b.yMax)},
+                    hasOnPress = node._onPress ~= nil or (node.parent and node.parent._onPress ~= nil),
+                }
+                if #results >= maxResults then break end
+            end
+            if node.numChildren then
+                for i = 1, node.numChildren do
+                    if node[i] then queue[#queue+1] = node[i] end
+                end
+            end
+        end
+    end
+    return results
+end
+
+-- Find the deepest pressable ancestor of a display object
+local function findPressableAncestor(obj)
+    local current = obj
+    while current do
+        if current._onPress then return current end
+        current = current.parent
+    end
+    return nil
+end
+
+-- Dump display tree as JSON-friendly table
+local function dumpTree(group, maxDepth, depth)
+    depth = depth or 0
+    maxDepth = maxDepth or 8
+    if depth > maxDepth or not group then return nil end
+
+    local node = {}
+    local b = group.contentBounds
+    if group.text then node.text = group.text end
+    if group._textObj then node.text = group._textObj.text end
+    if group._isScrollView then node.type = "ScrollView" end
+    if group._onPress then node.pressable = true end
+    if group._bg then node.type = node.type or "View" end
+    if b then
+        node.bounds = {math.floor(b.xMin), math.floor(b.yMin), math.floor(b.xMax), math.floor(b.yMax)}
+    end
+    node.visible = group.isVisible ~= false
+    if group.numChildren and group.numChildren > 0 then
+        node.children = {}
+        for i = 1, group.numChildren do
+            local child = dumpTree(group[i], maxDepth, depth + 1)
+            if child then node.children[#node.children+1] = child end
+        end
+        if #node.children == 0 then node.children = nil end
+    end
+    return node
+end
+
+-- Simulate tap at screen coordinates via touch overlay / direct dispatch
+local function simulateTapAt(x, y, callback)
+    timer.performWithDelay(1, function()
+        -- Find the topmost touchable object at (x,y) and dispatch tap
+        local function findAndTap(grp)
+            if not grp or not grp.numChildren then return false end
+            for i = grp.numChildren, 1, -1 do
+                local child = grp[i]
+                if child and child.isVisible ~= false then
+                    local cb = child.contentBounds
+                    if cb and x >= cb.xMin and x <= cb.xMax and y >= cb.yMin and y <= cb.yMax then
+                        -- Recurse first
+                        if child.numChildren then
+                            if findAndTap(child) then return true end
+                        end
+                        -- Check for press handler
+                        if child._onPress then
+                            child._onPress({name="tap", x=x, y=y, target=child})
+                            if callback then callback(true, child) end
+                            return true
+                        end
+                    end
+                end
+            end
+            return false
+        end
+        local found = findAndTap(display.currentStage)
+        if not found and callback then callback(false) end
+    end)
+end
+
+-- Simulate touch drag sequence
+local function simulateDrag(x, y, dx, dy, duration)
+    duration = duration or 200
+    local steps = math.max(3, math.floor(duration / 16))
+
+    timer.performWithDelay(1, function()
+        -- Find the touch overlay or touchable at (x,y)
+        local function findTouchTarget(grp)
+            if not grp or not grp.numChildren then return nil end
+            for i = grp.numChildren, 1, -1 do
+                local child = grp[i]
+                if child and child.isVisible ~= false then
+                    local cb = child.contentBounds
+                    if cb and x >= cb.xMin and x <= cb.xMax and y >= cb.yMin and y <= cb.yMax then
+                        -- Check children first (depth-first, front to back)
+                        if child.numChildren then
+                            local found = findTouchTarget(child)
+                            if found then return found end
+                        end
+                        -- Touch overlay or any touch listener
+                        if child._isTouchOverlay or (child._tableListeners and child._tableListeners.touch) then
+                            return child
+                        end
+                    end
+                end
+            end
+            return nil
+        end
+
+        local target = findTouchTarget(display.currentStage)
+        if not target then return end
+
+        -- Began
+        target:dispatchEvent({name="touch", phase="began", x=x, y=y, target=target})
+
+        -- Moved (spread across duration)
+        for s = 1, steps do
+            local frac = s / steps
+            timer.performWithDelay(s * (duration / steps), function()
+                target:dispatchEvent({
+                    name="touch", phase="moved",
+                    x = x + dx * frac, y = y + dy * frac,
+                    target = target
+                })
+            end)
+        end
+
+        -- Ended
+        timer.performWithDelay(duration + 16, function()
+            target:dispatchEvent({name="touch", phase="ended", x=x+dx, y=y+dy, target=target})
+        end)
+    end)
+end
+
+----------------------------------------------------------------
+-- Screenshot (async)
+----------------------------------------------------------------
+
 local function processPendingScreenshots()
     for i = #pendingScreenshots, 1, -1 do
         local pending = pendingScreenshots[i]
-
-        -- Trigger capture if not yet requested
         if not pending.captureRequested then
             pending.captureRequested = true
             timer.performWithDelay(50, function()
-                -- display.save works reliably; captureScreen does not
-                local ok, err = pcall(function()
-                    display.save(display.currentStage, {
+                pcall(function()
+                    local target = pending.target or display.currentStage
+                    display.save(target, {
                         filename = pending.filename,
                         baseDir = system.TemporaryDirectory,
                     })
                 end)
-                print("[TEST_SERVER] display.save: " .. tostring(ok) .. (err and " err=" .. tostring(err) or ""))
             end)
-            -- Wait for next poll to check file (skip rest of loop)
         else
             local f = io.open(pending.path, "rb")
             if f then
-                local fileData = f:read("*all")
-                f:close()
-
-                local b64 = require("tests.infra.base64")
-                local encoded = b64.encode(fileData)
-                local response = httpResponse(jsonEncode({
-                    success = true,
-                    filename = pending.filename,
-                    base64 = encoded,
-                    size = #fileData
-                }))
-
-                pcall(function() pending.client:send(response) end)
+                local data = f:read("*all"); f:close()
+                local b64ok, b64 = pcall(require, "tests.infra.base64")
+                local resp
+                if b64ok then
+                    resp = ok({success=true, filename=pending.filename, base64=b64.encode(data), size=#data})
+                else
+                    resp = ok({success=true, filename=pending.filename, path=pending.path, size=#data})
+                end
+                pcall(function() pending.client:send(resp) end)
                 pcall(function() pending.client:close() end)
-                os.remove(pending.path)
-
                 table.remove(pendingScreenshots, i)
             elseif (system.getTimer() - pending.startTime) > 10000 then
-                -- Timeout after 10 seconds
-                print("[TEST_SERVER] Screenshot timeout, checking file: " .. tostring(pending.path))
-                -- List directory contents for debugging
-                local dir = system.pathForFile("", system.TemporaryDirectory)
-                if dir then
-                    local handle = io.popen("ls -la '" .. dir .. "' 2>/dev/null | tail -5")
-                    if handle then
-                        local result = handle:read("*a")
-                        handle:close()
-                        print("[TEST_SERVER] Dir contents: " .. tostring(result))
-                    end
-                end
-                local response = httpResponse(jsonEncode({
-                    success = false,
-                    error = "Screenshot capture timeout"
-                }), "500 Error")
-
-                pcall(function() pending.client:send(response) end)
+                pcall(function() pending.client:send(err("Screenshot timeout","500 Error")) end)
                 pcall(function() pending.client:close() end)
-
                 table.remove(pendingScreenshots, i)
             end
         end
     end
 end
 
--- Handle a client connection
+----------------------------------------------------------------
+-- HTTP request parsing
+----------------------------------------------------------------
+
+local function readRequest(client)
+    client:settimeout(5)
+    local buffer = ""
+    while true do
+        local line, e = client:receive("*l")
+        if not line then return nil, e end
+        if line == "" then break end
+        buffer = buffer .. line .. "\r\n"
+    end
+    local contentLength = tonumber(buffer:match("Content%-Length:%s*(%d+)")) or 0
+    local body = ""
+    if contentLength > 0 then
+        body = client:receive(contentLength) or ""
+    end
+    return buffer, body
+end
+
+----------------------------------------------------------------
+-- Route handler
+----------------------------------------------------------------
+
 local function handleClient(client)
     local req, body = readRequest(client)
-    if not req then
-        client:close()
-        return
-    end
+    if not req then client:close(); return end
 
-    -- Parse request line
     local requestLine = req:match("^([^\r\n]+)")
-    local method, path = requestLine:match("^([^%s]+)%s+([^%s]+)")
-    if not method or not path then
-        print("[TEST_SERVER] Invalid request: " .. tostring(requestLine))
-        client:send(httpResponse('{"error":"Invalid request"}', "400 Bad Request"))
-        client:close()
-        return
+    local method, rawPath = requestLine:match("^([^%s]+)%s+([^%s]+)")
+    if not method then
+        client:send(err("Invalid request")); client:close(); return
     end
 
-    -- Route request
+    local path, query = parseQuery(rawPath)
+    local params = parseBody(body)
+    -- Merge query into params (query takes lower priority)
+    for k, v in pairs(query) do if not params[k] then params[k] = v end end
+
     local response
+
+    -- ============================================================
+    -- Generic endpoints (work with any Solar2D app)
+    -- ============================================================
+
     if method == "GET" and path == "/status" then
-        response = httpResponse(jsonEncode({
-            running = true,
-            time = os.time(),
+        response = ok({
+            running = true, time = os.time(),
+            screen = {width = display.contentWidth, height = display.contentHeight},
             platform = system and system.getInfo and system.getInfo("platformName") or "unknown",
-        }))
-    elseif method == "POST" and path == "/run" then
-        local pattern = body:match("pattern=([^&]+)") or "all"
-        pattern = pattern:gsub("%%(%x%x)", function(h) return string.char(tonumber(h, 16)) end)
-        local ok, testRunner = pcall(require, "test_runner_solar2d")
-        if ok then
-            local results = testRunner.run(pattern)
-            response = httpResponse(jsonEncode({
-                success = results.failed == 0,
-                passed = results.passed,
-                failed = results.failed,
-                files = results.files,
-            }))
+        })
+
+    elseif method == "GET" and path == "/screenshot" then
+        local label = params.label or ("shot_" .. os.time())
+        local filename = label .. ".png"
+        table.insert(pendingScreenshots, {
+            client = client,
+            path = system.pathForFile(filename, system.TemporaryDirectory),
+            filename = filename,
+            startTime = system.getTimer(),
+            captureRequested = false,
+            target = nil, -- full screen; custom routes can override
+        })
+        return -- async response
+
+    elseif method == "POST" and path == "/tap" then
+        local x = tonumber(params.x)
+        local y = tonumber(params.y)
+        if x and y then
+            simulateTapAt(x, y)
+            response = ok({success=true, action="tap", x=x, y=y})
         else
-            response = httpResponse(jsonEncode({ error = "Test runner not available" }), "500 Error")
+            response = err("Missing x,y")
         end
-    elseif method == "POST" and path == "/exec" then
-        local code = body:match("code=([^&]+)")
-        if code then
-            code = code:gsub("%%(%x%x)", function(h) return string.char(tonumber(h, 16)) end)
-            -- Defer execution to main thread to avoid native object creation in socket callback
-            timer.performWithDelay(0, function()
-                local loadfn = loadstring or load
-                local fn, err = loadfn(code, "=remote")
-                if fn then
-                    local ok, result = pcall(fn)
-                    print("[EXEC] " .. (ok and "OK: " .. tostring(result) or "ERROR: " .. tostring(result)))
-                else
-                    print("[EXEC] COMPILE ERROR: " .. tostring(err))
+
+    elseif method == "POST" and path == "/tap-text" then
+        local text = params.text or params.title
+        local index = tonumber(params.index) or 1
+        if text then
+            timer.performWithDelay(1, function()
+                local matches = findByText(text, index)
+                local target = matches[index]
+                if target then
+                    simulateTapAt(target.x, target.y)
                 end
             end)
-            response = httpResponse(jsonEncode({ success = true, message = "Code scheduled for execution" }))
+            response = ok({success=true, text=text, index=index})
         else
-            response = httpResponse(jsonEncode({ error = "Missing code" }), "400 Bad Request")
+            response = err("Missing text")
         end
-    elseif method == "POST" and path == "/tap-button" then
-        -- Find a button by its text label and tap it
-        -- Usage: POST /tap-button  title=Start
-        local title = body:match("title=([^&]+)")
-        if title then
-            title = title:gsub("%%(%x%x)", function(h) return string.char(tonumber(h, 16)) end)
+
+    elseif method == "POST" and path == "/longpress" then
+        local x = tonumber(params.x)
+        local y = tonumber(params.y)
+        local ms = tonumber(params.ms) or 500
+        if x and y then
             timer.performWithDelay(1, function()
-                -- Breadth-first search through display tree
-                local queue = {}
-                for i = 1, display.currentStage.numChildren do
-                    queue[#queue+1] = display.currentStage[i]
-                end
-                local idx = 1
-                while idx <= #queue and idx <= 2000 do
-                    local node = queue[idx]
-                    idx = idx + 1
-                    if node then
-                        -- Check if this node's _textObj matches
-                        if node._textObj and node._textObj.text == title then
-                            -- Text found — tap its parent (the Button View with _onPress)
-                            local target = node.parent
-                            if target and target._onPress then
-                                target._onPress({name="tap", target=target})
-                                print("[TAP-BUTTON] Tapped parent._onPress for: " .. title)
-                                return
-                            elseif node._onPress then
-                                node._onPress({name="tap", target=node})
-                                print("[TAP-BUTTON] Tapped node._onPress for: " .. title)
-                                return
-                            end
-                            -- No handler on this match — continue searching for another
-                        end
-                        -- Enqueue children
-                        if node.numChildren then
-                            for i = 1, node.numChildren do
-                                if node[i] then queue[#queue+1] = node[i] end
+                -- Began
+                local evt = {name="touch", phase="began", x=x, y=y}
+                -- Find target
+                local function findTouch(grp)
+                    if not grp or not grp.numChildren then return nil end
+                    for i = grp.numChildren, 1, -1 do
+                        local c = grp[i]
+                        if c and c.isVisible ~= false then
+                            local cb = c.contentBounds
+                            if cb and x >= cb.xMin and x <= cb.xMax and y >= cb.yMin and y <= cb.yMax then
+                                if c.numChildren then
+                                    local found = findTouch(c)
+                                    if found then return found end
+                                end
+                                if c._isTouchOverlay or c._onPress or c._onLongPress then
+                                    return c
+                                end
                             end
                         end
                     end
+                    return nil
                 end
-                print("[TAP-BUTTON] '" .. title .. "' not found (searched " .. (idx-1) .. " nodes)")
-            end)
-            response = httpResponse(jsonEncode({ success = true, title = title }))
-        else
-            response = httpResponse(jsonEncode({ error = "Missing title" }), "400 Bad Request")
-        end
-    elseif method == "GET" and path == "/categories" then
-        local categories = {
-            { key = "Basics", label = "基础" },
-            { key = "Forms", label = "表单" },
-            { key = "Lists", label = "列表" },
-            { key = "Nav", label = "导航" },
-            { key = "Animation", label = "动画" },
-            { key = "Overlay", label = "弹层" },
-            { key = "Layout", label = "布局" },
-            { key = "Advanced", label = "高级" },
-            { key = "Interop", label = "互操" },
-        }
-        response = httpResponse(jsonEncode({ categories = categories }))
-    elseif method == "POST" and path == "/tap" then
-        local category = body:match("category=([^&]+)")
-        if category then
-            category = category:gsub("%%(%x%x)", function(h) return string.char(tonumber(h, 16)) end)
-            if callbacks.onCategoryTap then
-                callbacks.onCategoryTap(category)
-            end
-            response = httpResponse(jsonEncode({ success = true, action = "category", target = category }))
-        else
-            response = httpResponse(jsonEncode({ error = "Missing category" }), "400 Bad Request")
-        end
-    elseif method == "POST" and path == "/navigate" then
-        local route = body:match("route=([^&]+)")
-        if route then
-            route = route:gsub("%%(%x%x)", function(h) return string.char(tonumber(h, 16)) end)
-            if callbacks.onNavigate then
-                callbacks.onNavigate(route)
-            end
-            response = httpResponse(jsonEncode({ success = true, route = route }))
-        else
-            response = httpResponse(jsonEncode({ error = "Missing route" }), "400 Bad Request")
-        end
-    elseif method == "POST" and path == "/drag" then
-        -- Simulate drag gesture on Slider at specific coordinates
-        local x = tonumber(body:match("x=(%d+)")) or 0
-        local y = tonumber(body:match("y=(%d+)")) or 0
-        local dx = tonumber(body:match("dx=(%-?%d+)")) or 50  -- default drag right 50px
-        local dy = tonumber(body:match("dy=(%-?%d+)")) or 0
-
-        -- Dispatch touch events to simulate drag
-        timer.performWithDelay(0, function()
-            -- Fire custom event that Slider can listen for (via Runtime)
-            local event = {
-                name = "test_drag",
-                x = x,
-                y = y,
-                dx = dx,
-                dy = dy,
-                phase = "began"
-            }
-            Runtime:dispatchEvent(event)
-
-            -- After short delay, dispatch moved and ended
-            timer.performWithDelay(50, function()
-                event.phase = "moved"
-                event.x = x + dx
-                event.y = y + dy
-                Runtime:dispatchEvent(event)
-            end)
-
-            timer.performWithDelay(100, function()
-                event.phase = "ended"
-                Runtime:dispatchEvent(event)
-            end)
-        end)
-
-        response = httpResponse(jsonEncode({
-            success = true,
-            action = "drag",
-            start = {x = x, y = y},
-            delta = {dx = dx, dy = dy},
-            end_pos = {x = x + dx, y = y + dy}
-        }))
-    elseif method == "GET" and path == "/screenshot" then
-        -- Screenshot: saves to TemporaryDirectory, returns {path, filename}
-        local label = body and body:match("label=([^&]+)") or ("shot_" .. os.time())
-        label = label:gsub("%%(%x%x)", function(h) return string.char(tonumber(h, 16)) end)
-        local filename = label .. ".png"
-        local screenshotPath = system.pathForFile(filename, system.TemporaryDirectory)
-
-        table.insert(pendingScreenshots, {
-            client = client,
-            path = screenshotPath,
-            filename = filename,
-            startTime = system.getTimer(),
-            captureRequested = false
-        })
-        return  -- response sent asynchronously by processPendingScreenshots
-
-    elseif method == "GET" and path == "/pages" then
-        -- Full page manifest: all categories and their demo screens
-        local manifest = {
-            { category = "Basics",    pages = { "View","Text","Image","Button","Pressable","Touchable","LinearGradient" } },
-            { category = "Forms",     pages = { "TextInput","Switch","Modal","Indicator","KeyboardAV" } },
-            { category = "Lists",     pages = { "ScrollView","FlatList","VirtualList","SectionList" } },
-            { category = "Nav",       pages = { "StackNav","Headers","DrawerNav" } },
-            { category = "Animation", pages = { "Timing","Spring","Sequence","Parallel","Loop" } },
-            { category = "Overlay",   pages = { "Alert","ActionSheet","Toast","Popover" } },
-            { category = "Layout",    pages = { "Flexbox","Responsive","SafeArea","SafeAreaView","Spacing" } },
-            { category = "Advanced",  pages = { "Badge","Progress","Accordion","Dropdown","Card","Gesture Handler","useId","useImperativeHandle","useSyncExternalStore" } },
-            { category = "Interop",   pages = { "ReactInSolar","Solar2DInReact","AsyncStorage","VectorIcons","Slider","DeviceInfo","DateTimePicker" } },
-        }
-        response = httpResponse(jsonEncode({ pages = manifest }))
-
-    elseif method == "POST" and path == "/autotest/start" then
-        -- Start automated full-sweep: navigate every page, screenshot each one
-        if sweep and sweep.running then
-            response = httpResponse(jsonEncode({ error = "Already running" }), "409 Conflict")
-        else
-            local delay = tonumber(body and body:match("delay=(%d+)")) or 1500
-            sweep = { running = true, current = nil, completed = 0, total = 0,
-                      results = {}, startTime = system.getTimer() }
-
-            -- Build flat list of all (category, page) pairs
-            local queue = {}
-            local manifest = {
-                { cat="Basics",    pages={"View","Text","Image","Button","Pressable","Touchable","LinearGradient"} },
-                { cat="Forms",     pages={"TextInput","Switch","Modal","Indicator","KeyboardAV"} },
-                { cat="Lists",     pages={"ScrollView","FlatList","VirtualList","SectionList"} },
-                { cat="Nav",       pages={"StackNav","Headers","DrawerNav"} },
-                { cat="Animation", pages={"Timing","Spring","Sequence","Parallel","Loop"} },
-                { cat="Overlay",   pages={"Alert","ActionSheet","Toast","Popover"} },
-                { cat="Layout",    pages={"Flexbox","Responsive","SafeArea","SafeAreaView","Spacing"} },
-                { cat="Advanced",  pages={"Badge","Progress","Accordion","Dropdown","Card"} },
-                { cat="Interop",   pages={"ReactInSolar","Solar2DInReact","AsyncStorage","VectorIcons","Slider","DeviceInfo","DateTimePicker"} },
-            }
-            for _, c in ipairs(manifest) do
-                for _, p in ipairs(c.pages) do
-                    queue[#queue+1] = { category = c.cat, page = p }
-                end
-            end
-            sweep.total = #queue
-
-            -- State machine: navigate → wait → screenshot → next
-            local step = 1
-            local function runNext()
-                if not sweep or not sweep.running then return end
-                if step > #queue then
-                    sweep.running = false
-                    sweep.completedAt = system.getTimer()
-                    print("[AUTOTEST] Complete: " .. sweep.completed .. "/" .. sweep.total)
-                    return
-                end
-                local item = queue[step]
-                step = step + 1
-                sweep.current = item.category .. "/" .. item.page
-
-                -- Navigate
-                if callbacks.onNavigate then
-                    callbacks.onNavigate(item.page)
-                end
-
-                -- Wait for render, then screenshot
-                timer.performWithDelay(delay, function()
-                    local filename = "autotest_" .. item.category .. "_" .. item.page:gsub("%s+","_") .. ".png"
-                    local fpath = system.pathForFile(filename, system.TemporaryDirectory)
-                    local ok, err = pcall(function()
-                        display.save(display.currentStage, {
-                            filename = filename,
-                            baseDir = system.TemporaryDirectory,
-                        })
+                local target = findTouch(display.currentStage)
+                if target then
+                    evt.target = target
+                    target:dispatchEvent(evt)
+                    timer.performWithDelay(ms, function()
+                        evt.phase = "ended"
+                        target:dispatchEvent(evt)
                     end)
-                    sweep.results[#sweep.results+1] = {
-                        category = item.category,
-                        page = item.page,
-                        file = fpath,
-                        ok = ok,
-                        err = err and tostring(err) or nil,
-                    }
-                    sweep.completed = sweep.completed + 1
-                    print("[AUTOTEST] " .. sweep.completed .. "/" .. sweep.total .. " " .. sweep.current)
+                end
+            end)
+            response = ok({success=true, action="longpress", x=x, y=y, ms=ms})
+        else
+            response = err("Missing x,y")
+        end
 
-                    -- Next page
-                    timer.performWithDelay(50, runNext)
-                end)
+    elseif method == "POST" and path == "/drag" then
+        local x  = tonumber(params.x) or 0
+        local y  = tonumber(params.y) or 0
+        local dx = tonumber(params.dx) or 0
+        local dy = tonumber(params.dy) or 0
+        local ms = tonumber(params.ms) or 200
+        simulateDrag(x, y, dx, dy, ms)
+        response = ok({success=true, action="drag", from={x=x,y=y}, delta={dx=dx,dy=dy}, ms=ms})
+
+    elseif method == "POST" and path == "/scroll" then
+        local x  = tonumber(params.x) or display.contentCenterX
+        local y  = tonumber(params.y) or display.contentCenterY
+        local dx = tonumber(params.dx) or 0
+        local dy = tonumber(params.dy) or 0
+        timer.performWithDelay(1, function()
+            -- Find ScrollView at position and dispatch mouse scroll
+            local function findScrollAt(grp)
+                if not grp or not grp.numChildren then return nil end
+                for i = grp.numChildren, 1, -1 do
+                    local c = grp[i]
+                    if c and c.isVisible ~= false then
+                        local cb = c.contentBounds
+                        if cb and x >= cb.xMin and x <= cb.xMax and y >= cb.yMin and y <= cb.yMax then
+                            if c.numChildren then
+                                local found = findScrollAt(c)
+                                if found then return found end
+                            end
+                            if c._isTouchOverlay then return c end
+                        end
+                    end
+                end
+                return nil
             end
+            local overlay = findScrollAt(display.currentStage)
+            if overlay then
+                overlay:dispatchEvent({name="mouse", type="scroll", x=x, y=y, scrollX=dx, scrollY=dy})
+            end
+        end)
+        response = ok({success=true, action="scroll", x=x, y=y, dx=dx, dy=dy})
 
-            timer.performWithDelay(500, runNext)
-            response = httpResponse(jsonEncode({ started = true, total = sweep.total, delay = delay }))
-        end
+    elseif method == "GET" and path == "/tree" then
+        local maxDepth = tonumber(params.depth) or 8
+        timer.performWithDelay(1, function()
+            local tree = dumpTree(display.currentStage, maxDepth)
+            local resp = ok({tree=tree})
+            pcall(function() client:send(resp) end)
+            pcall(function() client:close() end)
+        end)
+        return -- async
 
-    elseif method == "GET" and path == "/autotest/status" then
-        if not sweep then
-            response = httpResponse(jsonEncode({ running = false, completed = 0, total = 0 }))
+    elseif method == "GET" and path == "/find" then
+        local text = params.text
+        local limit = tonumber(params.limit) or 20
+        if text then
+            local results = findByText(text, limit)
+            response = ok({results=results, count=#results})
         else
-            local elapsed = sweep.completedAt and (sweep.completedAt - sweep.startTime) or (system.getTimer() - sweep.startTime)
-            response = httpResponse(jsonEncode({
-                running = sweep.running,
-                current = sweep.current,
-                completed = sweep.completed,
-                total = sweep.total,
-                elapsed_ms = math.floor(elapsed),
-            }))
+            response = err("Missing text parameter")
         end
 
-    elseif method == "GET" and path == "/autotest/results" then
-        if not sweep then
-            response = httpResponse(jsonEncode({ results = {}, completed = 0 }))
+    elseif method == "POST" and path == "/exec" then
+        local code = params.code
+        if code then
+            timer.performWithDelay(0, function()
+                local loadfn = loadstring or load
+                local fn, compErr = loadfn(code, "=remote")
+                if fn then
+                    local success, result = pcall(fn)
+                    print("[EXEC] " .. (success and "OK: " .. tostring(result) or "ERROR: " .. tostring(result)))
+                else
+                    print("[EXEC] COMPILE ERROR: " .. tostring(compErr))
+                end
+            end)
+            response = ok({success=true, message="Code scheduled"})
         else
-            response = httpResponse(jsonEncode({
-                completed = sweep.completed,
-                total = sweep.total,
-                running = sweep.running,
-                results = sweep.results,
-            }))
+            response = err("Missing code")
         end
 
-    elseif method == "POST" and path == "/autotest/stop" then
-        if sweep then sweep.running = false end
-        response = httpResponse(jsonEncode({ stopped = true }))
+    elseif method == "POST" and path == "/wait" then
+        local text = params.text
+        local timeout = tonumber(params.timeout) or 5000
+        if text then
+            -- Poll for element with text, respond when found or timeout
+            local startTime = system.getTimer()
+            local function poll()
+                local results = findByText(text, 1)
+                if #results > 0 then
+                    local resp = ok({found=true, elapsed=math.floor(system.getTimer()-startTime), result=results[1]})
+                    pcall(function() client:send(resp) end)
+                    pcall(function() client:close() end)
+                elseif (system.getTimer() - startTime) > timeout then
+                    local resp = ok({found=false, elapsed=math.floor(system.getTimer()-startTime)})
+                    pcall(function() client:send(resp) end)
+                    pcall(function() client:close() end)
+                else
+                    timer.performWithDelay(100, poll)
+                end
+            end
+            timer.performWithDelay(100, poll)
+            return -- async
+        else
+            response = err("Missing text")
+        end
 
     else
-        response = httpResponse(jsonEncode({ error = "Not found" }), "404 Not Found")
+        -- Check custom routes
+        local key = method .. " " .. path
+        if customRoutes[key] then
+            response = customRoutes[key](params, client)
+            if not response then return end -- handler sent async response
+        else
+            response = err("Not found", "404 Not Found")
+        end
     end
 
     client:send(response)
     client:close()
 end
 
--- Start server
+----------------------------------------------------------------
+-- Public API
+----------------------------------------------------------------
+
+--- Register a custom route handler
+--- handler(params, client) → response string, or nil for async
+function M.route(method, path, handler)
+    customRoutes[method .. " " .. path] = handler
+end
+
+--- Start the test server
 function M.start(port)
     port = port or 9876
     server = socket.bind("*", port)
@@ -485,30 +558,24 @@ function M.start(port)
         return false
     end
     server:settimeout(0)
-
     print("[TEST_SERVER] Started on port " .. port)
-
     M._running = true
+    M._port = port
 
-    -- Accept loop - runs in timer
     timer.performWithDelay(50, function()
         if not M._running then return end
-
         local client = server:accept()
         if client then
-            print("[TEST_SERVER] Client connected")
-            -- Handle client in a coroutine-based timer
             timer.performWithDelay(10, function()
-                local ok, err = pcall(handleClient, client)
-                if not ok then
-                    print("[TEST_SERVER] Error handling client: " .. tostring(err))
-                    client:close()
+                local success, e = pcall(handleClient, client)
+                if not success then
+                    print("[TEST_SERVER] Error: " .. tostring(e))
+                    pcall(function() client:close() end)
                 end
             end)
         end
     end, 0)
 
-    -- Screenshot polling loop
     timer.performWithDelay(100, function()
         if not M._running then return end
         processPendingScreenshots()
@@ -519,15 +586,15 @@ end
 
 function M.stop()
     M._running = false
-    if server then
-        server:close()
-        server = nil
-    end
+    if server then server:close(); server = nil end
 end
 
--- Callbacks
-function M.onCategoryTap(fn) callbacks.onCategoryTap = fn end
-function M.onTap(fn) callbacks.onTap = fn end
-function M.onNavigate(fn) callbacks.onNavigate = fn end
+-- Expose utilities for custom route handlers
+M.ok = ok
+M.err = err
+M.findByText = findByText
+M.simulateTapAt = simulateTapAt
+M.simulateDrag = simulateDrag
+M.dumpTree = dumpTree
 
 return M
