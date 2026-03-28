@@ -42,6 +42,7 @@ local function wrapValue(val, minVal, maxVal)
 end
 
 -- Single column: shows prev/current/next values with up/down tap areas
+-- Supports drag gestures via _onDragHandler (forwarded by parent ScrollView)
 local function Column(props)
     local React = require("react")
     local ce = React.createElement
@@ -59,6 +60,8 @@ local function Column(props)
     local propsRef = useRef({})
     propsRef.current = { value = value, minVal = minVal, maxVal = maxVal, onChange = onChange, disabled = disabled }
 
+    local dragState = useRef({})
+
     local handleUp = useCallback(function()
         local p = propsRef.current
         if p.disabled then return end
@@ -73,6 +76,36 @@ local function Column(props)
         if p.onChange then p.onChange(newVal) end
     end, {})
 
+    -- Drag handler: vertical drag changes value (drag up = decrement, drag down = increment)
+    local dragRefCallback = useCallback(function(instance)
+        if not instance then return end
+        instance._onDragHandler = function(event)
+            local p = propsRef.current
+            if p.disabled then return end
+            local ds = dragState.current
+
+            if event.phase == "began" then
+                ds.startY = event.y
+                ds.accum = 0
+                ds.lastValue = p.value
+            elseif event.phase == "moved" then
+                local dy = event.y - (ds.startY or event.y)
+                -- Negative dy (drag up) = increment value, positive = decrement
+                local steps = math.floor(-dy / 28 + 0.5) -- 28px per step
+                local targetSteps = steps - (ds.accum or 0)
+                if targetSteps ~= 0 then
+                    ds.accum = steps
+                    local newVal = (ds.lastValue or p.value) + steps
+                    -- Wrap within range
+                    local range = p.maxVal - p.minVal + 1
+                    newVal = ((newVal - p.minVal) % range + range) % range + p.minVal
+                    if p.onChange then p.onChange(newVal) end
+                end
+            end
+            -- "ended"/"cancelled" — no special cleanup needed
+        end
+    end, {})
+
     local prevVal = wrapValue(value - 1, minVal, maxVal)
     local nextVal = wrapValue(value + 1, minVal, maxVal)
 
@@ -85,7 +118,8 @@ local function Column(props)
             width = width,
             height = itemH * 3,
             alignItems = "center",
-        }
+        },
+        ref = dragRefCallback,
     },
         -- Previous value (tap to decrement) — needs backgroundColor for hit area
         ce("View", {

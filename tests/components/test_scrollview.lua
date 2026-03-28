@@ -12,7 +12,7 @@ timer = { performWithDelay = function() return {} end, cancel = function() end }
 local HostConfig = require("renderer.HostConfig")
 
 T.describe("ScrollView: creation", function()
-    T.it("creates a group with content group", function()
+    T.it("creates a container with content group", function()
         local inst = HostConfig.createInstance("ScrollView", {
             style = { width = 300, height = 400 },
         })
@@ -72,9 +72,8 @@ T.describe("ScrollView: scroll state", function()
         local inst = HostConfig.createInstance("ScrollView", {
             style = { width = 300, height = 400 },
         })
-        -- touchOverlay is the last child of clipContainer (on top of contentGroup)
-        -- It should have touch and mouse listeners
-        local overlay = inst[inst.numChildren]
+        -- touchOverlay is inside offsetGroup (Container center→top-left translation)
+        local overlay = inst._touchOverlay
         T.expect(overlay).toBeTruthy()
         T.expect(overlay._type).toBe("rect")
         T.expect(overlay.isHitTestable).toBe(true)

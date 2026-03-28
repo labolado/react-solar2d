@@ -128,7 +128,7 @@ T.describe("ScrollView: mouse scroll", function()
         local inst = HostConfig.createInstance("ScrollView", {
             style = { width = 300, height = 400 },
         })
-        local overlay = inst[inst.numChildren]
+        local overlay = inst._touchOverlay
         T.expect(overlay._listeners["mouse"]).toBeTruthy()
     end)
 
@@ -136,7 +136,7 @@ T.describe("ScrollView: mouse scroll", function()
         local inst = HostConfig.createInstance("ScrollView", {
             style = { width = 300, height = 400 },
         })
-        local overlay = inst[inst.numChildren]
+        local overlay = inst._touchOverlay
         T.expect(overlay._listeners["touch"]).toBeTruthy()
     end)
 end)

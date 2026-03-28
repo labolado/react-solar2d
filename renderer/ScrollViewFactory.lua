@@ -20,6 +20,7 @@ local function createScrollView(props, style, applyCommonStyle)
     touchOverlay._isTouchOverlay = true
 
     clipContainer._contentGroup = contentGroup
+    clipContainer._touchOverlay = touchOverlay
     clipContainer._scrollW = w
     clipContainer._scrollH = h
     clipContainer._horizontal = horizontal

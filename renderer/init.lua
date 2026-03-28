@@ -47,6 +47,11 @@ local function buildLayoutTree(fiber)
         end
     end
 
+    -- TextInput: set minimum height so Yoga doesn't collapse it
+    if fiber.type == "TextInput" and not style.height then
+        node:setHeight(40)
+    end
+
     local child = fiber.child
     local childIndex = 0
     while child do
@@ -99,8 +104,13 @@ local function applyLayout(yogaNode, fiber)
         -- Store layout position separately so translateX/Y can offset from it
         fiber.stateNode._layoutX = l
         fiber.stateNode._layoutY = t
-        fiber.stateNode.x = l + (fiber.stateNode._translateX or 0)
-        fiber.stateNode.y = t + (fiber.stateNode._translateY or 0)
+        -- For the root fiber (tag == "root"), preserve the container's original
+        -- position set by the caller (e.g. screenOriginY offset). Yoga computes
+        -- (0,0) for the root, which would overwrite the caller's positioning.
+        if fiber.tag ~= "root" then
+            fiber.stateNode.x = l + (fiber.stateNode._translateX or 0)
+            fiber.stateNode.y = t + (fiber.stateNode._translateY or 0)
+        end
         -- Update size for bg rect if present (guard against removed objects)
         -- When style has explicit width/height, skip Yoga's value — updateInstance
         -- already set the correct size and fiber.props.style may be stale during
@@ -113,30 +123,31 @@ local function applyLayout(yogaNode, fiber)
                 fiber.stateNode._bg.path.height = h
             end
         end
-        -- TextInput: sync native text field position to layout
+        -- TextInput: position native field using screen coordinates
+        -- native.* objects don't respect group hierarchy, so we must use
+        -- localToContent to convert group-local position to screen coordinates
         if fiber.type == "TextInput" and fiber.stateNode._inputField then
             local field = fiber.stateNode._inputField
-            local pad = 4 -- padding inside the input
-            field.x = l + pad
-            field.y = t + pad
+            local pad = 4
+            -- Convert group-local (pad, pad) to screen coordinates
+            local sx, sy = fiber.stateNode:localToContent(pad, pad)
+            field.x = sx
+            field.y = sy
             -- Update size if changed
             if w > pad * 2 then field.width = w - pad * 2 end
             if h > pad * 2 then field.height = h - pad * 2 end
+            -- Store pad for scroll sync
+            fiber.stateNode._fieldPad = pad
         end
         -- ScrollView: update scroll dimensions and touch overlay size
         if fiber.type == "ScrollView" and fiber.stateNode._contentGroup then
             fiber.stateNode._scrollW = w
             fiber.stateNode._scrollH = h
             -- Update touch overlay rect to match new size
-            if fiber.stateNode.numChildren and fiber.stateNode.numChildren > 0 then
-                for i = 1, fiber.stateNode.numChildren do
-                    local child = fiber.stateNode[i]
-                    if child and child._isTouchOverlay and child.path then
-                        child.path.width = w
-                        child.path.height = h
-                        break
-                    end
-                end
+            local overlay = fiber.stateNode._touchOverlay
+            if overlay and overlay.path then
+                overlay.path.width = w
+                overlay.path.height = h
             end
         end
         -- Text wrapping: if Yoga computed a width, rebuild text with that width

@@ -43,6 +43,10 @@ local testFiles = {
     "tests/navigation/test_drawer.lua",
     "tests/navigation/test_deeplink.lua",
     "tests/integration/test_full_render.lua",
+    "tests/infra/test_test_server.lua",
+    "tests/components/test_nested_scrollview.lua",
+    "tests/lib/test_datetime_picker.lua",
+    "tests/react/test_nil_children.lua",
 }
 
 -- Filter if pattern given

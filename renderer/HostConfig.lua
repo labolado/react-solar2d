@@ -652,7 +652,9 @@ function M.createInstance(elementType, props)
                         end
                     end
                 end)
-                group:insert(field)
+                -- Do NOT insert native field into group — native objects don't
+                -- respect group transforms reliably. Position managed by applyLayout
+                -- and ScrollView syncNativeFields via localToContent.
             end
         else
             -- Fallback: placeholder text for mock/non-native environments
@@ -801,6 +803,11 @@ end
 function M.removeChild(parent, child)
     if parent._invalidateContentSize then parent._invalidateContentSize() end
     unsubscribeAnimatedValues(child)
+    -- Clean up native text field (not in group hierarchy, managed separately)
+    if child._inputField and child._inputField.removeSelf then
+        child._inputField:removeSelf()
+        child._inputField = nil
+    end
     child:removeSelf()
 end
 

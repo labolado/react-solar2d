@@ -118,17 +118,20 @@ function M.Slider(props)
     end, {disabled, value, step, minimumValue, maximumValue, onValueChange, onSlidingComplete})
 
     -- Build UI
+    local showButtons = props.showButtons ~= false -- default true for backwards compat
     local btnW = 30
     local btnH = 24
+    local trackLeft = showButtons and 40 or 0
+    local totalWidth = showButtons and (trackWidth + 80) or trackWidth
 
     return ce("View", {
         style = {
-            width  = trackWidth + 80,
+            width  = totalWidth,
             height = thumbSize + 10,
         }
     },
-        -- Decrement button
-        ce("View", {
+        -- Decrement button (hidden when showButtons=false)
+        showButtons and ce("View", {
             style = {
                 position        = "absolute",
                 left            = 0,
@@ -150,13 +153,13 @@ function M.Slider(props)
                     textAlign  = "center",
                 }
             }, "-")
-        ),
+        ) or nil,
 
         -- Track container
         ce("View", {
             style = {
                 position = "absolute",
-                left     = 40,
+                left     = trackLeft,
                 top      = 0,
                 width    = trackWidth,
                 height   = thumbSize + 10,
@@ -214,11 +217,11 @@ function M.Slider(props)
             })
         ),
 
-        -- Increment button
-        ce("View", {
+        -- Increment button (hidden when showButtons=false)
+        showButtons and ce("View", {
             style = {
                 position        = "absolute",
-                left            = 40 + trackWidth + 5,
+                left            = trackLeft + trackWidth + 5,
                 top             = (thumbSize + 10 - btnH) / 2,
                 width           = btnW,
                 height          = btnH,
@@ -237,7 +240,7 @@ function M.Slider(props)
                     textAlign  = "center",
                 }
             }, "+")
-        )
+        ) or nil
     )
 end
 

@@ -255,11 +255,22 @@ local function processPendingScreenshots()
             pending.captureRequested = true
             timer.performWithDelay(50, function()
                 pcall(function()
-                    local target = pending.target or display.currentStage
-                    display.save(target, {
-                        filename = pending.filename,
-                        baseDir = system.TemporaryDirectory,
-                    })
+                    if pending.target then
+                        -- Save specific display object
+                        display.save(pending.target, {
+                            filename = pending.filename,
+                            baseDir = system.TemporaryDirectory,
+                        })
+                    else
+                        -- Save full stage to file. The result includes the full
+                        -- content area (e.g. 768x1024 portrait). The visibleArea
+                        -- info in the response tells the client where to crop to
+                        -- get just the visible region.
+                        display.save(display.currentStage, {
+                            filename = pending.filename,
+                            baseDir = system.TemporaryDirectory,
+                        })
+                    end
                 end)
             end)
         else
@@ -268,10 +279,19 @@ local function processPendingScreenshots()
                 local data = f:read("*all"); f:close()
                 local b64ok, b64 = pcall(require, "tests.infra.base64")
                 local resp
+                -- Include visible area info for proper cropping
+                local visibleArea = {
+                    screenOriginX = display.screenOriginX or 0,
+                    screenOriginY = display.screenOriginY or 0,
+                    actualContentWidth = display.actualContentWidth or display.contentWidth,
+                    actualContentHeight = display.actualContentHeight or display.contentHeight,
+                    contentWidth = display.contentWidth,
+                    contentHeight = display.contentHeight,
+                }
                 if b64ok then
-                    resp = ok({success=true, filename=pending.filename, base64=b64.encode(data), size=#data})
+                    resp = ok({success=true, filename=pending.filename, base64=b64.encode(data), size=#data, visibleArea=visibleArea})
                 else
-                    resp = ok({success=true, filename=pending.filename, path=pending.path, size=#data})
+                    resp = ok({success=true, filename=pending.filename, path=pending.path, size=#data, visibleArea=visibleArea})
                 end
                 pcall(function() pending.client:send(resp) end)
                 pcall(function() pending.client:close() end)
