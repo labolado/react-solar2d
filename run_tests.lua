@@ -49,6 +49,7 @@ local testFiles = {
     "tests/react/test_nil_children.lua",
     "tests/components/test_imperative_canvas.lua",
     "tests/components/test_scene_canvas.lua",
+    "tests/components/test_pagelet.lua",
     "tests/renderer/test_resize.lua",
 }
 

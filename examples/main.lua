@@ -4,7 +4,8 @@
 
 -- Framework path: go up one level from examples/ to reach react-solar2d root
 local path = system.pathForFile("main.lua"):gsub("examples/main.lua$", "")
-package.path = path .. "?.lua;" .. path .. "?/init.lua;" .. package.path
+local examplesPath = path .. "examples/"
+package.path = path .. "?.lua;" .. path .. "?/init.lua;" .. examplesPath .. "?.lua;" .. examplesPath .. "?/init.lua;" .. package.path
 
 -- Yoga plugin (optional)
 local YOGA = path .. "plugins/yoga/build-solar2d/"

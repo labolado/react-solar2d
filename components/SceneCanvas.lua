@@ -16,6 +16,8 @@ local function SceneCanvas(props)
             name = "create",
             view = surface,
             params = params,
+            width = w,
+            height = h,
         })
 
         -- Dispatch show will
@@ -24,6 +26,8 @@ local function SceneCanvas(props)
             phase = "will",
             view = surface,
             params = params,
+            width = w,
+            height = h,
         })
 
         -- Dispatch show did (next frame equivalent — immediate in this context)
@@ -32,6 +36,8 @@ local function SceneCanvas(props)
             phase = "did",
             view = surface,
             params = params,
+            width = w,
+            height = h,
         })
 
         -- Cleanup: hide + destroy
