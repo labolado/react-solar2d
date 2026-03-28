@@ -47,6 +47,8 @@ local testFiles = {
     "tests/components/test_nested_scrollview.lua",
     "tests/lib/test_datetime_picker.lua",
     "tests/react/test_nil_children.lua",
+    "tests/components/test_imperative_canvas.lua",
+    "tests/components/test_scene_canvas.lua",
 }
 
 -- Filter if pattern given

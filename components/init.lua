@@ -16,4 +16,7 @@ return {
     RefreshControl = require("components.RefreshControl"),
     KeyboardAvoidingView = require("components.KeyboardAvoidingView"),
     SafeAreaView = require("components.SafeAreaView"),
+    ImperativeCanvas = require("components.ImperativeCanvas"),
+    SceneCanvas = require("components.SceneCanvas"),
+    SceneAdapter = require("components.SceneAdapter"),
 }
