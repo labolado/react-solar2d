@@ -253,23 +253,41 @@ local function processPendingScreenshots()
         local pending = pendingScreenshots[i]
         if not pending.captureRequested then
             pending.captureRequested = true
+            pending.method = "captureBounds"
             timer.performWithDelay(50, function()
                 pcall(function()
                     if pending.target then
-                        -- Save specific display object
+                        -- Save specific display object via display.save
+                        pending.method = "save_target"
                         display.save(pending.target, {
                             filename = pending.filename,
                             baseDir = system.TemporaryDirectory,
                         })
                     else
-                        -- Save full stage to file. The result includes the full
-                        -- content area (e.g. 768x1024 portrait). The visibleArea
-                        -- info in the response tells the client where to crop to
-                        -- get just the visible region.
-                        display.save(display.currentStage, {
-                            filename = pending.filename,
-                            baseDir = system.TemporaryDirectory,
-                        })
+                        -- Use display.captureBounds to capture the visible screen area.
+                        -- This captures the composited GPU frame INCLUDING Container
+                        -- children, unlike display.save which misses them.
+                        -- Pattern from labo_papercut_car's capture_screen.lua.
+                        pending.method = "captureBounds"
+                        local screenBounds = {
+                            xMin = display.screenOriginX or 0,
+                            yMin = display.screenOriginY or 0,
+                            xMax = (display.screenOriginX or 0) + (display.actualContentWidth or display.contentWidth),
+                            yMax = (display.screenOriginY or 0) + (display.actualContentHeight or display.contentHeight),
+                        }
+                        local snapshot = display.captureBounds(screenBounds, false)
+                        if snapshot then
+                            display.save(snapshot, {
+                                filename = pending.filename,
+                                baseDir = system.TemporaryDirectory,
+                                captureOffscreenArea = true,
+                            })
+                            timer.performWithDelay(200, function()
+                                if snapshot and snapshot.removeSelf then
+                                    snapshot:removeSelf()
+                                end
+                            end)
+                        end
                     end
                 end)
             end)
@@ -289,17 +307,21 @@ local function processPendingScreenshots()
                     contentHeight = display.contentHeight,
                 }
                 if b64ok then
-                    resp = ok({success=true, filename=pending.filename, base64=b64.encode(data), size=#data, visibleArea=visibleArea})
+                    resp = ok({success=true, filename=pending.filename, base64=b64.encode(data),
+                               size=#data, method=pending.method, visibleArea=visibleArea})
                 else
-                    resp = ok({success=true, filename=pending.filename, path=pending.path, size=#data, visibleArea=visibleArea})
+                    resp = ok({success=true, filename=pending.filename, path=pending.path,
+                               size=#data, method=pending.method, visibleArea=visibleArea})
                 end
                 pcall(function() pending.client:send(resp) end)
                 pcall(function() pending.client:close() end)
                 table.remove(pendingScreenshots, i)
-            elseif (system.getTimer() - pending.startTime) > 10000 then
-                pcall(function() pending.client:send(err("Screenshot timeout","500 Error")) end)
-                pcall(function() pending.client:close() end)
-                table.remove(pendingScreenshots, i)
+            else
+                if (system.getTimer() - pending.startTime) > 10000 then
+                    pcall(function() pending.client:send(err("Screenshot timeout","500 Error")) end)
+                    pcall(function() pending.client:close() end)
+                    table.remove(pendingScreenshots, i)
+                end
             end
         end
     end
