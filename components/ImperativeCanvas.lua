@@ -8,6 +8,10 @@ local function ImperativeCanvas(props)
     local viewRef = React.useRef(nil)
     local cleanupRef = React.useRef(nil)
 
+    -- propsRef: always holds latest props, avoids stale closures in onFrame
+    local propsRef = React.useRef({})
+    propsRef.current = props
+
     local onViewRef = React.useCallback(function(instance)
         viewRef.current = instance
     end, {})
@@ -17,30 +21,54 @@ local function ImperativeCanvas(props)
         local view = viewRef.current
         if not view then return end
 
-        local surface = display.newGroup()
-        view:insert(surface)
-        surface:toBack()
-        if view._bg then view._bg:toBack() end
-        surfaceRef.current = surface
-
-        -- Call onDraw
-        local style = props.style or {}
+        local style = propsRef.current.style or {}
         local w = style.width or 0
         local h = style.height or 0
-        if props.onDraw then
-            cleanupRef.current = props.onDraw(surface, w, h)
+        local clip = propsRef.current.clip
+        local overlay = propsRef.current.overlay
+
+        local surface, drawTarget
+        if clip then
+            -- Container clips children to bounds; uses center-origin internally
+            surface = display.newContainer(w, h)
+            surface.anchorX, surface.anchorY = 0, 0
+            surface.anchorChildren = false
+            -- Offset group for top-left coordinate system
+            local inner = display.newGroup()
+            inner.x = -w / 2
+            inner.y = -h / 2
+            surface:insert(inner)
+            drawTarget = inner
+        else
+            surface = display.newGroup()
+            drawTarget = surface
         end
 
-        -- enterFrame for onFrame
+        view:insert(surface)
+        if not overlay then
+            surface:toBack()
+            if view._bg then view._bg:toBack() end
+        end
+        surfaceRef.current = surface
+
+        -- Call onDraw with drawTarget (top-left coords) and propsRef
+        if propsRef.current.onDraw then
+            cleanupRef.current = propsRef.current.onDraw(drawTarget, w, h, propsRef)
+        end
+
+        -- enterFrame for onFrame — reads from propsRef to avoid stale closures
         local onFrameListener
-        if props.onFrame then
+        if propsRef.current.onFrame then
             local lastTime = nil
             onFrameListener = function(event)
                 local now = event.time
                 local dt = lastTime and (now - lastTime) / 1000 or 0
                 lastTime = now
                 if dt > 0 and dt < 0.5 then
-                    props.onFrame(surface, dt)
+                    local currentOnFrame = propsRef.current.onFrame
+                    if currentOnFrame then
+                        currentOnFrame(drawTarget, dt)
+                    end
                 end
             end
             Runtime:addEventListener("enterFrame", onFrameListener)

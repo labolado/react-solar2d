@@ -60,6 +60,8 @@ local function SceneCanvas(props)
         style = props.style,
         onDraw = onDraw,
         onFrame = props.onFrame,
+        clip = props.clip,
+        overlay = props.overlay,
     })
 end
 

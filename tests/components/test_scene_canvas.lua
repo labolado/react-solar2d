@@ -208,4 +208,78 @@ T.describe("SceneCanvas: without scene", function()
     end)
 end)
 
+T.describe("SceneCanvas: clip prop passthrough", function()
+    T.it("passes clip=true to ImperativeCanvas, creates Container", function()
+        local container = mockDisplay.newGroup()
+        local reconciler = Reconciler.create(HostConfig)
+
+        local scene = SceneAdapter.newScene()
+        local receivedView = nil
+
+        local handler = {}
+        function handler:create(event)
+            receivedView = event.view
+        end
+        scene:addEventListener("create", handler)
+
+        reconciler.render(
+            ce(SceneCanvas, {
+                style = { width = 200, height = 150 },
+                scene = scene,
+                clip = true,
+            }),
+            container
+        )
+
+        -- The view received by the scene should be the inner offset group
+        T.expect(receivedView).toBeTruthy()
+        T.expect(receivedView._type).toBe("group")
+        -- Inner group should be inside a container
+        T.expect(receivedView._parent).toBeTruthy()
+        T.expect(receivedView._parent._type).toBe("container")
+        -- Offset for top-left coords
+        T.expect(receivedView.x).toBe(-100)  -- -w/2
+        T.expect(receivedView.y).toBe(-75)   -- -h/2
+    end)
+end)
+
+T.describe("SceneCanvas: overlay prop passthrough", function()
+    T.it("passes overlay=true to ImperativeCanvas", function()
+        local container = mockDisplay.newGroup()
+        local reconciler = Reconciler.create(HostConfig)
+
+        local scene = SceneAdapter.newScene()
+        local toBackCalled = false
+
+        -- Patch to detect toBack
+        local origNewGroup = mockDisplay.newGroup
+        mockDisplay.newGroup = function(...)
+            local g = origNewGroup(...)
+            local origToBack = g.toBack
+            g.toBack = function(self)
+                toBackCalled = true
+                origToBack(self)
+            end
+            return g
+        end
+
+        local handler = {}
+        function handler:create(event) end
+        scene:addEventListener("create", handler)
+
+        reconciler.render(
+            ce(SceneCanvas, {
+                style = { width = 200, height = 150 },
+                scene = scene,
+                overlay = true,
+            }),
+            container
+        )
+
+        T.expect(toBackCalled).toBe(false)
+
+        mockDisplay.newGroup = origNewGroup
+    end)
+end)
+
 T.summary()

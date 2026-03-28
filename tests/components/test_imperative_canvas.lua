@@ -207,4 +207,201 @@ T.describe("ImperativeCanvas: no onDraw", function()
     end)
 end)
 
+T.describe("ImperativeCanvas: clip prop", function()
+    T.it("creates Container when clip=true", function()
+        local container = mockDisplay.newGroup()
+        local reconciler = Reconciler.create(HostConfig)
+        local drawnSurface = nil
+
+        reconciler.render(
+            ce(ImperativeCanvas, {
+                style = { width = 200, height = 150 },
+                clip = true,
+                onDraw = function(surface, w, h)
+                    drawnSurface = surface
+                end,
+            }),
+            container
+        )
+
+        -- The View is container's first child
+        local view = container[1]
+        T.expect(view).toBeTruthy()
+
+        -- Find the container surface inside the view
+        local containerSurface = nil
+        for i = 1, view.numChildren do
+            local child = view[i]
+            if child._type == "container" then
+                containerSurface = child
+                break
+            end
+        end
+
+        T.expect(containerSurface).toBeTruthy()
+        T.expect(containerSurface._type).toBe("container")
+        T.expect(containerSurface.anchorX).toBe(0)
+        T.expect(containerSurface.anchorY).toBe(0)
+
+        -- drawTarget should be the inner offset group (top-left coords)
+        T.expect(drawnSurface).toBeTruthy()
+        T.expect(drawnSurface._type).toBe("group")
+        T.expect(drawnSurface._parent).toBe(containerSurface)
+        T.expect(drawnSurface.x).toBe(-100)  -- -w/2
+        T.expect(drawnSurface.y).toBe(-75)   -- -h/2
+    end)
+
+    T.it("creates Group when clip=false (default)", function()
+        local container = mockDisplay.newGroup()
+        local reconciler = Reconciler.create(HostConfig)
+        local drawnSurface = nil
+
+        reconciler.render(
+            ce(ImperativeCanvas, {
+                style = { width = 200, height = 150 },
+                onDraw = function(surface, w, h)
+                    drawnSurface = surface
+                end,
+            }),
+            container
+        )
+
+        T.expect(drawnSurface).toBeTruthy()
+        T.expect(drawnSurface._type).toBe("group")
+    end)
+end)
+
+T.describe("ImperativeCanvas: overlay prop", function()
+    T.it("does not call toBack when overlay=true", function()
+        local container = mockDisplay.newGroup()
+        local reconciler = Reconciler.create(HostConfig)
+        local toBackCalled = false
+
+        -- Patch toBack on all new groups to detect calls
+        local origNewGroup = mockDisplay.newGroup
+        mockDisplay.newGroup = function(...)
+            local g = origNewGroup(...)
+            local origToBack = g.toBack
+            g.toBack = function(self)
+                toBackCalled = true
+                origToBack(self)
+            end
+            return g
+        end
+
+        reconciler.render(
+            ce(ImperativeCanvas, {
+                style = { width = 200, height = 150 },
+                overlay = true,
+                onDraw = function() end,
+            }),
+            container
+        )
+
+        T.expect(toBackCalled).toBe(false)
+
+        -- Restore
+        mockDisplay.newGroup = origNewGroup
+    end)
+
+    T.it("calls toBack when overlay=false (default)", function()
+        local container = mockDisplay.newGroup()
+        local reconciler = Reconciler.create(HostConfig)
+        local toBackCalled = false
+
+        local origNewGroup = mockDisplay.newGroup
+        mockDisplay.newGroup = function(...)
+            local g = origNewGroup(...)
+            local origToBack = g.toBack
+            g.toBack = function(self)
+                toBackCalled = true
+                origToBack(self)
+            end
+            return g
+        end
+
+        reconciler.render(
+            ce(ImperativeCanvas, {
+                style = { width = 200, height = 150 },
+                onDraw = function() end,
+            }),
+            container
+        )
+
+        T.expect(toBackCalled).toBe(true)
+
+        mockDisplay.newGroup = origNewGroup
+    end)
+end)
+
+T.describe("ImperativeCanvas: propsRef", function()
+    T.it("onDraw receives propsRef as 4th argument", function()
+        local container = mockDisplay.newGroup()
+        local reconciler = Reconciler.create(HostConfig)
+        local receivedPropsRef = nil
+
+        reconciler.render(
+            ce(ImperativeCanvas, {
+                style = { width = 200, height = 150 },
+                myCustomProp = "hello",
+                onDraw = function(surface, w, h, propsRef)
+                    receivedPropsRef = propsRef
+                end,
+            }),
+            container
+        )
+
+        T.expect(receivedPropsRef).toBeTruthy()
+        T.expect(receivedPropsRef.current).toBeTruthy()
+        T.expect(receivedPropsRef.current.myCustomProp).toBe("hello")
+    end)
+
+    T.it("onFrame reads latest props via propsRef", function()
+        Runtime._listeners = {}
+        local container = mockDisplay.newGroup()
+        local reconciler = Reconciler.create(HostConfig)
+
+        local capturedValue = nil
+        local frameCount = 0
+
+        -- First render
+        reconciler.render(
+            ce(ImperativeCanvas, {
+                style = { width = 200, height = 150 },
+                myValue = "initial",
+                onFrame = function(surface, dt)
+                    frameCount = frameCount + 1
+                    -- This would be stale without propsRef fix
+                end,
+                onDraw = function(surface, w, h, propsRef)
+                    -- Store propsRef for later assertion
+                    capturedValue = propsRef
+                end,
+            }),
+            container
+        )
+
+        T.expect(capturedValue).toBeTruthy()
+        T.expect(capturedValue.current.myValue).toBe("initial")
+
+        -- Re-render with new props
+        reconciler.render(
+            ce(ImperativeCanvas, {
+                style = { width = 200, height = 150 },
+                myValue = "updated",
+                onFrame = function(surface, dt)
+                    frameCount = frameCount + 1
+                end,
+                onDraw = function(surface, w, h, propsRef)
+                    capturedValue = propsRef
+                end,
+            }),
+            container
+        )
+
+        -- propsRef.current should now reflect updated props
+        T.expect(capturedValue.current.myValue).toBe("updated")
+    end)
+end)
+
 T.summary()
