@@ -259,7 +259,95 @@ end
 
 ----------------------------------------------------------------
 -- Screenshot (async)
+-- Uses Container-to-Group swap to ensure display.save captures
+-- Container children (which display.save may skip due to stencil
+-- buffer re-rendering issues in some Solar2D builds).
 ----------------------------------------------------------------
+
+-- Find all Container objects (anchorChildren==true) in the display tree
+local function findContainers(group, result)
+    result = result or {}
+    if not group or not group.numChildren then return result end
+    for i = 1, group.numChildren do
+        local child = group[i]
+        if child then
+            if child.anchorChildren == true and child.numChildren then
+                result[#result+1] = child
+            end
+            if child.numChildren then
+                findContainers(child, result)
+            end
+        end
+    end
+    return result
+end
+
+-- Temporarily replace Containers with Groups so display.save captures all content.
+-- Returns a restore function that undoes the swap.
+local function swapContainersForSave()
+    local containers = findContainers(display.currentStage)
+    if #containers == 0 then return nil end
+
+    local swaps = {}
+    for _, container in ipairs(containers) do
+        local parent = container.parent
+        if parent then
+            -- Create a replacement Group at the same visual position.
+            -- Container uses center-origin: its (x,y) is the center.
+            -- Container children are in center-origin coords (0,0 = center).
+            -- We create a Group at the Container's position.
+            local tmpGroup = display.newGroup()
+            tmpGroup.x = container.x
+            tmpGroup.y = container.y
+            tmpGroup.alpha = container.alpha
+            tmpGroup.rotation = container.rotation
+            tmpGroup.xScale = container.xScale
+            tmpGroup.yScale = container.yScale
+
+            -- Move all children from Container to the temp Group.
+            -- Children keep their relative positions (center-origin coords).
+            local children = {}
+            while container.numChildren > 0 do
+                local child = container[1]
+                children[#children+1] = child
+                tmpGroup:insert(child)
+            end
+
+            -- Hide the Container (it's now empty but still in the tree)
+            local wasVisible = container.isVisible
+            container.isVisible = false
+
+            -- Insert the temp Group into the parent
+            parent:insert(tmpGroup)
+
+            swaps[#swaps+1] = {
+                container = container,
+                tmpGroup = tmpGroup,
+                parent = parent,
+                children = children,
+                wasVisible = wasVisible,
+            }
+        end
+    end
+
+    if #swaps == 0 then return nil end
+
+    -- Return restore function
+    return function()
+        for _, swap in ipairs(swaps) do
+            -- Move children back to Container
+            for _, child in ipairs(swap.children) do
+                swap.container:insert(child)
+            end
+            -- Restore Container visibility
+            swap.container.isVisible = swap.wasVisible
+            -- Remove temp Group
+            if swap.tmpGroup and swap.tmpGroup.removeSelf then
+                swap.tmpGroup:removeSelf()
+            end
+        end
+    end
+end
 
 local function processPendingScreenshots()
     for i = #pendingScreenshots, 1, -1 do
@@ -280,10 +368,14 @@ local function processPendingScreenshots()
                                 baseDir = system.TemporaryDirectory,
                             })
                         else
-                            -- display.save captures at content resolution, includes all
-                            -- display objects EXCEPT Container stencil content.
-                            -- For now this is the most reliable method.
-                            pending.method = pending._method or "save_stage"
+                            -- Swap Containers for Groups to ensure all content is captured.
+                            -- display.save re-renders the tree to a bitmap, and some Solar2D
+                            -- builds fail to render Container stencil children during this
+                            -- off-screen render pass.
+                            local restore = swapContainersForSave()
+                            pending.method = pending._method or (restore and "save_stage_swapped" or "save_stage")
+                            -- Store restore function so it runs after file is written
+                            pending._restoreContainers = restore
                             display.save(display.currentStage, {
                                 filename = pending.filename,
                                 baseDir = system.TemporaryDirectory,
@@ -297,6 +389,11 @@ local function processPendingScreenshots()
             local f = io.open(pending.path, "rb")
             if f then
                 local data = f:read("*all"); f:close()
+                -- Restore any swapped Containers now that the file is written
+                if pending._restoreContainers then
+                    pending._restoreContainers()
+                    pending._restoreContainers = nil
+                end
                 local b64ok, b64 = pcall(require, "tests.infra.base64")
                 local resp
                 -- Include visible area info for proper cropping
@@ -322,6 +419,11 @@ local function processPendingScreenshots()
                 table.remove(pendingScreenshots, i)
             else
                 if (system.getTimer() - pending.startTime) > 10000 then
+                    -- Restore Containers on timeout too
+                    if pending._restoreContainers then
+                        pending._restoreContainers()
+                        pending._restoreContainers = nil
+                    end
                     pcall(function() pending.client:send(err("Screenshot timeout","500 Error")) end)
                     pcall(function() pending.client:close() end)
                     table.remove(pendingScreenshots, i)
