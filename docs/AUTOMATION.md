@@ -235,10 +235,10 @@ curl -s -X POST "$BASE/wait" -d "text=Success&timeout=5000"
 curl -s "$BASE/screenshot?label=after_click" -o response.json
 ```
 
-### Claude Code / AI Agent 集成
+### 自动化脚本集成
 
 ```bash
-# AI agent 可以通过 /tree 理解界面结构
+# 通过 /tree 理解界面结构
 curl -s "http://localhost:9876/tree?depth=4" | python3 -m json.tool
 
 # 通过 /find 定位元素
@@ -272,7 +272,7 @@ curl -s "http://localhost:9876/screenshot?label=verify"
         ↕ HTTP (localhost:9876)
 ┌─────────────────────────────────────────┐
 │  External Test Runner                   │
-│  (Python / Bash / Claude Code / CI)     │
+│  (Python / Bash / CI)                   │
 └─────────────────────────────────────────┘
 ```
 

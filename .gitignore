@@ -6,3 +6,7 @@ plugins/yoga/test/plugin_yoga.so
 # Runtime route files (test artifacts)
 .route
 **/.route
+.claude/
+session-recall.md
+*-handoff.md
+test_progress*.lua
