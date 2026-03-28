@@ -303,4 +303,27 @@ function ReactSolar2D.startAutoFlush()
     end)
 end
 
+-- Re-run layout with current screen dimensions (call on window resize)
+function ReactSolar2D.handleResize(container)
+    if not reconcilerInstance or not layoutOk then return end
+    local rootFiber = reconcilerInstance._getRootFiber()
+    if not rootFiber then return end
+
+    -- Update root container position (screenOriginY may have changed)
+    container.x = display.screenOriginX or 0
+    container.y = display.screenOriginY or 0
+
+    -- Re-run layout with new dimensions
+    local width = display.actualContentWidth or display.contentWidth
+    local height = display.actualContentHeight or display.contentHeight
+    runLayoutPass(rootFiber, width, height)
+end
+
+-- Convenience: listen for Runtime "resize" events and re-layout automatically
+function ReactSolar2D.startResizeListener(container)
+    Runtime:addEventListener("resize", function()
+        ReactSolar2D.handleResize(container)
+    end)
+end
+
 return ReactSolar2D
