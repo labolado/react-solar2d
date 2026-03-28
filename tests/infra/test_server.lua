@@ -12,6 +12,8 @@
 --   POST /input     {text}           — send key events (type text into focused field)
 --   GET  /tree?depth=N               — display hierarchy dump (default depth 8)
 --   GET  /find?text=X&prop=Y        — find elements matching criteria
+--   GET  /screenshot-element?text=X&label=Y  — screenshot a specific element by text
+--   GET  /screenshot-element?x=&y=&w=&h=&label=Y — screenshot a region
 --   POST /exec      {code}           — execute arbitrary Lua code
 --   POST /wait      {text,timeout}   — wait until element with text appears (polls)
 --
@@ -108,6 +110,7 @@ local function findByText(searchText, maxResults)
                     bounds = b and {xMin=math.floor(b.xMin), yMin=math.floor(b.yMin),
                                     xMax=math.floor(b.xMax), yMax=math.floor(b.yMax)},
                     hasOnPress = node._onPress ~= nil or (node.parent and node.parent._onPress ~= nil),
+                    object = node,
                 }
                 if #results >= maxResults then break end
             end
@@ -126,6 +129,16 @@ local function findPressableAncestor(obj)
     local current = obj
     while current do
         if current._onPress then return current end
+        current = current.parent
+    end
+    return nil
+end
+
+-- Walk up to find nearest parent View (has _bg property) for better screenshot context
+local function findParentView(obj)
+    local current = obj and obj.parent
+    while current and current ~= display.currentStage do
+        if current._bg then return current end
         current = current.parent
     end
     return nil
@@ -253,44 +266,33 @@ local function processPendingScreenshots()
         local pending = pendingScreenshots[i]
         if not pending.captureRequested then
             pending.captureRequested = true
-            pending.method = "captureBounds"
-            timer.performWithDelay(50, function()
-                pcall(function()
-                    if pending.target then
-                        -- Save specific display object via display.save
-                        pending.method = "save_target"
-                        display.save(pending.target, {
-                            filename = pending.filename,
-                            baseDir = system.TemporaryDirectory,
-                        })
-                    else
-                        -- Use display.captureBounds to capture the visible screen area.
-                        -- This captures the composited GPU frame INCLUDING Container
-                        -- children, unlike display.save which misses them.
-                        -- Pattern from labo_papercut_car's capture_screen.lua.
-                        pending.method = "captureBounds"
-                        local screenBounds = {
-                            xMin = display.screenOriginX or 0,
-                            yMin = display.screenOriginY or 0,
-                            xMax = (display.screenOriginX or 0) + (display.actualContentWidth or display.contentWidth),
-                            yMax = (display.screenOriginY or 0) + (display.actualContentHeight or display.contentHeight),
-                        }
-                        local snapshot = display.captureBounds(screenBounds, false)
-                        if snapshot then
-                            display.save(snapshot, {
+            pending.method = pending._method or "captureBounds"
+            if pending._skipCapture then
+                -- Capture already handled externally (e.g. captureBounds region)
+            else
+                timer.performWithDelay(50, function()
+                    pcall(function()
+                        if pending.target then
+                            -- Save specific display object via display.save
+                            pending.method = pending._method or "save_target"
+                            display.save(pending.target, {
+                                filename = pending.filename,
+                                baseDir = system.TemporaryDirectory,
+                            })
+                        else
+                            -- display.save captures at content resolution, includes all
+                            -- display objects EXCEPT Container stencil content.
+                            -- For now this is the most reliable method.
+                            pending.method = pending._method or "save_stage"
+                            display.save(display.currentStage, {
                                 filename = pending.filename,
                                 baseDir = system.TemporaryDirectory,
                                 captureOffscreenArea = true,
                             })
-                            timer.performWithDelay(200, function()
-                                if snapshot and snapshot.removeSelf then
-                                    snapshot:removeSelf()
-                                end
-                            end)
                         end
-                    end
+                    end)
                 end)
-            end)
+            end
         else
             local f = io.open(pending.path, "rb")
             if f then
@@ -306,13 +308,15 @@ local function processPendingScreenshots()
                     contentWidth = display.contentWidth,
                     contentHeight = display.contentHeight,
                 }
+                local result = {success=true, filename=pending.filename,
+                               size=#data, method=pending.method, visibleArea=visibleArea}
+                if pending._bounds then result.bounds = pending._bounds end
                 if b64ok then
-                    resp = ok({success=true, filename=pending.filename, base64=b64.encode(data),
-                               size=#data, method=pending.method, visibleArea=visibleArea})
+                    result.base64 = b64.encode(data)
                 else
-                    resp = ok({success=true, filename=pending.filename, path=pending.path,
-                               size=#data, method=pending.method, visibleArea=visibleArea})
+                    result.path = pending.path
                 end
+                resp = ok(result)
                 pcall(function() pending.client:send(resp) end)
                 pcall(function() pending.client:close() end)
                 table.remove(pendingScreenshots, i)
@@ -392,6 +396,87 @@ local function handleClient(client)
             target = nil, -- full screen; custom routes can override
         })
         return -- async response
+
+    elseif method == "GET" and path == "/screenshot-element" then
+        local text = params.text
+        local label = params.label or "element"
+        local padding = tonumber(params.padding) or 10
+
+        if text then
+            -- Text-based element capture
+            timer.performWithDelay(1, function()
+                local matches = findByText(text, 1)
+                local match = matches[1]
+                if not match or not match.object then
+                    local resp = err("Element not found: " .. text)
+                    pcall(function() client:send(resp) end)
+                    pcall(function() client:close() end)
+                    return
+                end
+                -- Walk up to find parent View for better context
+                local target = findParentView(match.object) or match.object
+                local b = target.contentBounds
+                local bounds = b and {
+                    xMin=math.floor(b.xMin), yMin=math.floor(b.yMin),
+                    xMax=math.floor(b.xMax), yMax=math.floor(b.yMax)
+                }
+                local filename = label .. ".png"
+                table.insert(pendingScreenshots, {
+                    client = client,
+                    path = system.pathForFile(filename, system.TemporaryDirectory),
+                    filename = filename,
+                    startTime = system.getTimer(),
+                    captureRequested = false,
+                    target = target,
+                    _method = "element_text",
+                    _bounds = bounds,
+                })
+            end)
+            return -- async
+
+        elseif params.x and params.y then
+            -- Region-based capture
+            local x = tonumber(params.x)
+            local y = tonumber(params.y)
+            local w = tonumber(params.w) or 100
+            local h = tonumber(params.h) or 100
+            local filename = label .. ".png"
+            local bounds = {xMin=x, yMin=y, xMax=x+w, yMax=y+h}
+
+            timer.performWithDelay(50, function()
+                pcall(function()
+                    local capture = display.captureBounds({
+                        xMin = x, yMin = y,
+                        xMax = x + w, yMax = y + h,
+                    })
+                    if capture then
+                        display.save(capture, {
+                            filename = filename,
+                            baseDir = system.TemporaryDirectory,
+                        })
+                        -- Remove capture object after save
+                        timer.performWithDelay(100, function()
+                            if capture and capture.removeSelf then capture:removeSelf() end
+                        end)
+                    end
+                end)
+            end)
+
+            table.insert(pendingScreenshots, {
+                client = client,
+                path = system.pathForFile(filename, system.TemporaryDirectory),
+                filename = filename,
+                startTime = system.getTimer(),
+                captureRequested = false,
+                target = nil, -- handled by captureBounds above
+                _method = "element_region",
+                _bounds = bounds,
+                _skipCapture = true, -- capture handled manually above
+            })
+            return -- async
+        else
+            response = err("Missing text or x,y parameters")
+        end
 
     elseif method == "POST" and path == "/tap" then
         local x = tonumber(params.x)

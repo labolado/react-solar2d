@@ -240,8 +240,9 @@ T.describe("ImperativeCanvas: clip prop", function()
 
         T.expect(containerSurface).toBeTruthy()
         T.expect(containerSurface._type).toBe("container")
-        T.expect(containerSurface.anchorX).toBe(0)
-        T.expect(containerSurface.anchorY).toBe(0)
+        -- Default anchor (0.5, 0.5) with position at (w/2, h/2)
+        T.expect(containerSurface.anchorX).toBe(0.5)
+        T.expect(containerSurface.anchorY).toBe(0.5)
 
         -- drawTarget should be the inner offset group (top-left coords)
         T.expect(drawnSurface).toBeTruthy()

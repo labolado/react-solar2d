@@ -29,11 +29,13 @@ local function ImperativeCanvas(props)
 
         local surface, drawTarget
         if clip then
-            -- Container clips children to bounds; uses center-origin internally
+            -- Container clips children to bounds; center-origin internally.
+            -- Position at (w/2, h/2) with default anchor so it covers the same
+            -- area as the View's _bg rect at (0,0) anchor=(0,0).
             surface = display.newContainer(w, h)
-            surface.anchorX, surface.anchorY = 0, 0
-            surface.anchorChildren = false
-            -- Offset group for top-left coordinate system
+            surface.x = w / 2
+            surface.y = h / 2
+            -- Offset group translates center-origin to top-left-origin
             local inner = display.newGroup()
             inner.x = -w / 2
             inner.y = -h / 2
@@ -93,19 +95,18 @@ local function ImperativeCanvas(props)
         props.onResize(surface, w, h)
     end, { props.style and props.style.width, props.style and props.style.height })
 
-    -- Pass children through
+    -- Pass children through (children can be a single element or an array)
     local children = props.children
-    if children and type(children) == "table" and #children > 0 then
-        return ce("View", {
-            style = props.style,
-            ref = onViewRef,
-        }, unpack(children))
-    else
-        return ce("View", {
-            style = props.style,
-            ref = onViewRef,
-        })
+    if children then
+        if children["$$typeof"] then
+            -- Single child element
+            return ce("View", { style = props.style, ref = onViewRef }, children)
+        elseif type(children) == "table" and #children > 0 then
+            -- Array of children
+            return ce("View", { style = props.style, ref = onViewRef }, unpack(children))
+        end
     end
+    return ce("View", { style = props.style, ref = onViewRef })
 end
 
 return ImperativeCanvas
