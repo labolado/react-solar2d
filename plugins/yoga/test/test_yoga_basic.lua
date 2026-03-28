@@ -1,7 +1,8 @@
 ------------------------------------------------------------
 -- test_yoga_basic.lua  --  8 basic Yoga C-binding tests
 ------------------------------------------------------------
-package.cpath = "/path/to/project/plugins/yoga/build/?.so;" .. package.cpath
+local dir = debug.getinfo(1, "S").source:match("@(.+/)") or "./"
+package.cpath = dir .. "../build/?.so;" .. package.cpath
 local yoga = require("plugin_yoga")
 
 local passed, failed = 0, 0

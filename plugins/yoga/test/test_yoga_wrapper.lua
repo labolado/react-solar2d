@@ -1,5 +1,7 @@
-package.path = "/path/to/project/?.lua;/path/to/project/?/init.lua;" .. package.path
-package.cpath = "/path/to/project/plugins/yoga/build/?.so;" .. package.cpath
+local dir = debug.getinfo(1, "S").source:match("@(.+/)") or "./"
+local root = dir .. "../../../"
+package.path = root .. "?.lua;" .. root .. "?/init.lua;" .. package.path
+package.cpath = dir .. "../build/?.so;" .. package.cpath
 
 local Layout = require("layout")
 
