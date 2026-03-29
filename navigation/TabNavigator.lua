@@ -126,7 +126,7 @@ local function createBottomTabNavigator()
                 backgroundColor = tabBarBg,
                 width = contentW,
             },
-        }, (unpack or table.unpack)(tabItems))
+        }, tabItems)
 
         -- Layout: content area above tab bar + tab bar pinned at bottom
         local contentArea = ce("View", {
