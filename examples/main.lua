@@ -196,6 +196,7 @@ timer.performWithDelay(500, function()
                 {category="Layout",    pages={"Flexbox","Responsive","SafeArea","SafeAreaView","Spacing"}},
                 {category="Advanced",  pages={"Badge","Progress","Accordion","Dropdown","Card","Gesture Handler","useId","useImperativeHandle","useSyncExternalStore"}},
                 {category="Interop",   pages={"ReactInSolar","Solar2DInReact","AsyncStorage","VectorIcons","Slider","DeviceInfo","DateTimePicker"}},
+                {category="Canvas",   pages={"Canvas","Tetris"}},
             }})
         end)
 
