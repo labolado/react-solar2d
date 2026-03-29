@@ -135,46 +135,52 @@ local function createBoardScene()
             local engine = engineRef
             local function onFrame()
                 if not alive or not cellObjs then return end
+                -- pcall: display objects may be destroyed mid-frame by ImperativeCanvas cleanup
+                local ok, err = pcall(function()
+                    local grid = engine.getGrid()
+                    local cur = engine.getCurrent()
+                    local ghostY = engine.getGhostY()
 
-                local grid = engine.getGrid()
-                local cur = engine.getCurrent()
-                local ghostY = engine.getGhostY()
-
-                for r = 1, ROWS do
-                    for c = 1, COLS do
-                        cellObjs[r][c].isVisible = false
-                    end
-                end
-
-                for r = 1, ROWS do
-                    for c = 1, COLS do
-                        if grid[r][c] then
-                            cellObjs[r][c].isVisible = true
-                            cellObjs[r][c]:setFillColor(hexToRGBA(grid[r][c]))
+                    for r = 1, ROWS do
+                        for c = 1, COLS do
+                            cellObjs[r][c].isVisible = false
                         end
                     end
-                end
 
-                if cur and ghostY and ghostY ~= cur.y then
-                    for _, b in ipairs(cur.blocks) do
-                        local gc = cur.x + b[1]
-                        local gr = ghostY + b[2]
-                        if gr >= 1 and gr <= ROWS and gc >= 1 and gc <= COLS then
-                            cellObjs[gr][gc].isVisible = true
-                            cellObjs[gr][gc]:setFillColor(hexToRGBA(cur.ghostColor))
+                    for r = 1, ROWS do
+                        for c = 1, COLS do
+                            if grid[r][c] then
+                                cellObjs[r][c].isVisible = true
+                                cellObjs[r][c]:setFillColor(hexToRGBA(grid[r][c]))
+                            end
                         end
                     end
-                end
 
-                if cur then
-                    for _, b in ipairs(cur.blocks) do
-                        local cc = cur.x + b[1]
-                        local cr = cur.y + b[2]
-                        if cr >= 1 and cr <= ROWS and cc >= 1 and cc <= COLS then
-                            cellObjs[cr][cc].isVisible = true
-                            cellObjs[cr][cc]:setFillColor(hexToRGBA(cur.color))
+                    if cur and ghostY and ghostY ~= cur.y then
+                        for _, b in ipairs(cur.blocks) do
+                            local gc = cur.x + b[1]
+                            local gr = ghostY + b[2]
+                            if gr >= 1 and gr <= ROWS and gc >= 1 and gc <= COLS then
+                                cellObjs[gr][gc].isVisible = true
+                                cellObjs[gr][gc]:setFillColor(hexToRGBA(cur.ghostColor))
+                            end
                         end
                     end
+
+                    if cur then
+                        for _, b in ipairs(cur.blocks) do
+                            local cc = cur.x + b[1]
+                            local cr = cur.y + b[2]
+                            if cr >= 1 and cr <= ROWS and cc >= 1 and cc <= COLS then
+                                cellObjs[cr][cc].isVisible = true
+                                cellObjs[cr][cc]:setFillColor(hexToRGBA(cur.color))
+                            end
+                        end
+                    end
+                end)
+                if not ok then
+                    -- Objects destroyed, stop rendering
+                    alive = false
                 end
             end
 
