@@ -946,7 +946,7 @@ function M.updateInstance(instance, oldProps, newProps)
                 x = oldTextObj.x, y = oldTextObj.y,
                 font = newFont,
                 fontSize = newStyle.fontSize or oldTextObj.size,
-                width = newStyle.width or oldTextObj.width,
+                width = newStyle.width,  -- only constrain if explicitly set
                 height = 0,
                 align = newStyle.textAlign or "left",
             })
