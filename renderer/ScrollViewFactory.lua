@@ -81,6 +81,9 @@ local function createScrollView(props, style, applyCommonStyle)
         if maxW > 0 then clipContainer._contentW = maxW end
     end
 
+    -- Force immediate recalc (called after layout pass)
+    clipContainer._recalcContentSize = recalcContentSize
+
     -- Invalidate cache when children change (called by appendChild/removeChild)
     clipContainer._invalidateContentSize = function()
         contentSizeDirty = true

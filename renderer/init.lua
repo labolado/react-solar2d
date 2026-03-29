@@ -61,20 +61,10 @@ local function buildLayoutTree(fiber)
         node:setHeight(40)
     end
 
-    -- ScrollView: let content extend beyond container in scroll direction
-    -- Yoga normally constrains children to the container's width/height.
-    -- For ScrollView we need children to overflow so we can measure total
-    -- content size and enable scrolling. Set a very large dimension in the
-    -- scroll direction so Yoga lays out children naturally.
+    -- ScrollView: don't let Yoga constrain children in scroll direction
     if fiber.type == "ScrollView" then
         local scrollStyle = {}
         for k, v in pairs(style) do scrollStyle[k] = v end
-        local isHorizontal = fiber.props and fiber.props.horizontal
-        if isHorizontal then
-            scrollStyle.width = 99999  -- don't constrain horizontal content
-        else
-            scrollStyle.height = 99999  -- don't constrain vertical content
-        end
         scrollStyle.overflow = "scroll"
         node = Layout.newNode(scrollStyle)
     end
@@ -100,17 +90,6 @@ local function applyLayout(yogaNode, fiber)
     if fiber.stateNode then
         local l, t, w, h = yogaNode:getLayout()
         local style = (fiber.props and fiber.props.style) or {}
-
-        -- ScrollView: Yoga was given a large height/width for content overflow.
-        -- Restore actual dimensions for display positioning.
-        if fiber.type == "ScrollView" then
-            local isHorizontal = fiber.props and fiber.props.horizontal
-            if isHorizontal then
-                w = style.width or (display.contentWidth or 320)
-            else
-                h = style.height or (display.contentHeight or 480)
-            end
-        end
 
         -- Check for absolute positioning with explicit coordinates
         if style.position == "absolute" then
@@ -289,20 +268,13 @@ local function applyLayout(yogaNode, fiber)
         child = child.sibling
     end
 
-    -- Update ScrollView content dimensions after laying out children
-    -- Use the larger of Yoga's computed extent and the existing content size
-    -- (recalcContentSize measures actual display objects which may exceed Yoga's
-    -- constrained layout, e.g. when content is taller than the ScrollView)
+    -- ScrollView content dimensions: measure actual display object bounds
     if fiber.stateNode and fiber.stateNode._contentGroup then
-        if maxBottom > (fiber.stateNode._contentH or 0) then
-            fiber.stateNode._contentH = maxBottom
-        end
-        if maxRight > (fiber.stateNode._contentW or 0) then
-            fiber.stateNode._contentW = maxRight
-        end
-        -- Force recalc on next touch to get accurate display bounds
         if fiber.stateNode._invalidateContentSize then
             fiber.stateNode._invalidateContentSize()
+        end
+        if fiber.stateNode._recalcContentSize then
+            fiber.stateNode._recalcContentSize()
         end
     end
 
