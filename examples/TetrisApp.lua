@@ -14,7 +14,7 @@ local useEffect = React.useEffect
 local Pagelet = require("components.Pagelet")
 local SceneCanvas = require("components.SceneCanvas")
 local E = require("kitchen_sink.tetris_scenes.engine")
-local BoardScene = require("kitchen_sink.tetris_scenes.BoardScene")
+local createBoardScene = require("kitchen_sink.tetris_scenes.BoardScene")
 
 local W = display.contentWidth
 local TAB_BAR_H = 56
@@ -466,13 +466,19 @@ local function TetrisApp()
     local engineRef = useRef(nil)
     local tick, setTick = useState(0)  -- force HUD re-render
 
-    -- Create engine on game start
+    -- Create engine + scene on game start
     local engine = useMemo(function()
         if screen ~= "game" and screen ~= "gameover" then return nil end
         local eng = E.createEngine(speedLevel)
         engineRef.current = eng
         return eng
     end, { screen == "game" and speedLevel or nil })
+
+    -- Fresh scene per game session (avoids stale listeners on remount)
+    local boardScene = useMemo(function()
+        if not engine then return nil end
+        return createBoardScene()
+    end, { engine })
 
     -- Board scene params
     local boardParams = useMemo(function()
@@ -529,7 +535,7 @@ local function TetrisApp()
             -- Layer 1: Game board (SceneCanvas — composer scene)
             ce(SceneCanvas, {
                 key = "board-" .. speedLevel,
-                scene = BoardScene,
+                scene = boardScene,
                 params = boardParams,
                 style = { width = W, height = H },
             }),
