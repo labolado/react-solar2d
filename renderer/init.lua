@@ -61,6 +61,17 @@ local function buildLayoutTree(fiber)
         node:setHeight(40)
     end
 
+    -- ScrollView: override overflow so Yoga doesn't constrain content to bounds
+    -- Without this, children are clipped to ScrollView's width/height in Yoga,
+    -- preventing horizontal ScrollView from having wider content
+    if fiber.type == "ScrollView" and not style.overflow then
+        -- Rebuild node with overflow = "scroll" so applyStyle handles it
+        local scrollStyle = {}
+        for k, v in pairs(style) do scrollStyle[k] = v end
+        scrollStyle.overflow = "scroll"
+        node = Layout.newNode(scrollStyle)
+    end
+
     local child = fiber.child
     local childIndex = 0
     while child do
