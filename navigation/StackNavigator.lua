@@ -129,9 +129,17 @@ local function createStackNavigator()
 
         local Header = require("navigation.Header")
 
-        -- Render all screens in stack, only topmost visible
+        -- Render screens in stack
+        -- unmountOnBlur: only mount active + previous screen, unmount deeper ones
+        local unmountOnBlur = props.screenOptions and props.screenOptions.unmountOnBlur
+        local keepCount = unmountOnBlur and 2 or #state.routes  -- keep last 2 or all
         local screenElements = {}
         for i, route in ipairs(state.routes) do
+            -- Skip screens beyond keepCount from the top
+            if i < (#state.routes - keepCount + 1) then
+                -- Don't render deep screens when unmountOnBlur is on
+                goto continue
+            end
             local screenConfig = nil
             for _, s in ipairs(screens) do
                 if s.name == route.name then
@@ -193,6 +201,7 @@ local function createStackNavigator()
                     })
                 )
             end
+            ::continue::
         end
 
         return ce("View", { style = props.style or {} }, screenElements)

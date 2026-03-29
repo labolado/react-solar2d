@@ -1,47 +1,17 @@
 # React-Solar2D 架构修复 TODO
 
-> 计划执行时间：2026-03-29 凌晨 3:00+
 > 修复完成后：让 kimi 再做一次深度 review，coordinator 验证结果
 
-## 🔴 P0 — 严重 Bug
+## 🔴 P0 — 严重 Bug ✅ 全部完成
 
-### 1. 修复 `Reconciler.unmount` 清理路径
-- **文件**: `react/Reconciler.lua:347-355`
-- **问题**: `unmount` 直接 `removeSelf()` display objects，不走 fiber 清理路径，导致 useEffect cleanup、ref cleanup、useSyncExternalStore unsubscribe 全部丢失
-- **修复**: 让 unmount 走正常的 reconciler 路径——将 root fiber 标记为 DELETION，调用 `commitDeletion`，确保所有 effect cleanup 和 ref 清理被执行
-- [ ] 修复代码
-- [ ] 补充测试（验证 unmount 后 useEffect cleanup 被调用）
+### 1. ✅ `Reconciler.unmount` 清理路径
+### 2. ✅ `commitDeletion` hooks cleanup
 
-### 2. 修复 `commitDeletion` 不清理 useEffect cleanup
-- **文件**: `react/Reconciler.lua:221-246`
-- **问题**: `commitDeletion` 只清理 `_storeCleanups` 和 `ref`，不遍历 `fiber._hooks` 执行 useEffect 的 cleanup 函数
-- **修复**: 在 commitDeletion 中遍历 function fiber 的 `_hooks`，对所有带 `cleanup` 字段的 hook 执行清理
-- [ ] 修复代码
-- [ ] 补充测试（验证组件删除后 useEffect cleanup 被调用）
+## 🟡 P1 — 中等问题（3/6 完成）
 
-## 🟡 P1 — 中等问题
-
-### 3. Fragment reconciler 支持
-- **文件**: `react/Reconciler.lua` performUnitOfWork
-- **问题**: `React.Fragment = "$$react.fragment"` 声明了但 reconciler 无处理，当 host component 创建了多余 group
-- **修复**: 在 performUnitOfWork 中增加 Fragment 分支，直接 `reconcileChildren(fiber, fiber.props.children)`
-- [ ] 修复代码
-- [ ] 补充测试
-
-### 4. 组件级 React.memo 支持
-- **文件**: `react/Reconciler.lua` reconcileChildren + `react/init.lua`
-- **问题**: 无 memo 支持，每次 state 更新全树遍历
-- **修复**: 实现 `React.memo(component, areEqual)`，在 reconcileChildren 中对 memo 组件做 props 浅比较，未变化时跳过子树
-- [ ] 实现 React.memo
-- [ ] 实现 shallowEqual
-- [ ] 补充测试
-
-### 5. updateInstance 动态属性缺失
-- **文件**: `renderer/HostConfig.lua:839+`
-- **问题**: backgroundColor 从无到有、borderRadius 变化等不会动态创建/重建 _bg
-- **修复**: updateInstance 中检测 _bg 需要创建/重建的情况
-- [ ] 修复代码
-- [ ] 补充测试
+### 3. ✅ Fragment reconciler 支持
+### 4. ✅ React.memo
+### 5. ✅ updateInstance 动态属性
 
 ### 6. StackNavigator 内存优化
 - **文件**: `navigation/StackNavigator.lua`
