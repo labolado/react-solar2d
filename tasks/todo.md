@@ -75,6 +75,14 @@
 
 ---
 
+### 6.5 Text auto-wrap in ScrollView
+- **文件**: `renderer/init.lua` buildLayoutTree + applyLayout reflow
+- **问题**: ScrollView 内容区域在 Yoga 里没有宽度约束，导致子 Text 节点可以无限扩展，reflow 永远不触发
+- **根因**: buildLayoutTree 给 Text 设 `node:setWidth(textObj.width)`，Yoga 允许父容器扩展到该宽度，所以 `w == textObj.width`，条件 `textObj.width > w + 1` 为 false
+- **需要**: 让 ScrollView 的 content 区域在 cross-axis 上约束子节点宽度，或在 buildLayoutTree 中不给 Text 设固定 width 而是用 measure function
+- [ ] 调研 Yoga 的 measure function 机制
+- [ ] 实现
+
 ## 🟢 P2 — 新功能
 
 ### 11. WebView 组件
