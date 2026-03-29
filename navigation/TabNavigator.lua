@@ -83,6 +83,11 @@ local function createBottomTabNavigator()
         end
 
         -- Tab bar
+        local TAB_BAR_H = tabBarOptions.height or 56
+        local tabBarBg = tabBarOptions.backgroundColor or "#FFFFFF"
+        local contentW = display and display.contentWidth or 320
+        local tabW = math.floor(contentW / #screens)
+
         local tabItems = {}
         for i, screen in ipairs(screens) do
             local isActive = (state.routes[state.index].name == screen.name)
@@ -99,10 +104,10 @@ local function createBottomTabNavigator()
                     navigation.navigate(screen.name)
                 end,
                 style = {
-                    flex = 1,
+                    width = tabW,
                     alignItems = "center",
                     justifyContent = "center",
-                    height = 56,
+                    height = TAB_BAR_H,
                 },
             },
                 ce("Text", { style = { color = tint, fontSize = tabBarOptions.iconSize or 16 } }, icon),
@@ -111,10 +116,6 @@ local function createBottomTabNavigator()
                     or nil
             )
         end
-
-        local TAB_BAR_H = tabBarOptions.height or 56
-        local tabBarBg = tabBarOptions.backgroundColor or "#FFFFFF"
-        local contentW = display and display.contentWidth or 320
         local contentH = display and display.contentHeight or 480
         local tabBar = ce("View", {
             key = "__tabbar",
