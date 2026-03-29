@@ -406,12 +406,12 @@ function M.createInstance(elementType, props)
     end
 
     if elementType == "View" then
+        local vw = type(style.width) == "number" and style.width or 0
+        local vh = type(style.height) == "number" and style.height or 0
+
         local group = display.newGroup()
         group.anchorX, group.anchorY = 0, 0
         group.anchorChildren = true
-
-        local vw = type(style.width) == "number" and style.width or 0
-        local vh = type(style.height) == "number" and style.height or 0
 
         -- Background rect: create if has background/border, OR if has explicit size (for hit testing)
         if style.backgroundColor or style.borderWidth or style.borderColor or (vw > 0 and vh > 0) then
