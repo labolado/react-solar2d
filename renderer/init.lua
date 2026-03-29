@@ -182,10 +182,11 @@ local function applyLayout(yogaNode, fiber)
             end
         end
         -- Text wrapping: rebuild text if it overflows its parent's width
-        if fiber.type == "Text" and fiber.stateNode._textObj then
+        -- Only for long text that was flagged in buildLayoutTree (has _naturalTextWidth)
+        if fiber.type == "Text" and fiber.stateNode._textObj and fiber.stateNode._naturalTextWidth then
             local textObj = fiber.stateNode._textObj
             local textStyle = (fiber.props and fiber.props.style) or {}
-            local naturalW = fiber.stateNode._naturalTextWidth or textObj.width
+            local naturalW = fiber.stateNode._naturalTextWidth
             -- Compute wrap width: walk up the fiber tree accumulating padding/margin
             -- from all host parents to find the actual available content width
             local wrapW = w
