@@ -27,6 +27,15 @@ React.useSyncExternalStore = Hooks.useSyncExternalStore
 -- Fragment (represented as special type)
 React.Fragment = "$$react.fragment"
 
+-- memo: skip re-render if props haven't changed
+function React.memo(component, areEqual)
+    return {
+        _isMemo = true,
+        component = component,
+        areEqual = areEqual,  -- optional custom comparison
+    }
+end
+
 -- Internal (for reconciler)
 React._Hooks = Hooks
 React._ReactElement = ReactElement

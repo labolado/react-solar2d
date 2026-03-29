@@ -141,6 +141,53 @@ T.describe("Reconciler", function()
     end)
 end)
 
+T.describe("React.memo", function()
+    T.it("skips re-render when props are unchanged", function()
+        local container = testHostConfig.createInstance("View", {})
+        local reconciler = Reconciler.create(testHostConfig)
+        local renderCount = 0
+
+        local MemoChild = React.memo(function(props)
+            renderCount = renderCount + 1
+            return React.createElement("View", { value = props.value })
+        end)
+
+        local function App()
+            return React.createElement(MemoChild, { value = 42 })
+        end
+
+        reconciler.render(React.createElement(App), container)
+        T.expect(renderCount).toBe(1)
+
+        -- Re-render with same props
+        reconciler.render(React.createElement(App), container)
+        T.expect(renderCount).toBe(1)  -- should NOT re-render
+    end)
+
+    T.it("re-renders when props change", function()
+        local container = testHostConfig.createInstance("View", {})
+        local reconciler = Reconciler.create(testHostConfig)
+        local renderCount = 0
+        local val = 1
+
+        local MemoChild = React.memo(function(props)
+            renderCount = renderCount + 1
+            return React.createElement("View", { value = props.value })
+        end)
+
+        local function App()
+            return React.createElement(MemoChild, { value = val })
+        end
+
+        reconciler.render(React.createElement(App), container)
+        T.expect(renderCount).toBe(1)
+
+        val = 2
+        reconciler.render(React.createElement(App), container)
+        T.expect(renderCount).toBe(2)  -- should re-render
+    end)
+end)
+
 T.describe("Fragment", function()
     T.it("renders Fragment children without extra host node", function()
         local container = testHostConfig.createInstance("View", {})

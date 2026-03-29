@@ -7,6 +7,19 @@ local M = {}
 
 local FRAGMENT_TYPE = "$$react.fragment"
 
+-- Shallow equality check for memo props comparison
+local function shallowEqual(a, b)
+    if a == b then return true end
+    if type(a) ~= "table" or type(b) ~= "table" then return false end
+    for k, v in pairs(a) do
+        if k ~= "children" and b[k] ~= v then return false end
+    end
+    for k in pairs(b) do
+        if k ~= "children" and a[k] == nil then return false end
+    end
+    return true
+end
+
 -- Check if a value is callable (function or table with __call metamethod)
 local function isCallable(v)
     if type(v) == "function" then return true end
@@ -109,6 +122,8 @@ function M.create(hostConfig)
                         tag = "function"  -- forwardRef handled in performUnitOfWork
                     elseif elementType == FRAGMENT_TYPE then
                         tag = "function"  -- Fragment: pass children through
+                    elseif type(elementType) == "table" and elementType._isMemo then
+                        tag = "function"  -- memo component
                     else
                         tag = "host"
                     end
@@ -129,6 +144,8 @@ function M.create(hostConfig)
                         tag = "function"  -- forwardRef handled in performUnitOfWork
                     elseif elementType == FRAGMENT_TYPE then
                         tag = "function"  -- Fragment: pass children through
+                    elseif type(elementType) == "table" and elementType._isMemo then
+                        tag = "function"  -- memo component
                     else
                         tag = "host"
                     end
@@ -197,6 +214,33 @@ function M.create(hostConfig)
                 -- Fragment — just pass children through, no host node created
                 Hooks._finishHooks()
                 reconcileChildren(fiber, fiber.props.children)
+            elseif type(elementType) == "table" and elementType._isMemo then
+                -- React.memo — skip re-render if props haven't changed
+                local oldProps = fiber.alternate and fiber.alternate.props
+                local equal = false
+                if oldProps then
+                    if elementType.areEqual then
+                        equal = elementType.areEqual(oldProps, fiber.props)
+                    else
+                        equal = shallowEqual(oldProps, fiber.props)
+                    end
+                end
+                if equal and fiber.alternate then
+                    -- Props unchanged — reuse old children
+                    Hooks._finishHooks()
+                    fiber.child = fiber.alternate.child
+                    -- Re-parent old children to new fiber
+                    local c = fiber.child
+                    while c do
+                        c.parent = fiber
+                        c = c.sibling
+                    end
+                else
+                    -- Props changed — re-render the wrapped component
+                    local children = elementType.component(fiber.props)
+                    Hooks._finishHooks()
+                    reconcileChildren(fiber, children)
+                end
             else
                 local children = fiber.type(fiber.props)
                 Hooks._finishHooks()
