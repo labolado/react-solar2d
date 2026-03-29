@@ -49,7 +49,7 @@ local CATEGORIES = {
     { key = "Layout",    label = "布局", screens = safeRequire("kitchen_sink.LayoutScreens") },
     { key = "Advanced",  label = "高级", screens = safeRequire("kitchen_sink.AdvancedScreens") },
     { key = "Interop",   label = "互操", screens = safeRequire("kitchen_sink.InteropScreens") },
-    { key = "Canvas",    label = "Canvas", screens = safeRequire("kitchen_sink.CanvasScreens") },
+    { key = "Canvas",    label = "画布", screens = safeRequire("kitchen_sink.CanvasScreens") },
 }
 
 -- ListScreen: renders a card list for the selected category
