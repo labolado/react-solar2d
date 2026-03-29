@@ -61,13 +61,20 @@ local function buildLayoutTree(fiber)
         node:setHeight(40)
     end
 
-    -- ScrollView: override overflow so Yoga doesn't constrain content to bounds
-    -- Without this, children are clipped to ScrollView's width/height in Yoga,
-    -- preventing horizontal ScrollView from having wider content
-    if fiber.type == "ScrollView" and not style.overflow then
-        -- Rebuild node with overflow = "scroll" so applyStyle handles it
+    -- ScrollView: let content extend beyond container in scroll direction
+    -- Yoga normally constrains children to the container's width/height.
+    -- For ScrollView we need children to overflow so we can measure total
+    -- content size and enable scrolling. Set a very large dimension in the
+    -- scroll direction so Yoga lays out children naturally.
+    if fiber.type == "ScrollView" then
         local scrollStyle = {}
         for k, v in pairs(style) do scrollStyle[k] = v end
+        local isHorizontal = fiber.props and fiber.props.horizontal
+        if isHorizontal then
+            scrollStyle.width = 99999  -- don't constrain horizontal content
+        else
+            scrollStyle.height = 99999  -- don't constrain vertical content
+        end
         scrollStyle.overflow = "scroll"
         node = Layout.newNode(scrollStyle)
     end
@@ -92,8 +99,20 @@ local function applyLayout(yogaNode, fiber)
 
     if fiber.stateNode then
         local l, t, w, h = yogaNode:getLayout()
-        -- Check for absolute positioning with explicit coordinates
         local style = (fiber.props and fiber.props.style) or {}
+
+        -- ScrollView: Yoga was given a large height/width for content overflow.
+        -- Restore actual dimensions for display positioning.
+        if fiber.type == "ScrollView" then
+            local isHorizontal = fiber.props and fiber.props.horizontal
+            if isHorizontal then
+                w = style.width or (display.contentWidth or 320)
+            else
+                h = style.height or (display.contentHeight or 480)
+            end
+        end
+
+        -- Check for absolute positioning with explicit coordinates
         if style.position == "absolute" then
             -- For absolute positioning, use specified top/left/right/bottom directly
             -- This allows Modal to position itself at screen origin
