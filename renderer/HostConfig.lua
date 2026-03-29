@@ -800,14 +800,27 @@ function M.appendChild(parent, child)
     end
 end
 
+-- Recursively clean up native fields in a display group tree
+-- native.* objects are NOT in the GL group hierarchy, so removeSelf() on a
+-- parent group won't remove them. We must walk the tree and removeSelf each one.
+local function cleanupNativeFields(node)
+    if node._inputField and node._inputField.removeSelf then
+        node._inputField:removeSelf()
+        node._inputField = nil
+    end
+    -- Walk children (display groups have integer-indexed children)
+    if node.numChildren then
+        for i = 1, node.numChildren do
+            local child = node[i]
+            if child then cleanupNativeFields(child) end
+        end
+    end
+end
+
 function M.removeChild(parent, child)
     if parent._invalidateContentSize then parent._invalidateContentSize() end
     unsubscribeAnimatedValues(child)
-    -- Clean up native text field (not in group hierarchy, managed separately)
-    if child._inputField and child._inputField.removeSelf then
-        child._inputField:removeSelf()
-        child._inputField = nil
-    end
+    cleanupNativeFields(child)
     child:removeSelf()
 end
 
