@@ -243,20 +243,25 @@ local function KitchenSinkApp()
         }, cat.label))
     end
 
-    -- Narrow mode: wrap category bar (no ScrollView to avoid scroll reset on re-render)
-    local narrowCategoryBar = ce("View", {
+    -- Narrow mode: horizontal scrollable category bar
+    local narrowCategoryBar = ce(RN.ScrollView, {
+        horizontal = true,
+        contentInset = { right = 40 },
         style = {
-            flexDirection = "row",
-            flexWrap = "wrap",
             backgroundColor = T.surface,
-            paddingHorizontal = 6,
-            paddingTop = SAFE_TOP + 4,
-            paddingBottom = 4,
+            paddingTop = SAFE_TOP + 8,
+            paddingBottom = 8,
             borderBottomWidth = 1,
             borderColor = T.border,
             zIndex = 100,
+            height = SAFE_TOP + 50,
         },
-    }, narrowCatButtons)
+    }, ce("View", {
+        style = {
+            flexDirection = "row",
+            paddingHorizontal = T.pad,
+        },
+    }, narrowCatButtons))
 
     -- Wide mode: left sidebar with vertical category list
     local wideSidebar = ce("View", {
