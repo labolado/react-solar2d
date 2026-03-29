@@ -96,7 +96,7 @@ local function ListScreen(props)
     end
     return ce("ScrollView", {
         style = { flex = 1, backgroundColor = T.bg },
-        contentContainerStyle = { padding = T.pad, paddingBottom = 70 },
+        contentInset = { bottom = 70 },
     }, items)
 end
 

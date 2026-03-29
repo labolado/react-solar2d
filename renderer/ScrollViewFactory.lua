@@ -6,6 +6,11 @@ local function createScrollView(props, style, applyCommonStyle)
     local h = style.height or (display.contentHeight or 480)
     local horizontal = props.horizontal or false
 
+    -- Content inset: extra scroll range so content clears fixed UI (tab bars etc.)
+    local contentInset = props.contentInset or {}
+    local insetBottom = contentInset.bottom or 0
+    local insetRight = contentInset.right or 0
+
     local clipContainer = display.newGroup()
     clipContainer.anchorX, clipContainer.anchorY = 0, 0
 
@@ -228,7 +233,7 @@ local function createScrollView(props, style, applyCommonStyle)
                 if horizontal then
                     local ddx = event.x - startX
                     local newScrollX = startScrollX + ddx
-                    local maxScroll = math.max(0, clipContainer._contentW - w)
+                    local maxScroll = math.max(0, clipContainer._contentW - w + insetRight)
                     if newScrollX > 0 then
                         newScrollX = newScrollX * 0.4
                     elseif newScrollX < -maxScroll then
@@ -239,7 +244,7 @@ local function createScrollView(props, style, applyCommonStyle)
                 else
                     local ddy = event.y - startY
                     local newScrollY = startScrollY + ddy
-                    local maxScroll = math.max(0, clipContainer._contentH - h)
+                    local maxScroll = math.max(0, clipContainer._contentH - h + insetBottom)
                     if newScrollY > 0 then
                         clipContainer._scrollY = newScrollY * 0.4
                         contentGroup.y = clipContainer._scrollY
@@ -336,7 +341,7 @@ local function createScrollView(props, style, applyCommonStyle)
 
             -- Snap back from overscroll
             if not horizontal then
-                local maxScroll = math.max(0, clipContainer._contentH - h)
+                local maxScroll = math.max(0, clipContainer._contentH - h + insetBottom)
                 if clipContainer._pullingToRefresh and props.onRefresh then
                     clipContainer._refreshing = true
                     clipContainer._scrollY = refreshOffset
@@ -350,7 +355,7 @@ local function createScrollView(props, style, applyCommonStyle)
                     contentGroup.y = -maxScroll
                 end
             else
-                local maxScroll = math.max(0, clipContainer._contentW - w)
+                local maxScroll = math.max(0, clipContainer._contentW - w + insetRight)
                 if clipContainer._scrollX > 0 then
                     clipContainer._scrollX = 0
                     contentGroup.x = 0
@@ -373,14 +378,14 @@ local function createScrollView(props, style, applyCommonStyle)
             recalcContentSize()
             local scrollSpeed = 20
             if horizontal then
-                local maxScroll = math.max(0, clipContainer._contentW - w)
+                local maxScroll = math.max(0, clipContainer._contentW - w + insetRight)
                 local newScrollX = clipContainer._scrollX - event.scrollX * scrollSpeed
                 if newScrollX > 0 then newScrollX = 0 end
                 if newScrollX < -maxScroll then newScrollX = -maxScroll end
                 clipContainer._scrollX = newScrollX
                 contentGroup.x = newScrollX
             else
-                local maxScroll = math.max(0, clipContainer._contentH - h)
+                local maxScroll = math.max(0, clipContainer._contentH - h + insetBottom)
                 local newScrollY = clipContainer._scrollY + event.scrollY * scrollSpeed
                 if newScrollY > 0 then newScrollY = 0 end
                 if newScrollY < -maxScroll then newScrollY = -maxScroll end

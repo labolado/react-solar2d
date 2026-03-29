@@ -30,8 +30,9 @@ function T.DemoPage(props)
     local W = display.contentWidth - 24  -- subtract KitchenSink paddingHorizontal
     return ce("ScrollView", {
         style = { flex = 1, backgroundColor = T.bg },
+        contentInset = { bottom = 70 },
     }, ce("View", {
-        style = { padding = T.pad, paddingBottom = 70, width = W },
+        style = { padding = T.pad, width = W },
     }, props.children))
 end
 
