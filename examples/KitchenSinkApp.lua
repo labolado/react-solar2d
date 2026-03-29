@@ -298,7 +298,7 @@ local function KitchenSinkApp()
 
         content = ce("View", { style = { flex = 1, backgroundColor = T.bg } },
             backBtn,
-            ce("View", { style = { flex = 1, paddingHorizontal = 12, paddingBottom = 60 } },
+            ce("View", { style = { flex = 1, paddingHorizontal = 12, paddingBottom = 0 } },
                 ce(activeDemo.component, {
                     navigation = { goBack = function() setActiveDemo(nil) end },
                     route = { name = activeDemo.name, params = {} },
@@ -310,7 +310,7 @@ local function KitchenSinkApp()
         )
     else
         local cat = CATEGORIES[activeCategory]
-        content = ce("View", { style = { flex = 1, paddingBottom = 60 } },
+        content = ce("View", { style = { flex = 1, paddingBottom = 0 } },
             ce(ListScreen, {
                 screens = cat and cat.screens or {},
                 onSelect = function(s)

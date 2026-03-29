@@ -120,8 +120,6 @@ local function createBottomTabNavigator()
         local tabBar = ce("View", {
             key = "__tabbar",
             style = {
-                position = "absolute",
-                bottom = 0, left = 0,
                 flexDirection = "row",
                 height = TAB_BAR_H,
                 backgroundColor = tabBarBg,
@@ -129,15 +127,12 @@ local function createBottomTabNavigator()
             },
         }, tabItems)
 
-        -- Layout: content area above tab bar + tab bar pinned at bottom
+        -- Layout: content fills space above tab bar (flex layout, not absolute)
         local contentArea = ce("View", {
             key = "__content",
             style = {
-                position = "absolute",
-                top = 0, left = 0,
+                flex = 1,
                 width = contentW,
-                height = contentH - TAB_BAR_H,
-                overflow = "hidden",
             },
         }, screenElements)
 
