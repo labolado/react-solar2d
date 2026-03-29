@@ -37,16 +37,20 @@ local function buildLayoutTree(fiber)
     local node = Layout.newNode(style)
 
     -- Text elements: measure display object and feed intrinsic dimensions to Yoga
-    -- Don't set width — let Yoga's alignItems:stretch (default) constrain Text
-    -- to parent width. The reflow pass will detect when the text's natural width
-    -- exceeds the Yoga-computed width and rebuild with word wrapping.
-    -- Store natural width for reflow comparison.
+    -- Short text: set width so Yoga gives it its natural size (labels, buttons)
+    -- Long text (wider than screen): don't set width, let stretch + reflow wrap it
     if fiber.type == "Text" and fiber.stateNode and fiber.stateNode._textObj then
         local textObj = fiber.stateNode._textObj
-        if style.width then
-            node:setWidth(style.width)
+        local screenW = display.contentWidth
+        if not style.width then
+            if textObj.width <= screenW * 0.9 then
+                -- Short text: use natural width
+                node:setWidth(textObj.width)
+            else
+                -- Long text: don't set width, reflow will wrap it
+                fiber.stateNode._naturalTextWidth = textObj.width
+            end
         end
-        fiber.stateNode._naturalTextWidth = textObj.width
         if not style.height then
             node:setHeight(textObj.height)
         end
