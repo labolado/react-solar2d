@@ -263,6 +263,14 @@ local function applyLayout(yogaNode, fiber)
         fiber.stateNode._contentH = maxBottom
         fiber.stateNode._contentW = maxRight
     end
+
+    -- Re-apply zIndex after all children are laid out
+    -- (toFront at createInstance time is too early — siblings don't exist yet)
+    if fiber.stateNode and fiber.stateNode._zIndex and fiber.stateNode._zIndex > 0 then
+        if fiber.stateNode.toFront then
+            fiber.stateNode:toFront()
+        end
+    end
 end
 
 local function runLayoutPass(rootFiber, width, height)
