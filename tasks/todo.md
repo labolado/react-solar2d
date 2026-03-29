@@ -75,7 +75,48 @@
 
 ---
 
-### 6.5 Text auto-wrap in ScrollView
+### 6.5 Host Component Registry（第三方库支持）
+- **文件**: 新建 `renderer/HostRegistry.lua` + 改造 `renderer/HostConfig.lua`
+- **问题**: 当前所有 host 组件逻辑集中在 HostConfig.lua（979行），第三方库无法在不修改核心代码的情况下注册新组件
+- **目标**: 提供 `registerComponent` API，让第三方库像 RN 的 `requireNativeComponent` 一样注册自定义 host 类型
+- **API 设计**:
+  ```lua
+  local Registry = require("renderer.HostRegistry")
+
+  -- 第三方库注册
+  Registry.register("LottieView", {
+      create = function(props)
+          local group = display.newGroup()
+          -- 初始化
+          return group
+      end,
+      update = function(instance, oldProps, newProps)
+          -- 更新
+      end,
+      remove = function(parent, instance)
+          -- 清理
+          instance:removeSelf()
+      end,
+  })
+
+  -- 用户使用
+  local LottieView = require("lottie-solar2d")
+  ce("LottieView", { source = "anim.json", autoPlay = true })
+  -- 或者导出组件字符串
+  ce(LottieView.Component, { ... })
+  ```
+- **实现要点**:
+  - HostConfig.createInstance 先查 Registry，有则委托，无则走内置逻辑
+  - HostConfig.updateInstance 同理
+  - HostConfig.removeChild 支持自定义 remove 回调
+  - 内置组件（View/Text/Image/ScrollView 等）也可迁移到 Registry，逐步瘦身 HostConfig
+- [ ] 设计 Registry API
+- [ ] 实现 HostRegistry.lua
+- [ ] 改造 HostConfig 查询 Registry
+- [ ] 迁移 1-2 个内置组件验证
+- [ ] 文档：如何编写第三方组件库
+
+### 6.6 Text auto-wrap in ScrollView
 - **文件**: `renderer/init.lua` buildLayoutTree + applyLayout reflow
 - **问题**: ScrollView 内容区域在 Yoga 里没有宽度约束，导致子 Text 节点可以无限扩展，reflow 永远不触发
 - **根因**: buildLayoutTree 给 Text 设 `node:setWidth(textObj.width)`，Yoga 允许父容器扩展到该宽度，所以 `w == textObj.width`，条件 `textObj.width > w + 1` 为 false
