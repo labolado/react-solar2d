@@ -141,4 +141,109 @@ T.describe("Reconciler", function()
     end)
 end)
 
+T.describe("Fragment", function()
+    T.it("renders Fragment children without extra host node", function()
+        local container = testHostConfig.createInstance("View", {})
+        local reconciler = Reconciler.create(testHostConfig)
+
+        local function App()
+            return React.createElement("View", {},
+                React.createElement(React.Fragment, {},
+                    React.createElement("View", { key = "a" }),
+                    React.createElement("View", { key = "b" })
+                )
+            )
+        end
+
+        reconciler.render(React.createElement(App), container)
+        -- Container has 1 child (the outer View)
+        T.expect(container.numChildren).toBe(1)
+        -- The outer View should have 2 children (a, b) — no Fragment wrapper
+        local outer = container[1]
+        T.expect(outer.numChildren).toBe(2)
+    end)
+end)
+
+T.describe("cleanup on deletion", function()
+    T.it("runs useEffect cleanup when component is deleted", function()
+        local container = testHostConfig.createInstance("View", {})
+        local reconciler = Reconciler.create(testHostConfig)
+        local cleanupCalled = false
+        local show = true
+
+        local function Child()
+            React.useEffect(function()
+                return function()
+                    cleanupCalled = true
+                end
+            end, {})
+            return React.createElement("View", {})
+        end
+
+        local function App()
+            if show then
+                return React.createElement(Child)
+            else
+                return React.createElement("View", {})
+            end
+        end
+
+        reconciler.render(React.createElement(App), container)
+        reconciler.flushUpdates()
+        T.expect(cleanupCalled).toBe(false)
+
+        -- Remove Child by toggling show
+        show = false
+        reconciler.render(React.createElement(App), container)
+        reconciler.flushUpdates()
+        T.expect(cleanupCalled).toBe(true)
+    end)
+
+    T.it("runs useEffect cleanup on unmount", function()
+        local container = testHostConfig.createInstance("View", {})
+        local reconciler = Reconciler.create(testHostConfig)
+        local cleanupCalled = false
+
+        local function App()
+            React.useEffect(function()
+                return function()
+                    cleanupCalled = true
+                end
+            end, {})
+            return React.createElement("View", {})
+        end
+
+        reconciler.render(React.createElement(App), container)
+        reconciler.flushUpdates()
+        T.expect(cleanupCalled).toBe(false)
+
+        reconciler.unmount(container)
+        T.expect(cleanupCalled).toBe(true)
+    end)
+
+    T.it("cleans up ref on deletion", function()
+        local container = testHostConfig.createInstance("View", {})
+        local reconciler = Reconciler.create(testHostConfig)
+        local myRef = { current = nil }
+        local show = true
+
+        local function App()
+            if show then
+                return React.createElement("View", { key = "refview", ref = myRef })
+            else
+                return React.createElement("Text", {}, "no ref")
+            end
+        end
+
+        reconciler.render(React.createElement(App), container)
+        reconciler.flushUpdates()
+        T.expect(myRef.current).toBeTruthy()
+
+        show = false
+        reconciler.render(React.createElement(App), container)
+        reconciler.flushUpdates()
+        T.expect(myRef.current == nil).toBe(true)
+    end)
+end)
+
 T.summary()

@@ -5,6 +5,8 @@ local Hooks = require("react.Hooks")
 
 local M = {}
 
+local FRAGMENT_TYPE = "$$react.fragment"
+
 -- Check if a value is callable (function or table with __call metamethod)
 local function isCallable(v)
     if type(v) == "function" then return true end
@@ -105,6 +107,8 @@ function M.create(hostConfig)
                         tag = "function"  -- Provider handled in performUnitOfWork
                     elseif type(elementType) == "table" and elementType._isForwardRef then
                         tag = "function"  -- forwardRef handled in performUnitOfWork
+                    elseif elementType == FRAGMENT_TYPE then
+                        tag = "function"  -- Fragment: pass children through
                     else
                         tag = "host"
                     end
@@ -123,6 +127,8 @@ function M.create(hostConfig)
                         tag = "function"  -- Provider handled in performUnitOfWork
                     elseif type(elementType) == "table" and elementType._isForwardRef then
                         tag = "function"  -- forwardRef handled in performUnitOfWork
+                    elseif elementType == FRAGMENT_TYPE then
+                        tag = "function"  -- Fragment: pass children through
                     else
                         tag = "host"
                     end
@@ -187,6 +193,10 @@ function M.create(hostConfig)
                 local children = elementType.render(fiber.props, fiber.ref)
                 Hooks._finishHooks()
                 reconcileChildren(fiber, children)
+            elseif elementType == FRAGMENT_TYPE then
+                -- Fragment — just pass children through, no host node created
+                Hooks._finishHooks()
+                reconcileChildren(fiber, fiber.props.children)
             else
                 local children = fiber.type(fiber.props)
                 Hooks._finishHooks()
@@ -218,21 +228,50 @@ function M.create(hostConfig)
         end
     end
 
-    local function commitDeletion(fiber, parentInstance)
-        -- Cleanup store subscriptions first
+    -- Clean up a single fiber's hooks (useEffect cleanup) and subscriptions
+    local function cleanupFiber(fiber)
+        -- useEffect / useLayoutEffect cleanup
+        if fiber._hooks then
+            for _, hook in ipairs(fiber._hooks) do
+                if type(hook) == "table" and type(hook.cleanup) == "function" then
+                    hook.cleanup()
+                    hook.cleanup = nil
+                end
+            end
+        end
+        -- useSyncExternalStore cleanup
         if fiber._storeCleanups then
             for _, cleanup in pairs(fiber._storeCleanups) do
                 if type(cleanup) == "function" then cleanup() end
             end
             fiber._storeCleanups = nil
         end
-        
-        -- Cleanup ref
-        if fiber.ref and type(fiber.ref) == "table" then
-            fiber.ref.current = nil
+        -- ref cleanup
+        if fiber.ref then
+            if type(fiber.ref) == "function" then
+                fiber.ref(nil)
+            elseif type(fiber.ref) == "table" then
+                fiber.ref.current = nil
+            end
         end
-        
+    end
+
+    local function commitDeletion(fiber, parentInstance)
+        -- Clean up this fiber's hooks, subscriptions, and refs
+        cleanupFiber(fiber)
+
         if fiber.tag == "host" or fiber.tag == "text" then
+            -- Before removing, recursively clean up all descendant fibers
+            local function cleanupDescendants(f)
+                local child = f.child
+                while child do
+                    cleanupFiber(child)
+                    cleanupDescendants(child)
+                    child = child.sibling
+                end
+            end
+            cleanupDescendants(fiber)
+
             if fiber.stateNode then
                 hostConfig.removeChild(parentInstance, fiber.stateNode)
             end
@@ -346,6 +385,16 @@ function M.create(hostConfig)
 
     function reconciler.unmount(container)
         if rootFiber then
+            -- Walk the entire fiber tree and clean up hooks, refs, subscriptions
+            local function unmountFiber(fiber)
+                if not fiber then return end
+                cleanupFiber(fiber)
+                unmountFiber(fiber.child)
+                unmountFiber(fiber.sibling)
+            end
+            unmountFiber(rootFiber)
+
+            -- Remove display objects
             for i = container.numChildren, 1, -1 do
                 local child = container[i]
                 if child then child:removeSelf() end
