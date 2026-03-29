@@ -136,72 +136,67 @@ local function createStackNavigator()
         local screenElements = {}
         for i, route in ipairs(state.routes) do
             -- Skip screens beyond keepCount from the top
-            if i < (#state.routes - keepCount + 1) then
-                -- Don't render deep screens when unmountOnBlur is on
-                goto continue
-            end
-            local screenConfig = nil
-            for _, s in ipairs(screens) do
-                if s.name == route.name then
-                    screenConfig = s
-                    break
-                end
-            end
-
-            if screenConfig then
-                local isActive = (i == state.index)
-                local routeObj = {
-                    name = route.name,
-                    key = route.key,
-                    params = route.params or {},
-                }
-
-                local screenNav = {}
-                for k, v in pairs(navigation) do screenNav[k] = v end
-                screenNav.isFocused = function() return isActive end
-
-                -- Resolve options (table or function)
-                local options = screenConfig.options or {}
-                if type(options) == "function" then
-                    options = options({ route = routeObj, navigation = screenNav })
-                end
-                local mergedOptions = {}
-                if props.screenOptions then
-                    for k, v in pairs(props.screenOptions) do mergedOptions[k] = v end
-                end
-                for k, v in pairs(options) do mergedOptions[k] = v end
-
-                local screenStyle = {
-                    display = isActive and "flex" or "none",
-                }
-
-                -- Register Screen-level listeners
-                if screenConfig.listeners then
-                    for event, fn in pairs(screenConfig.listeners) do
-                        if not listenersRef.current[route.key] then
-                            listenersRef.current[route.key] = {}
-                        end
-                        listenersRef.current[route.key][event] = fn
+            if i >= (#state.routes - keepCount + 1) then
+                local screenConfig = nil
+                for _, s in ipairs(screens) do
+                    if s.name == route.name then
+                        screenConfig = s
+                        break
                     end
                 end
 
-                screenElements[#screenElements + 1] = ce("View", {
-                    key = route.key,
-                    style = screenStyle,
-                },
-                    ce(Header, {
-                        options = mergedOptions,
-                        navigation = screenNav,
-                        route = routeObj,
-                        canGoBack = i > 1,
-                    }),
-                    ce(screenConfig.component, {
-                        navigation = screenNav,
-                        route = routeObj,
-                    })
-                )
+                if screenConfig then
+                    local isActive = (i == state.index)
+                    local routeObj = {
+                        name = route.name,
+                        key = route.key,
+                        params = route.params or {},
+                    }
+
+                    local screenNav = {}
+                    for k, v in pairs(navigation) do screenNav[k] = v end
+                    screenNav.isFocused = function() return isActive end
+
+                    local options = screenConfig.options or {}
+                    if type(options) == "function" then
+                        options = options({ route = routeObj, navigation = screenNav })
+                    end
+                    local mergedOptions = {}
+                    if props.screenOptions then
+                        for k, v in pairs(props.screenOptions) do mergedOptions[k] = v end
+                    end
+                    for k, v in pairs(options) do mergedOptions[k] = v end
+
+                    local screenStyle = {
+                        display = isActive and "flex" or "none",
+                    }
+
+                    if screenConfig.listeners then
+                        for event, fn in pairs(screenConfig.listeners) do
+                            if not listenersRef.current[route.key] then
+                                listenersRef.current[route.key] = {}
+                            end
+                            listenersRef.current[route.key][event] = fn
+                        end
+                    end
+
+                    screenElements[#screenElements + 1] = ce("View", {
+                        key = route.key,
+                        style = screenStyle,
+                    },
+                        ce(Header, {
+                            options = mergedOptions,
+                            navigation = screenNav,
+                            route = routeObj,
+                            canGoBack = i > 1,
+                        }),
+                        ce(screenConfig.component, {
+                            navigation = screenNav,
+                            route = routeObj,
+                        })
+                    )
+                end
             end
-            ::continue::
         end
 
         return ce("View", { style = props.style or {} }, screenElements)
