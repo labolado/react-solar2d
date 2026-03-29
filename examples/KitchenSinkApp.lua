@@ -1,6 +1,7 @@
 -- KitchenSinkApp.lua
 -- Kitchen Sink: comprehensive component showcase
 -- Uses a top category bar + stack navigator per category (no nested TabNavigator)
+-- Responsive: narrow screen uses top horizontal bar, wide screen uses left sidebar
 local React = require("react")
 local ce = React.createElement
 local useState = React.useState
@@ -18,6 +19,16 @@ if display and display.safeScreenOriginY and display.screenOriginY then
     SAFE_TOP = math.abs(display.safeScreenOriginY - display.screenOriginY)
 end
 if SAFE_TOP < s(40) then SAFE_TOP = s(40) end
+
+-- Responsive breakpoint (will be checked at render time for responsiveness)
+local SIDEBAR_WIDTH = 160
+local function isWideScreen()
+    -- Allow force wide mode via global for testing
+    if _G.FORCE_WIDE_MODE ~= nil then
+        return _G.FORCE_WIDE_MODE
+    end
+    return display and display.contentWidth >= 600
+end
 
 -- Safe require: if a screen module fails, log the error and use empty table
 local function safeRequire(mod)
@@ -177,11 +188,19 @@ local function KitchenSinkApp()
         setOverlayStack({})
     end, {})
 
-    -- Top category bar
-    local catButtons = {}
+    -- Category button press handler (shared between narrow and wide modes)
+    local onCategoryPress = useCallback(function(i, cat)
+        print("[KS] Category tap: " .. cat.label .. " (" .. i .. ")")
+        setActiveCategory(i)
+        setActiveDemo(nil)
+        clearOverlay()
+    end, {})
+
+    -- Build category buttons for narrow mode (horizontal)
+    local narrowCatButtons = {}
     for i, cat in ipairs(CATEGORIES) do
         local isActive = (i == activeCategory)
-        catButtons[#catButtons + 1] = ce(RN.Pressable, {
+        narrowCatButtons[#narrowCatButtons + 1] = ce(RN.Pressable, {
             key = cat.key,
             style = {
                 paddingHorizontal = 8,
@@ -190,12 +209,7 @@ local function KitchenSinkApp()
                 borderRadius = T.radiusSmall,
                 backgroundColor = isActive and T.accent or T.surface,
             },
-            onPress = function()
-                print("[KS] Category tap: " .. cat.label .. " (" .. i .. ")")
-                setActiveCategory(i)
-                setActiveDemo(nil)
-                clearOverlay() -- clear overlay when switching categories
-            end,
+            onPress = function() onCategoryPress(i, cat) end,
         }, ce("Text", {
             style = {
                 fontSize = 13,
@@ -205,7 +219,31 @@ local function KitchenSinkApp()
         }, cat.label))
     end
 
-    local categoryBar = ce(RN.ScrollView, {
+    -- Build category buttons for wide mode (vertical sidebar)
+    local wideCatButtons = {}
+    for i, cat in ipairs(CATEGORIES) do
+        local isActive = (i == activeCategory)
+        wideCatButtons[#wideCatButtons + 1] = ce(RN.Pressable, {
+            key = cat.key,
+            style = {
+                paddingHorizontal = 12,
+                paddingVertical = 10,
+                marginBottom = 2,
+                borderRadius = T.radiusSmall,
+                backgroundColor = isActive and T.accent or "transparent",
+            },
+            onPress = function() onCategoryPress(i, cat) end,
+        }, ce("Text", {
+            style = {
+                fontSize = 14,
+                fontWeight = isActive and "bold" or "normal",
+                color = isActive and "#FFFFFF" or T.textSecondary,
+            },
+        }, cat.label))
+    end
+
+    -- Narrow mode: horizontal scrollable category bar at top
+    local narrowCategoryBar = ce(RN.ScrollView, {
         horizontal = true,
         style = {
             backgroundColor = T.surface,
@@ -220,9 +258,23 @@ local function KitchenSinkApp()
         style = {
             flexDirection = "row",
             paddingHorizontal = T.pad,
-            paddingRight = 40,  -- extra space so last tab isn't cut off by bounce
         },
-    }, catButtons))
+    }, narrowCatButtons))
+
+    -- Wide mode: left sidebar with vertical category list
+    local wideSidebar = ce("View", {
+        style = {
+            width = SIDEBAR_WIDTH,
+            backgroundColor = T.surface,
+            paddingTop = SAFE_TOP + 8,
+            borderRightWidth = 1,
+            borderColor = T.border,
+            zIndex = 100,
+        },
+    }, ce("ScrollView", {
+        style = { flex = 1 },
+        contentContainerStyle = { paddingHorizontal = 8, paddingBottom = 16 },
+    }, wideCatButtons))
 
     -- Content: either demo list or active demo component
     local content
@@ -230,7 +282,7 @@ local function KitchenSinkApp()
         local backBtn = ce(RN.Pressable, {
             style = {
                 flexDirection = "row", alignItems = "center",
-                padding = T.pad,
+                paddingHorizontal = 12, paddingVertical = 8,
                 backgroundColor = T.surface,
                 borderBottomWidth = 1, borderColor = T.border,
             },
@@ -242,15 +294,17 @@ local function KitchenSinkApp()
             style = { fontSize = 14, color = T.accent },
         }, "← " .. activeDemo.name))
 
-        content = ce("View", { style = { flex = 1, backgroundColor = T.bg, paddingHorizontal = 12 } },
+        content = ce("View", { style = { flex = 1, backgroundColor = T.bg } },
             backBtn,
-            ce(activeDemo.component, {
-                navigation = { goBack = function() setActiveDemo(nil) end },
-                route = { name = activeDemo.name, params = {} },
-                pushOverlay = pushOverlay,
-                popOverlay = popOverlay,
-                clearOverlay = clearOverlay,
-            })
+            ce("View", { style = { flex = 1, paddingHorizontal = 12 } },
+                ce(activeDemo.component, {
+                    navigation = { goBack = function() setActiveDemo(nil) end },
+                    route = { name = activeDemo.name, params = {} },
+                    pushOverlay = pushOverlay,
+                    popOverlay = popOverlay,
+                    clearOverlay = clearOverlay,
+                })
+            )
         )
     else
         local cat = CATEGORIES[activeCategory]
@@ -264,15 +318,29 @@ local function KitchenSinkApp()
         )
     end
 
+    -- Main layout structure based on screen width (checked at render time)
+    local IS_WIDE = isWideScreen()
+    local mainContent
+    if IS_WIDE then
+        -- Wide mode: sidebar on left, content on right
+        mainContent = ce("View", { style = { flex = 1, flexDirection = "row" } },
+            wideSidebar,
+            ce("View", { style = { flex = 1 } }, content)
+        )
+    else
+        -- Narrow mode: horizontal bar at top, content below
+        mainContent = ce("View", { style = { flex = 1 } },
+            narrowCategoryBar,
+            content
+        )
+    end
+
     -- Structure:
-    -- 1. Main content (categoryBar + content)
-    -- 2. Global overlay layer (renders ABOVE everything, including categoryBar)
+    -- 1. Main content (responsive layout)
+    -- 2. Global overlay layer (renders ABOVE everything)
     return ce("View", { style = { flex = 1, backgroundColor = T.bg } },
         -- Main content layer
-        ce("View", { style = { flex = 1 } },
-            categoryBar,
-            content
-        ),
+        mainContent,
         -- Global overlay layer - always on top when content exists
         (#overlayStack > 0) and ce("View", {
             style = {
