@@ -259,7 +259,9 @@ end
 local TetrisApp = require("TetrisApp")
 
 local function TetrisPage(props)
-    return ce(TetrisApp)
+    -- Reduce height to fit inside KitchenSink (category bar + back btn + tab bar)
+    local availH = display.contentHeight - 180
+    return ce(TetrisApp, { style = { width = display.contentWidth, height = availH } })
 end
 
 return {

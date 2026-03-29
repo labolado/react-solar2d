@@ -457,7 +457,11 @@ end
 -- ============================================================
 -- TetrisApp: Pagelet.Container orchestrator
 -- ============================================================
-local function TetrisApp()
+local function TetrisApp(props)
+    -- Use props dimensions if provided (embedded in KitchenSink), else full screen
+    local AW = (props and props.style and props.style.width) or W
+    local AH = (props and props.style and props.style.height) or H
+
     local screen, setScreen = useState("menu")
     local speedLevel, setSpeedLevel = useState(2)
     local bestScore, setBestScore = useState(0)
@@ -504,7 +508,7 @@ local function TetrisApp()
         }
     end, { engine, bestScore })
 
-    return ce(Pagelet.Container, { current = screen, style = { width = W, height = H } },
+    return ce(Pagelet.Container, { current = screen, style = { width = AW, height = AH } },
 
         -- ── Menu ──────────────────────────────────────────────
         ce(Pagelet, {
@@ -530,14 +534,14 @@ local function TetrisApp()
         -- ── Game ──────────────────────────────────────────────
         ce(Pagelet, {
             name = "game",
-            style = { width = W, height = H },
+            style = { width = AW, height = AH },
         },
             -- Layer 1: Game board (SceneCanvas — composer scene)
             ce(SceneCanvas, {
                 key = "board-" .. speedLevel,
                 scene = boardScene,
                 params = boardParams,
-                style = { width = W, height = H },
+                style = { width = AW, height = AH },
             }),
             -- Layer 2: HUD (React overlay)
             ce(HUD, {
@@ -559,7 +563,7 @@ local function TetrisApp()
         -- ── Game Over ─────────────────────────────────────────
         ce(Pagelet, {
             name = "gameover",
-            style = { width = W, height = H },
+            style = { width = AW, height = AH },
         },
             ce(GameOverPage, {
                 result = gameResult,

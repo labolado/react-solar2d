@@ -205,19 +205,23 @@ local function KitchenSinkApp()
         }, cat.label))
     end
 
-    local categoryBar = ce("View", {
+    local categoryBar = ce(RN.ScrollView, {
+        horizontal = true,
         style = {
-            flexDirection = "row",
-            flexWrap = "wrap",
             backgroundColor = T.surface,
-            paddingHorizontal = T.pad,
             paddingTop = SAFE_TOP + 8,
             paddingBottom = 8,
             borderBottomWidth = 1,
             borderColor = T.border,
             zIndex = 100,
+            height = SAFE_TOP + 50,
         },
-    }, catButtons)
+    }, ce("View", {
+        style = {
+            flexDirection = "row",
+            paddingHorizontal = T.pad,
+        },
+    }, catButtons))
 
     -- Content: either demo list or active demo component
     local content
