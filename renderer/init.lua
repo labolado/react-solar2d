@@ -37,12 +37,13 @@ local function buildLayoutTree(fiber)
     local node = Layout.newNode(style)
 
     -- Text elements: measure display object and feed intrinsic dimensions to Yoga
-    -- If flexShrink is set, don't force intrinsic width — let Yoga shrink it
-    -- based on container constraints, enabling text wrapping in Pass 2.
+    -- Use flexBasis (not width) so Yoga treats it as preferred size but allows
+    -- shrinking when the container is narrower than the text's natural width.
     if fiber.type == "Text" and fiber.stateNode and fiber.stateNode._textObj then
         local textObj = fiber.stateNode._textObj
-        if not style.width and not (style.flexShrink and style.flexShrink > 0) then
-            node:setWidth(textObj.width)
+        if not style.width then
+            node:setFlexBasis(textObj.width)
+            node:setFlexShrink(style.flexShrink or 1)
         end
         if not style.height then
             node:setHeight(textObj.height)

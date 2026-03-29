@@ -8,6 +8,8 @@ local stubNode = {}
 stubNode.__index = stubNode
 function stubNode:setWidth(v) self._w = v end
 function stubNode:setHeight(v) self._h = v end
+function stubNode:setFlexBasis(v) self._flexBasis = v end
+function stubNode:setFlexShrink(v) self._flexShrink = v end
 function stubNode:insertChild(child, idx) self._children[idx] = child end
 function stubNode:calculateLayout()
     -- Simple: assign 0,0 position and propagated width/height
