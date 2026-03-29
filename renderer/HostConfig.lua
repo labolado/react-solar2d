@@ -853,11 +853,57 @@ function M.updateInstance(instance, oldProps, newProps)
     local oldStyle = oldProps.style or {}
     local newStyle = newProps.style or {}
 
-    -- Background rect updates (check removeSelf hasn't been called)
+    -- Background rect: handle create/update/recreate
+    local needsBg = newStyle.backgroundColor or newStyle.borderWidth or newStyle.borderColor
+    local oldBr = tonumber(oldStyle.borderRadius) or 0
+    local newBr = tonumber(newStyle.borderRadius) or 0
+    local brChanged = oldBr ~= newBr
+
+    if needsBg and not instance._bg then
+        -- Create _bg dynamically (was absent at createInstance time)
+        local vw = newStyle.width or instance._layoutW or 0
+        local vh = newStyle.height or instance._layoutH or 0
+        if vw > 0 and vh > 0 then
+            local bg
+            if newBr > 0 then
+                bg = display.newRoundedRect(instance, 0, 0, vw, vh, newBr)
+            else
+                bg = display.newRect(instance, 0, 0, vw, vh)
+            end
+            bg.anchorX, bg.anchorY = 0, 0
+            bg:setFillColor(0, 0, 0, 0)
+            bg:toBack()
+            instance._bg = bg
+            instance._borderRadius = newBr
+        end
+    elseif instance._bg and brChanged then
+        -- borderRadius changed: recreate _bg (rect vs roundedRect)
+        local vw = instance._bg.path and instance._bg.path.width or (newStyle.width or 0)
+        local vh = instance._bg.path and instance._bg.path.height or (newStyle.height or 0)
+        if vw > 0 and vh > 0 then
+            local oldBg = instance._bg
+            local bg
+            if newBr > 0 then
+                bg = display.newRoundedRect(instance, 0, 0, vw, vh, newBr)
+            else
+                bg = display.newRect(instance, 0, 0, vw, vh)
+            end
+            bg.anchorX, bg.anchorY = 0, 0
+            bg:setFillColor(0, 0, 0, 0)
+            bg:toBack()
+            oldBg:removeSelf()
+            instance._bg = bg
+            instance._borderRadius = newBr
+        end
+    end
+
+    -- Update existing _bg properties
     if instance._bg and instance._bg.removeSelf and instance._bg.path then
         if newStyle.backgroundColor then
             local c = parseColor(newStyle.backgroundColor)
             instance._bg:setFillColor(c[1], c[2], c[3], c[4])
+        elseif oldStyle.backgroundColor and not newStyle.backgroundColor then
+            instance._bg:setFillColor(0, 0, 0, 0)  -- transparent
         end
         if newStyle.borderColor then
             local c = parseColor(newStyle.borderColor)
