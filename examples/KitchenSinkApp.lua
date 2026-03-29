@@ -237,7 +237,7 @@ local function KitchenSinkApp()
             style = { fontSize = 14, color = T.accent },
         }, "← " .. activeDemo.name))
 
-        content = ce("View", { style = { flex = 1, backgroundColor = T.bg } },
+        content = ce("View", { style = { flex = 1, backgroundColor = T.bg, paddingHorizontal = 12 } },
             backBtn,
             ce(activeDemo.component, {
                 navigation = { goBack = function() setActiveDemo(nil) end },
