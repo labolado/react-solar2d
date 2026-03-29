@@ -184,9 +184,9 @@ local function KitchenSinkApp()
         catButtons[#catButtons + 1] = ce(RN.Pressable, {
             key = cat.key,
             style = {
-                paddingHorizontal = 12,
+                paddingHorizontal = 8,
                 paddingVertical = 6,
-                marginRight = 4,
+                marginRight = 2,
                 borderRadius = T.radiusSmall,
                 backgroundColor = isActive and T.accent or T.surface,
             },
