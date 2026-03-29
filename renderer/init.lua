@@ -155,12 +155,24 @@ local function applyLayout(yogaNode, fiber)
                 overlay.path.height = h
             end
         end
-        -- Text wrapping: if Yoga computed a width, rebuild text with that width
+        -- Text wrapping: rebuild text if it overflows its parent's width
         if fiber.type == "Text" and fiber.stateNode._textObj then
             local textObj = fiber.stateNode._textObj
             local textStyle = (fiber.props and fiber.props.style) or {}
             local naturalW = fiber.stateNode._naturalTextWidth or textObj.width
-            if not textStyle.width and w > 0 and naturalW > w + 1 then
+            -- Use the smaller of Yoga-computed width and parent's actual width
+            local wrapW = w
+            if fiber.parent and fiber.parent.stateNode then
+                local parentW = fiber.parent.stateNode._layoutW or fiber.parent.stateNode.width or 0
+                local parentStyle = (fiber.parent.props and fiber.parent.props.style) or {}
+                local pl = parentStyle.paddingLeft or parentStyle.paddingHorizontal or parentStyle.padding or 0
+                local pr = parentStyle.paddingRight or parentStyle.paddingHorizontal or parentStyle.padding or 0
+                local parentContentW = parentW - pl - pr
+                if parentContentW > 0 and parentContentW < wrapW then
+                    wrapW = parentContentW
+                end
+            end
+            if not textStyle.width and wrapW > 0 and naturalW > wrapW + 1 then
                 local parent = fiber.stateNode
                 local newTextObj = display.newText({
                     parent = parent,
@@ -168,7 +180,7 @@ local function applyLayout(yogaNode, fiber)
                     x = 0, y = 0,
                     font = fiber.stateNode._font or native.systemFont,
                     fontSize = fiber.stateNode._fontSize or 14,
-                    width = w,
+                    width = wrapW,
                     height = 0,
                     align = textStyle.textAlign or "left",
                 })
