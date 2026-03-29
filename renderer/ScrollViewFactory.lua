@@ -6,20 +6,15 @@ local function createScrollView(props, style, applyCommonStyle)
     local h = style.height or (display.contentHeight or 480)
     local horizontal = props.horizontal or false
 
-    -- Use Container for clipping (consumes 1 mask level)
-    local clipContainer = display.newContainer(w, h)
+    local clipContainer = display.newGroup()
     clipContainer.anchorX, clipContainer.anchorY = 0, 0
-    clipContainer._isScrollContainer = true
 
     local contentGroup = display.newGroup()
-    -- Container uses center-origin, offset content to top-left
-    contentGroup.x = -w / 2
-    contentGroup.y = -h / 2
     clipContainer:insert(contentGroup)
 
-    -- Touch overlay ON TOP of content
+    -- Touch overlay ON TOP of content. Uses touch listener directly (no setFocus).
     local touchOverlay = display.newRect(clipContainer, 0, 0, w, h)
-    touchOverlay.anchorX, touchOverlay.anchorY = 0.5, 0.5
+    touchOverlay.anchorX, touchOverlay.anchorY = 0, 0
     touchOverlay:setFillColor(0, 0, 0, 0.001)
     touchOverlay.isHitTestable = true
     touchOverlay._isTouchOverlay = true
