@@ -808,6 +808,10 @@ local function cleanupNativeFields(node)
         node._inputField:removeSelf()
         node._inputField = nil
     end
+    if node._webView and node._webView.removeSelf then
+        node._webView:removeSelf()
+        node._webView = nil
+    end
     -- Walk children (display groups have integer-indexed children)
     if node.numChildren then
         for i = 1, node.numChildren do

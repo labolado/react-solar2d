@@ -150,6 +150,15 @@ local function applyLayout(yogaNode, fiber)
             -- Store pad for scroll sync
             fiber.stateNode._fieldPad = pad
         end
+        -- WebView: position native webview using screen coordinates
+        if fiber.stateNode._webView then
+            local wv = fiber.stateNode._webView
+            local sx, sy = fiber.stateNode:localToContent(0, 0)
+            wv.x = sx + w / 2
+            wv.y = sy + h / 2
+            wv.width = w
+            wv.height = h
+        end
         -- ScrollView: update scroll dimensions and touch overlay size
         if fiber.type == "ScrollView" and fiber.stateNode._contentGroup then
             fiber.stateNode._scrollW = w

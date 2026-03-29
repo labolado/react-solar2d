@@ -19,4 +19,6 @@ return {
     ImperativeCanvas = require("components.ImperativeCanvas"),
     SceneCanvas = require("components.SceneCanvas"),
     SceneAdapter = require("components.SceneAdapter"),
+    Pagelet = require("components.Pagelet"),
+    WebView = require("components.WebView"),
 }
