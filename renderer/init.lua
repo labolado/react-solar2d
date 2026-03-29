@@ -160,17 +160,25 @@ local function applyLayout(yogaNode, fiber)
             local textObj = fiber.stateNode._textObj
             local textStyle = (fiber.props and fiber.props.style) or {}
             local naturalW = fiber.stateNode._naturalTextWidth or textObj.width
-            -- Use the smaller of Yoga-computed width and parent's actual width
+            -- Use the smaller of Yoga-computed width and nearest host parent's width
             local wrapW = w
-            if fiber.parent and fiber.parent.stateNode then
-                local parentW = fiber.parent.stateNode._layoutW or fiber.parent.stateNode.width or 0
-                local parentStyle = (fiber.parent.props and fiber.parent.props.style) or {}
-                local pl = parentStyle.paddingLeft or parentStyle.paddingHorizontal or parentStyle.padding or 0
-                local pr = parentStyle.paddingRight or parentStyle.paddingHorizontal or parentStyle.padding or 0
-                local parentContentW = parentW - pl - pr
-                if parentContentW > 0 and parentContentW < wrapW then
-                    wrapW = parentContentW
+            local p = fiber.parent
+            while p do
+                if p.stateNode and p.tag == "host" then
+                    local parentW = p.stateNode.contentWidth or p.stateNode.width or 0
+                    if parentW <= 0 and p.stateNode._bg and p.stateNode._bg.path then
+                        parentW = p.stateNode._bg.path.width or 0
+                    end
+                    local parentStyle = (p.props and p.props.style) or {}
+                    local pl = parentStyle.paddingLeft or parentStyle.paddingHorizontal or parentStyle.padding or 0
+                    local pr = parentStyle.paddingRight or parentStyle.paddingHorizontal or parentStyle.padding or 0
+                    local parentContentW = parentW - pl - pr
+                    if parentContentW > 0 and (wrapW <= 0 or parentContentW < wrapW) then
+                        wrapW = parentContentW
+                    end
+                    break
                 end
+                p = p.parent
             end
             if not textStyle.width and wrapW > 0 and naturalW > wrapW + 1 then
                 local parent = fiber.stateNode
