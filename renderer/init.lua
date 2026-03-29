@@ -106,9 +106,11 @@ local function applyLayout(yogaNode, fiber)
                 end
             end
         end
-        -- Store layout position separately so translateX/Y can offset from it
+        -- Store layout dimensions for child text wrapping and position offsets
         fiber.stateNode._layoutX = l
         fiber.stateNode._layoutY = t
+        fiber.stateNode._layoutW = w
+        fiber.stateNode._layoutH = h
         -- For the root fiber (tag == "root"), preserve the container's original
         -- position set by the caller (e.g. screenOriginY offset). Yoga computes
         -- (0,0) for the root, which would overwrite the caller's positioning.
@@ -164,11 +166,8 @@ local function applyLayout(yogaNode, fiber)
             local wrapW = w
             local p = fiber.parent
             while p do
-                if p.stateNode and p.tag == "host" then
-                    local parentW = p.stateNode.contentWidth or p.stateNode.width or 0
-                    if parentW <= 0 and p.stateNode._bg and p.stateNode._bg.path then
-                        parentW = p.stateNode._bg.path.width or 0
-                    end
+                if p.stateNode and p.tag == "host" and p.stateNode._layoutW then
+                    local parentW = p.stateNode._layoutW
                     local parentStyle = (p.props and p.props.style) or {}
                     local pl = parentStyle.paddingLeft or parentStyle.paddingHorizontal or parentStyle.padding or 0
                     local pr = parentStyle.paddingRight or parentStyle.paddingHorizontal or parentStyle.padding or 0
