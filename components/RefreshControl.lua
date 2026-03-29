@@ -105,13 +105,17 @@ local function RefreshControl(props)
         }, title)
     end
 
+    -- Hide completely when not refreshing
+    if not refreshing then
+        return createElement("View", { style = { height = 0 } })
+    end
+
     return createElement("View", {
         style = {
             flexDirection = "column",
             justifyContent = "center",
             alignItems = "center",
             height = 60,
-            opacity = refreshing and 1 or 0.5,
         },
     },
         createElement("View", {
