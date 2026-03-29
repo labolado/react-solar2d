@@ -85,7 +85,7 @@ local function ListScreen(props)
     end
     return ce("ScrollView", {
         style = { flex = 1, backgroundColor = T.bg },
-        contentContainerStyle = { padding = T.pad },
+        contentContainerStyle = { padding = T.pad, paddingBottom = 70 },
     }, items)
 end
 
@@ -220,6 +220,7 @@ local function KitchenSinkApp()
         style = {
             flexDirection = "row",
             paddingHorizontal = T.pad,
+            paddingRight = 40,  -- extra space so last tab isn't cut off by bounce
         },
     }, catButtons))
 

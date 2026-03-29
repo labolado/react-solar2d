@@ -31,7 +31,7 @@ function T.DemoPage(props)
     return ce("ScrollView", {
         style = { flex = 1, backgroundColor = T.bg },
     }, ce("View", {
-        style = { padding = T.pad, width = W },
+        style = { padding = T.pad, paddingBottom = 70, width = W },
     }, props.children))
 end
 
