@@ -121,6 +121,33 @@ T.describe("SceneCanvas: lifecycle events", function()
         T.expect(events[3].phase).toBe("did")
     end)
 
+    T.it("passes width and height in lifecycle events", function()
+        local container = mockDisplay.newGroup()
+        local reconciler = Reconciler.create(HostConfig)
+
+        local scene = SceneAdapter.newScene()
+        local receivedW, receivedH = nil, nil
+
+        local handler = {}
+        function handler:create(event)
+            receivedW = event.width
+            receivedH = event.height
+        end
+
+        scene:addEventListener("create", handler)
+
+        reconciler.render(
+            ce(SceneCanvas, {
+                style = { width = 400, height = 250 },
+                scene = scene,
+            }),
+            container
+        )
+
+        T.expect(receivedW).toBe(400)
+        T.expect(receivedH).toBe(250)
+    end)
+
     T.it("passes params to scene events", function()
         local container = mockDisplay.newGroup()
         local reconciler = Reconciler.create(HostConfig)

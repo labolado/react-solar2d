@@ -174,3 +174,5 @@ T.describe("Pagelet.Container", function()
         reconciler.flushUpdates()
     end)
 end)
+
+T.summary()
