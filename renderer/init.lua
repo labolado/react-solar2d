@@ -162,22 +162,29 @@ local function applyLayout(yogaNode, fiber)
             local textObj = fiber.stateNode._textObj
             local textStyle = (fiber.props and fiber.props.style) or {}
             local naturalW = fiber.stateNode._naturalTextWidth or textObj.width
-            -- Use the smaller of Yoga-computed width and nearest host parent's width
+            -- Compute wrap width: walk up the fiber tree accumulating padding/margin
+            -- from all host parents to find the actual available content width
             local wrapW = w
-            local p = fiber.parent
-            while p do
-                if p.stateNode and p.tag == "host" and p.stateNode._layoutW then
-                    local parentW = p.stateNode._layoutW
-                    local parentStyle = (p.props and p.props.style) or {}
-                    local pl = parentStyle.paddingLeft or parentStyle.paddingHorizontal or parentStyle.padding or 0
-                    local pr = parentStyle.paddingRight or parentStyle.paddingHorizontal or parentStyle.padding or 0
-                    local parentContentW = parentW - pl - pr
-                    if parentContentW > 0 and (wrapW <= 0 or parentContentW < wrapW) then
-                        wrapW = parentContentW
+            if naturalW > wrapW + 1 then
+                -- Yoga didn't constrain — compute from screen width minus paddings
+                local totalPad = 0
+                local p = fiber
+                while p do
+                    if p.tag == "host" and p.props then
+                        local ps = p.props.style or {}
+                        local pad = (ps.paddingLeft or ps.paddingHorizontal or ps.padding or 0)
+                                  + (ps.paddingRight or ps.paddingHorizontal or ps.padding or 0)
+                        local mar = (ps.marginLeft or ps.marginHorizontal or ps.margin or 0)
+                                  + (ps.marginRight or ps.marginHorizontal or ps.margin or 0)
+                        totalPad = totalPad + pad + mar
                     end
-                    break
+                    p = p.parent
                 end
-                p = p.parent
+                local screenW = display.contentWidth
+                local computed = screenW - totalPad
+                if computed > 0 and computed < naturalW then
+                    wrapW = computed
+                end
             end
             if not textStyle.width and wrapW > 0 and naturalW > wrapW + 1 then
                 local parent = fiber.stateNode
