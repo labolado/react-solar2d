@@ -48,8 +48,18 @@ local function FlatList(props)
             children[#children + 1] = createElement("View", { key = "__footer" }, ListFooter)
         end
 
+        -- Default to flex:1 so ScrollView gets remaining space from parent
+        local scrollStyle = props.style or {}
+        if not scrollStyle.height and not scrollStyle.flex then
+            scrollStyle = {}
+            if props.style then
+                for k, v in pairs(props.style) do scrollStyle[k] = v end
+            end
+            scrollStyle.flex = 1
+        end
+
         return createElement("ScrollView", {
-            style = props.style,
+            style = scrollStyle,
             horizontal = props.horizontal,
             contentContainerStyle = props.contentContainerStyle,
             onScroll = props.onScroll,
