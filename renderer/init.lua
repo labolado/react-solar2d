@@ -259,9 +259,20 @@ local function applyLayout(yogaNode, fiber)
     end
 
     -- Update ScrollView content dimensions after laying out children
+    -- Use the larger of Yoga's computed extent and the existing content size
+    -- (recalcContentSize measures actual display objects which may exceed Yoga's
+    -- constrained layout, e.g. when content is taller than the ScrollView)
     if fiber.stateNode and fiber.stateNode._contentGroup then
-        fiber.stateNode._contentH = maxBottom
-        fiber.stateNode._contentW = maxRight
+        if maxBottom > (fiber.stateNode._contentH or 0) then
+            fiber.stateNode._contentH = maxBottom
+        end
+        if maxRight > (fiber.stateNode._contentW or 0) then
+            fiber.stateNode._contentW = maxRight
+        end
+        -- Force recalc on next touch to get accurate display bounds
+        if fiber.stateNode._invalidateContentSize then
+            fiber.stateNode._invalidateContentSize()
+        end
     end
 
     -- Re-apply zIndex after all children are laid out
