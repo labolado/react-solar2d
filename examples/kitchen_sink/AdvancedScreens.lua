@@ -244,7 +244,7 @@ local function AccordionDemo()
             isOpen and ce("View", {
                 style = { paddingHorizontal = 14, paddingBottom = 14, borderTopWidth = 1, borderColor = T.border, paddingTop = 10 },
             },
-                ce("Text", { style = { fontSize = 13, color = T.textSecondary, lineHeight = 20 } }, sec.content)
+                ce("Text", { style = { fontSize = 13, color = T.textSecondary, lineHeight = 20, flexShrink = 1 } }, sec.content)
             ) or nil
         )
     end
