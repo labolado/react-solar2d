@@ -203,16 +203,17 @@ local function KitchenSinkApp()
         narrowCatButtons[#narrowCatButtons + 1] = ce(RN.Pressable, {
             key = cat.key,
             style = {
-                paddingHorizontal = 8,
-                paddingVertical = 6,
+                paddingHorizontal = 6,
+                paddingVertical = 4,
                 marginRight = 2,
+                marginBottom = 2,
                 borderRadius = T.radiusSmall,
-                backgroundColor = isActive and T.accent or T.surface,
+                backgroundColor = isActive and T.accent or "transparent",
             },
             onPress = function() onCategoryPress(i, cat) end,
         }, ce("Text", {
             style = {
-                fontSize = 13,
+                fontSize = 12,
                 fontWeight = isActive and "bold" or "normal",
                 color = isActive and "#FFFFFF" or T.textSecondary,
             },
@@ -242,24 +243,20 @@ local function KitchenSinkApp()
         }, cat.label))
     end
 
-    -- Narrow mode: horizontal scrollable category bar at top
-    local narrowCategoryBar = ce(RN.ScrollView, {
-        horizontal = true,
+    -- Narrow mode: wrap category bar (no ScrollView to avoid scroll reset on re-render)
+    local narrowCategoryBar = ce("View", {
         style = {
+            flexDirection = "row",
+            flexWrap = "wrap",
             backgroundColor = T.surface,
-            paddingTop = SAFE_TOP + 8,
-            paddingBottom = 8,
+            paddingHorizontal = 6,
+            paddingTop = SAFE_TOP + 4,
+            paddingBottom = 4,
             borderBottomWidth = 1,
             borderColor = T.border,
             zIndex = 100,
-            height = SAFE_TOP + 50,
         },
-    }, ce("View", {
-        style = {
-            flexDirection = "row",
-            paddingHorizontal = T.pad,
-        },
-    }, narrowCatButtons))
+    }, narrowCatButtons)
 
     -- Wide mode: left sidebar with vertical category list
     local wideSidebar = ce("View", {
