@@ -10,6 +10,7 @@ dist/
 .test
 **/.test
 .claude/
+CLAUDE.md
 session-recall.md
 *-handoff.md
 test_progress*.lua
