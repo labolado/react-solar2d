@@ -721,9 +721,33 @@ function M.createInstance(elementType, props)
             end
         end
 
+        -- Apply resizeMode via fill.scaleX/scaleY on a shape with image fill
+        -- Default fill stretches image to shape bounds (= "stretch" mode)
+        -- scaleX/scaleY < 1 = zoom in (crop), > 1 = zoom out (letterbox)
+        local function applyFillResizeMode(shape, natW, natH, cw, ch, mode)
+            if natW <= 0 or natH <= 0 then return end
+            if mode == "stretch" then
+                return -- default fill behavior
+            end
+            local xS, yS = cw / natW, ch / natH
+            if mode == "contain" then
+                local minS = math.min(xS, yS)
+                shape.fill.scaleX = xS / minS
+                shape.fill.scaleY = yS / minS
+            elseif mode == "center" then
+                shape.fill.scaleX = cw / natW
+                shape.fill.scaleY = ch / natH
+            else -- "cover" (default)
+                local maxS = math.max(xS, yS)
+                shape.fill.scaleX = xS / maxS
+                shape.fill.scaleY = yS / maxS
+            end
+        end
+
+        local br = tonumber(style.borderRadius) or 0
+
         if uri:match("^https?://") then
             -- Remote image: placeholder + async download
-            local br = tonumber(style.borderRadius) or 0
             local bg
             if br > 0 then
                 bg = display.newRoundedRect(group, 0, 0, w, h, br)
@@ -742,24 +766,52 @@ function M.createInstance(elementType, props)
                 end
                 if event.phase == "ended" then
                     if not group or group.removeSelf == nil then return end
-                    local img = display.newImage(group, fname, system.TemporaryDirectory)
-                    if img then
-                        local natW, natH = img.width, img.height
-                        applyResizeMode(img, natW, natH, w, h, resizeMode)
-                        if bg and bg.removeSelf then bg:removeSelf() end
-                        group._imageObj = img
-                        group._bg = nil
-                        if props.onLoad then props.onLoad() end
+                    if br > 0 then
+                        -- Apply image as fill on the rounded shape (preserves rounded clipping)
+                        local tmpImg = display.newImage(fname, system.TemporaryDirectory)
+                        if tmpImg then
+                            local natW, natH = tmpImg.width, tmpImg.height
+                            tmpImg:removeSelf()
+                            bg.fill = { type = "image", filename = fname, baseDir = system.TemporaryDirectory }
+                            applyFillResizeMode(bg, natW, natH, w, h, resizeMode)
+                            group._imageObj = bg
+                            group._bg = nil
+                            if props.onLoad then props.onLoad() end
+                        end
+                    else
+                        local img = display.newImage(group, fname, system.TemporaryDirectory)
+                        if img then
+                            local natW, natH = img.width, img.height
+                            applyResizeMode(img, natW, natH, w, h, resizeMode)
+                            if bg and bg.removeSelf then bg:removeSelf() end
+                            group._imageObj = img
+                            group._bg = nil
+                            if props.onLoad then props.onLoad() end
+                        end
                     end
                 end
             end, {}, fname, system.TemporaryDirectory)
         else
             -- Local file: load at natural size, then apply resizeMode
-            local img = display.newImage(group, uri)
-            if img then
-                local natW, natH = img.width, img.height
-                applyResizeMode(img, natW, natH, w, h, resizeMode)
-                group._imageObj = img
+            if br > 0 then
+                -- Use roundedRect with image fill for borderRadius clipping
+                local shape = display.newRoundedRect(group, 0, 0, w, h, br)
+                shape.anchorX, shape.anchorY = 0, 0
+                local tmpImg = display.newImage(uri)
+                if tmpImg then
+                    local natW, natH = tmpImg.width, tmpImg.height
+                    tmpImg:removeSelf()
+                    shape.fill = { type = "image", filename = uri }
+                    applyFillResizeMode(shape, natW, natH, w, h, resizeMode)
+                end
+                group._imageObj = shape
+            else
+                local img = display.newImage(group, uri)
+                if img then
+                    local natW, natH = img.width, img.height
+                    applyResizeMode(img, natW, natH, w, h, resizeMode)
+                    group._imageObj = img
+                end
             end
         end
 

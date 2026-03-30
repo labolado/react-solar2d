@@ -20,9 +20,9 @@ function M.encode(data)
         c = c or 0
 
         local n = a * 65536 + b * 256 + c
-        local w = b64chars:sub(n // 262144 % 64 + 1, n // 262144 % 64 + 1)
-            .. b64chars:sub(n // 4096 % 64 + 1, n // 4096 % 64 + 1)
-            .. b64chars:sub(n // 64 % 64 + 1, n // 64 % 64 + 1)
+        local w = b64chars:sub(math.floor(n / 262144) % 64 + 1, math.floor(n / 262144) % 64 + 1)
+            .. b64chars:sub(math.floor(n / 4096) % 64 + 1, math.floor(n / 4096) % 64 + 1)
+            .. b64chars:sub(math.floor(n / 64) % 64 + 1, math.floor(n / 64) % 64 + 1)
             .. b64chars:sub(n % 64 + 1, n % 64 + 1)
 
         table.insert(result, w)
@@ -48,9 +48,9 @@ function M.decode(data)
         local d = b64lookup[data:sub(i + 3, i + 3)] or 0
 
         local n = a * 262144 + b * 4096 + c * 64 + d
-        table.insert(result, string.char(n // 65536 % 256))
+        table.insert(result, string.char(math.floor(n / 65536) % 256))
         if data:sub(i + 2, i + 2) ~= '' then
-            table.insert(result, string.char(n // 256 % 256))
+            table.insert(result, string.char(math.floor(n / 256) % 256))
         end
         if data:sub(i + 3, i + 3) ~= '' then
             table.insert(result, string.char(n % 256))

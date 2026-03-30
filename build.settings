@@ -5,6 +5,16 @@ settings = {
         default = "portrait",
         supported = { "portrait" },
     },
+    iphone = {
+        plist = {
+            UILaunchStoryboardName = "LaunchScreen",
+            UIStatusBarHidden = true,
+            NSAppTransportSecurity = { NSAllowsArbitraryLoads = true },
+        },
+    },
+    excludeFiles = {
+        all = { "tests/**", "plugins/**", "docs/**", "tasks/**", "*.md", ".git**", ".claude**", "run_tests.lua" },
+    },
     plugins = {
         ["plugin.yoga"] = {
             publisherId = "com.labolado",

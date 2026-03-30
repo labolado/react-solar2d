@@ -1,11 +1,12 @@
-plugins/yoga/yoga/
-plugins/yoga/build/
-plugins/yoga/build-solar2d/
-plugins/yoga/test/plugin_yoga.so
+plugins/
+.CoronaLiveBuild
+**/.CoronaLiveBuild
 
 # Runtime route files (test artifacts)
 .route
 **/.route
+.test
+**/.test
 .claude/
 session-recall.md
 *-handoff.md

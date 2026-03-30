@@ -64,7 +64,7 @@ local function ButtonTest()
             title = "Tap Me",
             color = "#2196F3",
             onPress = function() 
-                setCount(c => c + 1)
+                setCount(function(c) return c + 1 end)
                 print("[TEST] Button pressed")
             end
         })

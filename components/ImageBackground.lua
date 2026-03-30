@@ -14,6 +14,7 @@ local function ImageBackground(props)
         top = 0, left = 0, right = 0, bottom = 0,
         width = style.width,
         height = style.height,
+        borderRadius = style.borderRadius,
         resizeMode = resizeMode,
     }
     -- Merge user imageStyle overrides
