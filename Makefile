@@ -1,11 +1,10 @@
-CORONA_BUILDER = /Applications/Corona-b3/Native/Corona/mac/bin/CoronaBuilder.app/Contents/MacOS/CoronaBuilder
-PROFILE = /path/to/your/profile.mobileprovision
-DEVICE = YOUR-DEVICE-UUID
-BUNDLE_ID = com.example.myapp
-SIGN_ID = Apple Development: Your Name (XXXXXXXXXX)
-TEAM_ID = XXXXXXXXXX
-BUILD_DIR = /tmp/react-solar2d-build
-APP_NAME = ReactSolar2D
+# React-Solar2D iOS device build
+# Copy Makefile.local.example to Makefile.local and fill in your values
+-include Makefile.local
+
+CORONA_BUILDER ?= /Applications/Corona/Native/Corona/mac/bin/CoronaBuilder.app/Contents/MacOS/CoronaBuilder
+BUILD_DIR ?= /tmp/react-solar2d-build
+APP_NAME ?= ReactSolar2D
 
 .PHONY: device install build resign uninstall test
 

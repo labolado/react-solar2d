@@ -1,0 +1,9 @@
+# Copy to Makefile.local and fill in your values
+# Makefile.local is gitignored
+
+CORONA_BUILDER = /Applications/Corona/Native/Corona/mac/bin/CoronaBuilder.app/Contents/MacOS/CoronaBuilder
+PROFILE = /path/to/your/Development.mobileprovision
+DEVICE = YOUR-DEVICE-UUID
+BUNDLE_ID = com.example.myapp
+SIGN_ID = Apple Development: Your Name (XXXXXXXXXX)
+TEAM_ID = XXXXXXXXXX
