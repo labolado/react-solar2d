@@ -309,7 +309,7 @@ ce(ImperativeCanvas, {
 
 ## Examples
 
-See [react-solar2d-examples](https://github.com/labolado/react-solar2d-examples) for complete demo apps (News reader, Quiz, Tetris, KitchenSink component showcase).
+See the `examples/` directory for complete demo apps (News reader, Quiz, Tetris, KitchenSink component showcase).
 
 ## Tests
 
