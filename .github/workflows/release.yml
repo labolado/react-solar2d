@@ -33,11 +33,11 @@ jobs:
 
           VERSION="${GITHUB_REF_NAME}"
           mkdir -p dist
-          tar czf "dist/plugin.react-solar2d-${VERSION}.tgz" -C "$STAGING" .
+          tar czf "dist/plugin.react-solar2d.tgz" -C "$STAGING" .
 
           FILE_COUNT=$(find "$STAGING" -name '*.lua' | wc -l)
-          SIZE=$(du -h "dist/plugin.react-solar2d-${VERSION}.tgz" | cut -f1)
-          echo "Packaged: plugin.react-solar2d-${VERSION}.tgz ($FILE_COUNT files, $SIZE)"
+          SIZE=$(du -h "dist/plugin.react-solar2d.tgz" | cut -f1)
+          echo "Packaged: plugin.react-solar2d.tgz ($FILE_COUNT files, $SIZE)"
 
       - name: Create Release
         uses: softprops/action-gh-release@v2

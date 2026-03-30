@@ -7,7 +7,7 @@ Pure Lua React framework for Solar2D (Corona SDK). Write UI with React API + Fle
 Add to your `build.settings`:
 
 ```lua
-local rs2d_url = "https://github.com/labolado/react-solar2d/releases/download/v1/"
+local rs2d = "https://github.com/labolado/react-solar2d/releases/download/v1/"
 local yoga_url = "https://github.com/labolado/solar2d-plugin-yoga/releases/download/v5/"
 
 settings = {
@@ -15,11 +15,11 @@ settings = {
         ["plugin.react-solar2d"] = {
             publisherId = "com.labolado",
             supportedPlatforms = {
-                ["mac-sim"]    = { url = rs2d_url .. "plugin.react-solar2d-v1.tgz" },
-                android        = { url = rs2d_url .. "plugin.react-solar2d-v1.tgz" },
-                iphone         = { url = rs2d_url .. "plugin.react-solar2d-v1.tgz" },
-                ["iphone-sim"] = { url = rs2d_url .. "plugin.react-solar2d-v1.tgz" },
-                ["win32-sim"]  = { url = rs2d_url .. "plugin.react-solar2d-v1.tgz" },
+                ["mac-sim"]    = { url = rs2d .. "plugin.react-solar2d.tgz" },
+                android        = { url = rs2d .. "plugin.react-solar2d.tgz" },
+                iphone         = { url = rs2d .. "plugin.react-solar2d.tgz" },
+                ["iphone-sim"] = { url = rs2d .. "plugin.react-solar2d.tgz" },
+                ["win32-sim"]  = { url = rs2d .. "plugin.react-solar2d.tgz" },
             },
         },
         ["plugin.yoga"] = {

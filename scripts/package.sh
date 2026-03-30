@@ -37,7 +37,7 @@ cp "$ROOT/tests/infra/test_server.lua" "$STAGING/tests/infra/"
 cp "$ROOT/tests/infra/base64.lua" "$STAGING/tests/infra/"
 
 # Build
-FILENAME="plugin.react-solar2d-${VERSION}.tgz"
+FILENAME="plugin.react-solar2d.tgz"
 cd "$STAGING" && tar czf "$DIST/$FILENAME" .
 
 # Summary
@@ -46,6 +46,6 @@ SIZE=$(du -h "$DIST/$FILENAME" | cut -f1)
 echo "Packaged: dist/$FILENAME ($FILE_COUNT files, $SIZE)"
 echo ""
 echo "To publish: upload dist/$FILENAME to GitHub release $VERSION"
-echo "URL: https://github.com/labolado/react-solar2d/releases/download/$VERSION/$FILENAME"
+echo "URL: https://github.com/labolado/react-solar2d/releases/download/$VERSION/plugin.react-solar2d.tgz"
 
 rm -rf "$STAGING"
