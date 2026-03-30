@@ -1,11 +1,16 @@
--- components/VirtualizedList.lua
+--- VirtualizedList component.
 -- Core windowed rendering component. Manages scroll-driven window state.
+-- @module components.VirtualizedList
+
 local React = require("react")
 local createElement = React.createElement
 local useState = React.useState
 local useRef = React.useRef
 local calculateWindow = require("components.WindowCalculator")
 
+--- VirtualizedList component.
+-- @param props table {data, renderItem, keyExtractor, getItemLayout, initialNumToRender, windowSize, onEndReached, ...}
+-- @return table React element
 local function VirtualizedList(props)
     local data = props.data or {}
     local renderItem = props.renderItem

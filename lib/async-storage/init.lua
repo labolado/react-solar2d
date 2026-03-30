@@ -1,6 +1,7 @@
--- lib/async-storage/init.lua
--- @react-native-async-storage/async-storage implementation for Solar2D
--- Pure Lua, uses JSON files in system.DocumentsDirectory
+--- AsyncStorage module.
+-- @react-native-async-storage/async-storage implementation for Solar2D.
+-- Pure Lua, uses JSON files in system.DocumentsDirectory.
+-- @module lib.async-storage
 
 local M = {}
 
@@ -67,7 +68,10 @@ local function saveToDisk()
     return false
 end
 
--- Get item from storage
+--- Get item from storage.
+-- @param key string Storage key
+-- @param[opt] callback function Callback(err, value)
+-- @return string|nil Stored value
 function M.getItem(key, callback)
     assert(type(key) == "string", "key must be a string")
 
@@ -83,7 +87,11 @@ function M.getItem(key, callback)
     return value
 end
 
--- Set item in storage
+--- Set item in storage.
+-- @param key string Storage key
+-- @param value string Value to store
+-- @param[opt] callback function Callback(err)
+-- @return boolean Success
 function M.setItem(key, value, callback)
     assert(type(key) == "string", "key must be a string")
     assert(type(value) == "string", "value must be a string")
@@ -106,7 +114,10 @@ function M.setItem(key, value, callback)
     return success
 end
 
--- Remove item from storage
+--- Remove item from storage.
+-- @param key string Storage key
+-- @param[opt] callback function Callback(err)
+-- @return boolean Success
 function M.removeItem(key, callback)
     assert(type(key) == "string", "key must be a string")
 
@@ -128,7 +139,11 @@ function M.removeItem(key, callback)
     return success
 end
 
--- Merge item with existing value (for objects)
+--- Merge item with existing value (for objects).
+-- @param key string Storage key
+-- @param value string JSON string to merge
+-- @param[opt] callback function Callback(err)
+-- @return boolean Success
 function M.mergeItem(key, value, callback)
     assert(type(key) == "string", "key must be a string")
     assert(type(value) == "string", "value must be a string")
@@ -166,7 +181,9 @@ function M.mergeItem(key, value, callback)
     return M.setItem(key, value, callback)
 end
 
--- Get all keys
+--- Get all keys.
+-- @param[opt] callback function Callback(err, keys)
+-- @return table Array of keys
 function M.getAllKeys(callback)
     local data = loadFromDisk()
     local keys = {}
@@ -184,7 +201,9 @@ function M.getAllKeys(callback)
     return keys
 end
 
--- Clear all storage
+--- Clear all storage.
+-- @param[opt] callback function Callback(err)
+-- @return boolean Success
 function M.clear(callback)
     cache = {}
     local success = saveToDisk()
@@ -202,7 +221,8 @@ function M.clear(callback)
     return success
 end
 
--- Get storage info
+--- Get current storage file size in bytes.
+-- @return number File size
 function M.getCurrentSize()
     local data = loadFromDisk()
     local path = pathForFile(STORAGE_FILE, STORAGE_DIR)

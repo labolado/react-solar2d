@@ -1,8 +1,13 @@
--- components/ImageBackground.lua
+--- ImageBackground component.
 -- Image as background with children rendered on top (like RN ImageBackground).
+-- @module components.ImageBackground
+
 local React = require("react")
 local createElement = React.createElement
 
+--- ImageBackground component.
+-- @param props table {source, resizeMode, imageStyle, style, children}
+-- @return table React element
 local function ImageBackground(props)
     local source = props.source
     local resizeMode = props.resizeMode or props.imageStyle and props.imageStyle.resizeMode or "cover"

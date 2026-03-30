@@ -1,13 +1,16 @@
--- components/RefreshControl.lua
--- Pull-to-refresh control for ScrollView.
--- In React Native, this is used inside ScrollView/FlatList's refreshControl prop.
--- In Solar2D, we integrate with ScrollView's onRefresh mechanism.
+--- RefreshControl component.
+-- Pull-to-refresh control for ScrollView/FlatList.
+-- @module components.RefreshControl
+
 local React = require("react")
 local createElement = React.createElement
 local useState = React.useState
 local useEffect = React.useEffect
 local useRef = React.useRef
 
+--- RefreshControl component.
+-- @param props table {refreshing, onRefresh, tintColor, title, titleColor, progressViewOffset}
+-- @return table React element
 local function RefreshControl(props)
     local refreshing = props.refreshing or false
     local onRefresh = props.onRefresh

@@ -1,10 +1,13 @@
--- components/SafeAreaView.lua
+--- SafeAreaView component.
 -- Automatically applies insets for safe areas (notch, island, status bar).
--- Uses Solar2D's display.safeScreenOriginY and display.safeActualContentHeight.
--- Note: insets are calculated on each render to handle orientation changes.
+-- @module components.SafeAreaView
+
 local React = require("react")
 local createElement = React.createElement
 
+--- SafeAreaView component.
+-- @param props table {style, children}
+-- @return table React element
 local function SafeAreaView(props)
     local style = props.style or {}
     local children = props.children

@@ -1,4 +1,7 @@
--- navigation/StackNavigator.lua
+--- StackNavigator module.
+-- Creates a stack-based navigator with push/pop/replace/reset operations.
+-- @module navigation.StackNavigator
+
 local React = require("react")
 local ce = React.createElement
 local useState = React.useState
@@ -7,6 +10,8 @@ local useRef = React.useRef
 local NavState = require("navigation.NavigationState")
 local NavCtx = require("navigation.NavigationContext")
 
+--- Create a stack navigator factory.
+-- @return table Factory with Navigator and Screen
 local function createStackNavigator()
     local function Navigator(props)
         local children = props.children or {}

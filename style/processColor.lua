@@ -1,4 +1,7 @@
--- style/processColor.lua
+--- processColor module.
+-- Converts color strings and tables into normalized {r,g,b,a} tables.
+-- @module style.processColor
+
 local namedColors = {
     transparent = {0, 0, 0, 0},
     black = {0, 0, 0, 1}, white = {1, 1, 1, 1},
@@ -15,6 +18,9 @@ local namedColors = {
     teal = {0, 0.502, 0.502, 1}, indigo = {0.294, 0, 0.510, 1},
 }
 
+--- Process a color value into a normalized {r,g,b,a} table.
+-- @param color string|table|number|nil Color value
+-- @return table|nil Normalized color table
 local function processColor(color)
     if color == nil then return nil end
     if type(color) == "table" then return color end

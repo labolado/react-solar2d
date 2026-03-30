@@ -1,5 +1,6 @@
--- lib/gesture-handler/init.lua
--- Minimal react-native-gesture-handler implementation for Solar2D
+--- GestureHandler module.
+-- Minimal react-native-gesture-handler implementation for Solar2D.
+-- @module lib.gesture-handler
 
 local React = require("react")
 local ce = React.createElement
@@ -328,10 +329,16 @@ local function useController(factory, props)
     return ref.current
 end
 
+--- Root view wrapper for gesture handler tree.
+-- @param props table {style, children}
+-- @return table React element
 function GestureHandler.GestureHandlerRootView(props)
     return ce("View", { style = props and props.style }, props and props.children)
 end
 
+--- Pan gesture handler.
+-- @param props table {style, enabled, minDist, activeOffsetX, activeOffsetY, onGestureEvent, onHandlerStateChange, children}
+-- @return table React element
 function GestureHandler.PanGestureHandler(props)
     local controller = useController(createPanController, props or {})
     local style = props and props.style
@@ -344,6 +351,9 @@ function GestureHandler.PanGestureHandler(props)
     }, props and props.children)
 end
 
+--- Tap gesture handler.
+-- @param props table {style, enabled, maxDist, maxDurationMs, onActivated, onGestureEvent, onHandlerStateChange, children}
+-- @return table React element
 function GestureHandler.TapGestureHandler(props)
     local controller = useController(createTapController, props or {})
     return ce("View", {
@@ -355,6 +365,9 @@ function GestureHandler.TapGestureHandler(props)
     }, props and props.children)
 end
 
+--- Long press gesture handler.
+-- @param props table {style, enabled, maxDist, minDurationMs, onActivated, onGestureEvent, onHandlerStateChange, children}
+-- @return table React element
 function GestureHandler.LongPressGestureHandler(props)
     local controller = useController(createLongPressController, props or {})
     return ce("View", {

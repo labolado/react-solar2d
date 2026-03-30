@@ -1,5 +1,7 @@
--- navigation/DrawerNavigator.lua
+--- DrawerNavigator module.
 -- Drawer navigator: slide-out side panel (V1: button-only, no swipe gesture).
+-- @module navigation.DrawerNavigator
+
 local React = require("react")
 local ce = React.createElement
 local useState = React.useState
@@ -7,6 +9,8 @@ local useMemo = React.useMemo
 local useRef = React.useRef
 local NavState = require("navigation.NavigationState")
 
+--- Create a drawer navigator factory.
+-- @return table Factory with Navigator and Screen
 local function createDrawerNavigator()
 
     local function Navigator(props)

@@ -1,6 +1,12 @@
--- components/TouchableOpacity.lua
+--- TouchableOpacity component.
+-- Wrapper that dims on press with opacity feedback.
+-- @module components.TouchableOpacity
+
 local React = require("react")
 
+--- TouchableOpacity component.
+-- @param props table {style, onPress, activeOpacity, children}
+-- @return table React element
 local function TouchableOpacity(props)
     local children = props.children
     if type(children) == "table" and children[1] then

@@ -1,8 +1,13 @@
--- navigation/Header.lua
--- Default header: [Back] [Title] [Right]
+--- Header module.
+-- Default stack navigator header: [Back] [Title] [Right].
+-- @module navigation.Header
+
 local React = require("react")
 local ce = React.createElement
 
+--- Header component.
+-- @param props table {options, navigation, route, canGoBack}
+-- @return table React element
 local function Header(props)
     local options = props.options or {}
     local navigation = props.navigation

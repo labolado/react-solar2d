@@ -1,4 +1,8 @@
--- react_solar2d.lua (root module)
+--- React-Solar2D root module.
+-- Entry point that auto-configures package.path and re-exports React core,
+-- renderer, components, style, animated, and navigation APIs.
+-- @module react_solar2d
+
 -- Auto-configure package.path so sub-modules (react/init.lua etc.) are found
 do
     local info = debug.getinfo(1, "S")

@@ -1,5 +1,7 @@
--- navigation/init.lua
+--- Navigation module.
 -- Public exports for the navigation system.
+-- @module navigation
+
 local M = {}
 
 M.NavigationContainer = require("navigation.NavigationContainer")

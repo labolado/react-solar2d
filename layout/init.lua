@@ -1,6 +1,7 @@
--- layout/init.lua
--- High-level Yoga wrapper for react-solar2d
--- Translates RN-style style tables into Yoga C API calls
+--- Yoga layout wrapper for react-solar2d.
+-- Translates RN-style style tables into Yoga C API calls.
+-- Falls back to a no-op stub if the Yoga plugin is unavailable.
+-- @module layout
 
 local ok, yoga = pcall(require, "plugin_yoga")
 if not ok then
@@ -13,6 +14,8 @@ end
 if not ok then
     local stub = {}
     stub.applyStyle = function() end
+    --- Create a stub Yoga node.
+    -- @return table Stub node with no-op setters
     stub.newNode = function()
         return {
             setWidth = function() end,
@@ -131,6 +134,9 @@ local overflowMap = {
 local E = yoga.Edge
 local G = yoga.Gutter
 
+--- Apply a React Native style table to a Yoga node.
+-- @param node table Yoga node
+-- @param style table Style properties
 function M.applyStyle(node, style)
     if not style then return end
 
@@ -228,6 +234,9 @@ function M.applyStyle(node, style)
     if style.aspectRatio then node:setAspectRatio(style.aspectRatio) end
 end
 
+--- Create a new Yoga node and apply a style table.
+-- @param style table Style properties
+-- @return table Yoga node
 function M.newNode(style)
     local node = yoga.newNode()
     M.applyStyle(node, style)

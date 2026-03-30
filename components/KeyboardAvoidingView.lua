@@ -1,12 +1,16 @@
--- components/KeyboardAvoidingView.lua
--- Adjusts view position/height when keyboard appears.
--- Solar2D provides native keyboard events via Runtime:addEventListener("keyboard").
+--- KeyboardAvoidingView component.
+-- Adjusts view position/height when the keyboard appears.
+-- @module components.KeyboardAvoidingView
+
 local React = require("react")
 local createElement = React.createElement
 local useState = React.useState
 local useEffect = React.useEffect
 local useRef = React.useRef
 
+--- KeyboardAvoidingView component.
+-- @param props table {behavior="padding"|"position"|"height", keyboardVerticalOffset, enabled, style, children}
+-- @return table React element
 local function KeyboardAvoidingView(props)
     local behavior = props.behavior or "padding" -- "padding", "position", "height"
     local keyboardVerticalOffset = props.keyboardVerticalOffset or 0

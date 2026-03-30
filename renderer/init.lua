@@ -1,4 +1,8 @@
--- renderer/init.lua
+--- Solar2D renderer module.
+-- Bridges the React reconciler to Solar2D display objects, runs Yoga layout passes,
+-- and handles safe area insets, resize, and auto-flush.
+-- @module renderer
+
 local Reconciler = require("react.Reconciler")
 local HostConfig = require("renderer.HostConfig")
 
@@ -8,7 +12,8 @@ local layoutOk, Layout = pcall(require, "layout")
 local ReactSolar2D = {}
 local reconcilerInstance = nil
 
--- Safe area insets for notch/island devices
+--- Get safe area insets for notch/island devices.
+-- @return table Insets {top, bottom, left, right}
 function ReactSolar2D.getSafeAreaInsets()
     local safeX = display.safeScreenOriginX or display.screenOriginX or 0
     local safeY = display.safeScreenOriginY or display.screenOriginY or 0
@@ -383,6 +388,13 @@ local function runLayoutPass(rootFiber, width, height)
     end
 end
 
+--- Render a React element tree into a Solar2D container.
+-- @param element table React element tree
+-- @param container table Solar2D display group
+-- @param[opt] options table Options {width, height}
+-- @return table Reconciler instance
+-- @usage
+-- ReactSolar2D.render(App(), display.newGroup())
 function ReactSolar2D.render(element, container, options)
     if not reconcilerInstance then
         reconcilerInstance = Reconciler.create(HostConfig)
@@ -400,6 +412,8 @@ function ReactSolar2D.render(element, container, options)
     return reconcilerInstance
 end
 
+--- Unmount the React tree from a container.
+-- @param container table Solar2D display group
 function ReactSolar2D.unmount(container)
     if reconcilerInstance then
         reconcilerInstance.unmount(container)
@@ -407,6 +421,7 @@ function ReactSolar2D.unmount(container)
     end
 end
 
+--- Flush pending state updates and re-run layout if needed.
 function ReactSolar2D.flushUpdates()
     if reconcilerInstance then
         local didUpdate = reconcilerInstance.flushUpdates()
@@ -422,6 +437,7 @@ function ReactSolar2D.flushUpdates()
     end
 end
 
+--- Start auto-flushing updates on every enterFrame.
 function ReactSolar2D.startAutoFlush()
     Runtime:addEventListener("enterFrame", function()
         ReactSolar2D.flushUpdates()

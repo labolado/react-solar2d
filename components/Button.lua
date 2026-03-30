@@ -1,6 +1,14 @@
--- components/Button.lua
+--- Button component.
+-- Renders a pressable button with title text and touch feedback.
+-- @module components.Button
+
 local React = require("react")
 
+--- Button component.
+-- @param props table {title, onPress, color, width}
+-- @return table React element
+-- @usage
+-- React.createElement(Button, { title = "OK", onPress = function() end })
 local function Button(props)
     local style = {
         backgroundColor = props.color or "#2196F3",

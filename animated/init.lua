@@ -1,11 +1,19 @@
--- animated/init.lua
--- Animated API wrapping Solar2D transition.to
+--- Animated API module.
+-- Provides Animated.Value, Animated.timing, Animated.spring, Animated.sequence,
+-- Animated.parallel, Animated.loop, and Animated component markers.
+-- @module animated
+
 local Animated = {}
 
 -- AnimatedValue class
 local AnimatedValue = {}
 AnimatedValue.__index = AnimatedValue
 
+--- Create a new AnimatedValue.
+-- @param initial number Initial value (default 0)
+-- @return table AnimatedValue instance
+-- @usage
+-- local opacity = Animated.Value(1)
 function Animated.Value(initial)
     return setmetatable({
         _value = initial or 0,
@@ -14,10 +22,14 @@ function Animated.Value(initial)
     }, AnimatedValue)
 end
 
+--- Get the current value.
+-- @return number Current value
 function AnimatedValue:getValue()
     return self._value
 end
 
+--- Set the value and notify listeners.
+-- @param v number New value
 function AnimatedValue:setValue(v)
     self._value = v
     for _, listener in ipairs(self._listeners) do
@@ -25,17 +37,24 @@ function AnimatedValue:setValue(v)
     end
 end
 
+--- Add a listener for value changes.
+-- @param callback function Listener receiving {value}
+-- @return number Listener ID
 function AnimatedValue:addListener(callback)
     self._listeners[#self._listeners + 1] = callback
     return #self._listeners
 end
 
+--- Remove a listener by ID.
+-- @param id number Listener ID
 function AnimatedValue:removeListener(id)
     if id and self._listeners[id] then
         table.remove(self._listeners, id)
     end
 end
 
+--- Stop any running animation.
+-- @param[opt] callback function Called with current value
 function AnimatedValue:stopAnimation(callback)
     if self._animation then
         if transition and transition.cancel then
@@ -46,7 +65,10 @@ function AnimatedValue:stopAnimation(callback)
     if callback then callback(self._value) end
 end
 
--- Animated.timing — drive AnimatedValue via Solar2D transition.to
+--- Animated.timing — drive an AnimatedValue via Solar2D transition.to.
+-- @param value table AnimatedValue target
+-- @param config table {toValue, duration, easing, delay}
+-- @return table Animation object with start() and stop()
 function Animated.timing(value, config)
     local anim = {}
     local toValue = config.toValue
@@ -92,7 +114,10 @@ function Animated.timing(value, config)
     return anim
 end
 
--- Animated.spring — simplified using elastic easing
+--- Animated.spring — simplified spring using elastic easing.
+-- @param value table AnimatedValue target
+-- @param config table {toValue, duration, easing}
+-- @return table Animation object
 function Animated.spring(value, config)
     local newConfig = {
         toValue = config.toValue,
@@ -102,7 +127,9 @@ function Animated.spring(value, config)
     return Animated.timing(value, newConfig)
 end
 
--- Animated.sequence — run animations in order
+--- Animated.sequence — run animations in order.
+-- @param animations table Array of animation objects
+-- @return table Animation object
 function Animated.sequence(animations)
     local anim = {}
     anim._children = animations  -- expose for loop reset
@@ -128,7 +155,9 @@ function Animated.sequence(animations)
     return anim
 end
 
--- Animated.parallel — run animations simultaneously
+--- Animated.parallel — run animations simultaneously.
+-- @param animations table Array of animation objects
+-- @return table Animation object
 function Animated.parallel(animations)
     local anim = {}
     anim._children = animations  -- expose for loop reset
@@ -171,7 +200,10 @@ local function collectValues(animation)
     return vals
 end
 
--- Animated.loop — repeat an animation
+--- Animated.loop — repeat an animation.
+-- @param animation table Animation object to loop
+-- @param[opt] config table {iterations} (-1 for infinite)
+-- @return table Animation object
 function Animated.loop(animation, config)
     local iterations = (config and config.iterations) or -1 -- -1 = infinite
     local anim = {}

@@ -1,4 +1,7 @@
--- react/Reconciler.lua
+--- Fiber reconciler.
+-- Creates and updates the component tree, schedules effects, and commits changes to the host.
+-- @module react.Reconciler
+
 local ReactElement = require("react.ReactElement")
 local FiberNode = require("react.FiberNode")
 local Hooks = require("react.Hooks")
@@ -30,6 +33,9 @@ local function isCallable(v)
     return false
 end
 
+--- Create a reconciler instance bound to a host config.
+-- @param hostConfig table Host config with createInstance, updateInstance, appendChild, etc.
+-- @return table Reconciler instance with render, flushUpdates, and unmount methods
 function M.create(hostConfig)
     local reconciler = {}
     local rootFiber = nil
@@ -397,6 +403,9 @@ function M.create(hostConfig)
         end
     end
 
+    --- Render an element into a container.
+    -- @param element table React element tree
+    -- @param container table Solar2D display group
     function reconciler.render(element, container)
         local oldRoot = rootFiber
 
@@ -409,6 +418,8 @@ function M.create(hostConfig)
         flushEffects()
     end
 
+    --- Flush pending state updates and re-render.
+    -- @return boolean True if updates were processed
     function reconciler.flushUpdates()
         if #pendingUpdateFibers == 0 then return false end
         pendingUpdateFibers = {}
@@ -427,6 +438,8 @@ function M.create(hostConfig)
         return true
     end
 
+    --- Unmount the tree and clean up all resources.
+    -- @param container table Solar2D display group
     function reconciler.unmount(container)
         if rootFiber then
             -- Walk the entire fiber tree and clean up hooks, refs, subscriptions
@@ -447,6 +460,8 @@ function M.create(hostConfig)
         end
     end
 
+    --- Get the current root fiber (for testing/debugging).
+    -- @return table Root fiber node
     function reconciler._getRootFiber()
         return rootFiber
     end

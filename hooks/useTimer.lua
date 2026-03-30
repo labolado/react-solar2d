@@ -1,9 +1,14 @@
--- hooks/useTimer.lua
--- Timer/interval hooks for game loops
+--- useTimer hooks module.
+-- Timer/interval hooks for game loops.
+-- @module hooks.useTimer
+
 local React = require("react")
 
 local M = {}
 
+--- useInterval hook — run a callback on an interval.
+-- @param callback function Callback to run
+-- @param delay number|boolean Delay in ms, or false/nil to pause
 function M.useInterval(callback, delay)
     local callbackRef = React.useRef(callback)
     callbackRef.current = callback
@@ -23,6 +28,9 @@ function M.useInterval(callback, delay)
     end, {delay})
 end
 
+--- useTimeout hook — run a callback once after a delay.
+-- @param callback function Callback to run
+-- @param delay number|boolean Delay in ms, or false/nil to cancel
 function M.useTimeout(callback, delay)
     local callbackRef = React.useRef(callback)
     callbackRef.current = callback

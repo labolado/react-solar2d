@@ -1,9 +1,14 @@
--- components/Modal.lua
--- Function component: overlay backdrop + centered content
--- Renders at screen level to cover all content including navigation bars
+--- Modal component.
+-- Function component: overlay backdrop + centered content.
+-- Renders at screen level to cover all content including navigation bars.
+-- @module components.Modal
+
 local React = require("react")
 local createElement = React.createElement
 
+--- Modal component.
+-- @param props table {visible, transparent=true|false, onRequestClose, children}
+-- @return table React element
 local function Modal(props)
     if not props.visible then
         return nil

@@ -1,4 +1,7 @@
--- components/init.lua
+--- Component registry.
+-- Aggregates all built-in React-Solar2D components.
+-- @module components
+
 return {
     View = require("components.View"),
     Text = require("components.Text"),

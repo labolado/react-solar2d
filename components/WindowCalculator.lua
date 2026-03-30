@@ -1,4 +1,14 @@
--- components/WindowCalculator.lua
+--- WindowCalculator module.
+-- Calculates the visible item window for VirtualizedList based on scroll offset.
+-- @module components.WindowCalculator
+
+--- Calculate visible window.
+-- @param scrollOffset number Current scroll offset
+-- @param viewportHeight number Height of the viewport
+-- @param itemHeight number Height of each item
+-- @param totalCount number Total number of items
+-- @param windowSize number Buffer multiplier (default 5)
+-- @return table {first, last} 1-based indices
 local function calculateWindow(scrollOffset, viewportHeight, itemHeight, totalCount, windowSize)
     if totalCount == 0 or itemHeight == 0 then
         return { first = 1, last = 0 }

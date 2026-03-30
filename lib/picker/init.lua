@@ -1,10 +1,13 @@
--- lib/picker/init.lua
--- @react-native-picker/picker implementation for Solar2D
--- Native picker using Solar2D's native picker API
+--- Picker module.
+-- @react-native-picker/picker implementation for Solar2D.
+-- Native picker using Solar2D's native picker API.
+-- @module lib.picker
 
 local M = {}
 
--- Picker component
+--- Picker component.
+-- @param props table {selectedValue, onValueChange, enabled, style, children}
+-- @return table React element
 function M.Picker(props)
     local React = require("react")
     local useState = React.useState
@@ -77,7 +80,9 @@ function M.Picker(props)
     end)())
 end
 
--- PickerItem component (just a marker, actual rendering handled by Picker)
+--- PickerItem component (marker, actual rendering handled by Picker).
+-- @param props table {label, value, color}
+-- @return table PickerItem marker
 function M.PickerItem(props)
     -- This is a placeholder component
     return {

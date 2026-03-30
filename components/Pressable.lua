@@ -1,8 +1,13 @@
--- components/Pressable.lua
--- Function component: generic pressable wrapper with press feedback
+--- Pressable component.
+-- Generic pressable wrapper with press feedback.
+-- @module components.Pressable
+
 local React = require("react")
 local createElement = React.createElement
 
+--- Pressable component.
+-- @param props table {style, onPress, onLongPress, activeOpacity, children}
+-- @return table React element
 local function Pressable(props)
     local style = props.style or {}
     -- Ensure Pressable has a background so the group can receive taps.

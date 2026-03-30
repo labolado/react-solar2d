@@ -1,6 +1,7 @@
--- lib/netinfo/init.lua
--- @react-native-community/netinfo implementation for Solar2D
--- Network state detection using network.request polling
+--- NetInfo module.
+-- @react-native-community/netinfo implementation for Solar2D.
+-- Network state detection using network.request polling.
+-- @module lib.netinfo
 
 local M = {}
 
@@ -42,7 +43,7 @@ local function checkConnectivity()
     end, { timeout = 5 })
 end
 
--- Notify all listeners
+--- Notify all listeners.
 function M._notifyListeners()
     local state = {
         isConnected = isConnected,
@@ -58,7 +59,8 @@ function M._notifyListeners()
     end
 end
 
--- Get current network state
+--- Get current network state.
+-- @return table Network state
 function M.fetch()
     return {
         isConnected = isConnected,
@@ -70,7 +72,10 @@ function M.fetch()
     }
 end
 
--- Add event listener
+--- Add event listener.
+-- @param eventType string Must be "change"
+-- @param listener function Callback receiving state table
+-- @return table Subscription object with remove()
 function M.addEventListener(eventType, listener)
     if eventType ~= "change" then
         return false
@@ -93,7 +98,10 @@ function M.addEventListener(eventType, listener)
     }
 end
 
--- Remove event listener
+--- Remove event listener.
+-- @param eventType string Must be "change"
+-- @param listener function Registered callback
+-- @return boolean
 function M.removeEventListener(eventType, listener)
     if eventType ~= "change" then
         return false
@@ -115,7 +123,8 @@ function M.removeEventListener(eventType, listener)
     return true
 end
 
--- Configure (optional)
+--- Configure polling interval.
+-- @param config table {checkInterval}
 function M.configure(config)
     if config and config.checkInterval then
         checkInterval = config.checkInterval

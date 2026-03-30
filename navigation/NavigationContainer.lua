@@ -1,5 +1,7 @@
--- navigation/NavigationContainer.lua
+--- NavigationContainer module.
 -- Root component: wraps the navigator tree with NavigationContext.Provider.
+-- @module navigation.NavigationContainer
+
 local React = require("react")
 local ce = React.createElement
 local useState = React.useState
@@ -11,6 +13,9 @@ if not ok then
     DeepLinking = { resolve = function() return nil end }
 end
 
+--- NavigationContainer component.
+-- @param props table {children, initialState, linking, initialURL}
+-- @return table React element
 local function NavigationContainer(props)
     local children = props.children
 

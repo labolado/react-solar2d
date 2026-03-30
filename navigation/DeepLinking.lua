@@ -1,5 +1,7 @@
--- navigation/DeepLinking.lua
+--- DeepLinking module.
 -- Resolves a URL to navigation state based on linking config.
+-- @module navigation.DeepLinking
+
 local M = {}
 
 -- Parse path pattern like "detail/:id" into { segments, paramNames }
@@ -42,6 +44,10 @@ local function matchPattern(path, pattern)
     return params
 end
 
+--- Resolve a URL to a navigation state.
+-- @param url string Incoming URL
+-- @param linkingConfig table {prefixes={}, config={screens={}}}
+-- @return table|nil Navigation state or nil if no match
 function M.resolve(url, linkingConfig)
     if not url or not linkingConfig then return nil end
 

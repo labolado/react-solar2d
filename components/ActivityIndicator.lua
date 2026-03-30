@@ -1,10 +1,13 @@
--- components/ActivityIndicator.lua
+--- ActivityIndicator component.
 -- Simple loading indicator using three dots pattern.
--- Spinning animation requires the Animated API at the app level.
+-- @module components.ActivityIndicator
 
 local React = require("react")
 local createElement = React.createElement
 
+--- ActivityIndicator component.
+-- @param props table {animating=true|false, size="small"|"large"|number, color}
+-- @return table React element
 local function ActivityIndicator(props)
     if props.animating == false then return nil end
 

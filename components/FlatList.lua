@@ -1,10 +1,21 @@
--- components/FlatList.lua
--- Public API component. Wraps VirtualizedList with header/footer/separator support.
+--- FlatList component.
+-- Wraps VirtualizedList with header/footer/separator support.
 -- Without getItemLayout, falls back to rendering all items (backward compatible).
+-- @module components.FlatList
+
 local React = require("react")
 local createElement = React.createElement
 local VirtualizedList = require("components.VirtualizedList")
 
+--- FlatList component.
+-- @param props table {data, renderItem, keyExtractor, ItemSeparatorComponent, ListHeaderComponent, ListFooterComponent, ListEmptyComponent, getItemLayout, ...}
+-- @return table React element
+-- @usage
+-- React.createElement(FlatList, {
+--     data = items,
+--     renderItem = function(info) return React.createElement("Text", {}, info.item.name) end,
+--     keyExtractor = function(item, index) return tostring(index) end,
+-- })
 local function FlatList(props)
     local data = props.data or {}
     local renderItem = props.renderItem

@@ -1,10 +1,15 @@
--- components/SectionList.lua
+--- SectionList component.
 -- Sectioned list component with sticky headers. Wraps VirtualizedList.
 -- Falls back to ScrollView when getItemLayout is not provided.
+-- @module components.SectionList
+
 local React = require("react")
 local createElement = React.createElement
 local VirtualizedList = require("components.VirtualizedList")
 
+--- SectionList component.
+-- @param props table {sections, renderItem, renderSectionHeader, renderSectionFooter, keyExtractor, ItemSeparatorComponent, SectionSeparatorComponent, ...}
+-- @return table React element
 local function SectionList(props)
     local sections = props.sections or {}
     local renderItem = props.renderItem

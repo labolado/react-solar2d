@@ -1,8 +1,13 @@
--- components/Switch.lua
--- Function component: toggle switch
+--- Switch component.
+-- Toggle switch function component.
+-- @module components.Switch
+
 local React = require("react")
 local createElement = React.createElement
 
+--- Switch component.
+-- @param props table {value, onValueChange, trackColor={true=...,false=...}, thumbColor}
+-- @return table React element
 local function Switch(props)
     local value = props.value or false
     local onValueChange = props.onValueChange

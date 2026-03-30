@@ -1,6 +1,7 @@
--- lib/datetime-picker/init.lua
--- @react-native-community/datetimepicker implementation for Solar2D
--- Column-based picker: each column shows selected value with tap-to-change
+--- DateTimePicker module.
+-- @react-native-community/datetimepicker implementation for Solar2D.
+-- Column-based picker: each column shows selected value with tap-to-change.
+-- @module lib.datetime-picker
 
 local M = {}
 
@@ -191,6 +192,9 @@ local function Sep(props)
     )
 end
 
+--- DateTimePicker component.
+-- @param props table {value, mode="date"|"time"|"datetime", onChange, disabled, style, minimumDate, maximumDate}
+-- @return table React element
 function M.DateTimePicker(props)
     local React = require("react")
     local ce = React.createElement

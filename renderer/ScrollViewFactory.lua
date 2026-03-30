@@ -1,4 +1,7 @@
--- renderer/ScrollViewFactory.lua
+--- ScrollView factory for the renderer.
+-- Creates a scrollable container with touch/mouse wheel support and nested ScrollView handling.
+-- @module renderer.ScrollViewFactory
+
 -- ScrollView creation logic extracted from HostConfig
 
 local function createScrollView(props, style, applyCommonStyle)

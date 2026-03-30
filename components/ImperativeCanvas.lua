@@ -1,8 +1,19 @@
--- components/ImperativeCanvas.lua
--- Bridge component to embed imperative Solar2D rendering within React tree
+--- ImperativeCanvas component.
+-- Bridge component to embed imperative Solar2D rendering within the React tree.
+-- @module components.ImperativeCanvas
+
 local React = require("react")
 local ce = React.createElement
 
+--- ImperativeCanvas component.
+-- @param props table {style, onDraw, onFrame, onResize, clip, overlay, children}
+-- @return table React element
+-- @usage
+-- React.createElement(ImperativeCanvas, {
+--     style = { width = 200, height = 200 },
+--     onDraw = function(surface, w, h, propsRef) end,
+--     onFrame = function(surface, dt) end,
+-- })
 local function ImperativeCanvas(props)
     local surfaceRef = React.useRef(nil)
     local viewRef = React.useRef(nil)

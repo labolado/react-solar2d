@@ -1,11 +1,15 @@
--- navigation/NavigationTestUtils.lua
+--- NavigationTestUtils module.
 -- Helpers for navigating to specific screens in tests.
+-- @module navigation.NavigationTestUtils
+
 local NavState = require("navigation.NavigationState")
 
 local M = {}
 
--- Build an initialState that navigates to the given screen with params.
--- screenPath can be a simple name "Detail" or nested "News/Detail".
+--- Build an initialState that navigates to the given screen with params.
+-- @param screenPath string Simple name "Detail" or nested "News/Detail"
+-- @param[opt] params table Route params
+-- @return table Initial navigation state
 function M.buildInitialState(screenPath, params)
     local names = {}
     for name in screenPath:gmatch("[^/]+") do
@@ -27,7 +31,10 @@ function M.buildInitialState(screenPath, params)
     }
 end
 
--- Parse a .route file path like "news/detail/123" into app name + initialState
+--- Parse a .route file path like "news/detail/123" into app name + initialState.
+-- @param routePath string Route path
+-- @return string|nil App name
+-- @return table|nil Initial navigation state
 function M.parseRoutePath(routePath)
     local parts = {}
     for part in routePath:gmatch("[^/]+") do

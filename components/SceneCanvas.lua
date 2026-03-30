@@ -1,9 +1,14 @@
--- components/SceneCanvas.lua
--- Wraps ImperativeCanvas to load composer-style scenes
+--- SceneCanvas component.
+-- Wraps ImperativeCanvas to load composer-style scenes with lifecycle events.
+-- @module components.SceneCanvas
+
 local React = require("react")
 local ce = React.createElement
 local ImperativeCanvas = require("components.ImperativeCanvas")
 
+--- SceneCanvas component.
+-- @param props table {scene, params, style, onFrame, clip, overlay}
+-- @return table React element
 local function SceneCanvas(props)
     local scene = props.scene
     local params = props.params

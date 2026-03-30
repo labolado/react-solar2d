@@ -1,6 +1,7 @@
--- lib/vector-icons/init.lua
--- react-native-vector-icons implementation for Solar2D
--- Supports Material Icons, Font Awesome, Ionicons via text symbols
+--- VectorIcons module.
+-- react-native-vector-icons implementation for Solar2D.
+-- Supports Material Icons, Font Awesome, Ionicons via text symbols.
+-- @module lib.vector-icons
 
 local M = {}
 
@@ -773,14 +774,19 @@ M.MaterialIcons = M.createIconComponent("MaterialIcons")
 M.FontAwesome = M.createIconComponent("FontAwesome")
 M.Ionicons = M.createIconComponent("Ionicons")
 
--- Generic Icon component that accepts family prop
+--- Generic Icon component that accepts family prop.
+-- @param props table {family="MaterialIcons"|"FontAwesome"|"Ionicons", name, size, color, style}
+-- @return table React element
 function M.Icon(props)
     local family = props.family or "MaterialIcons"
     local Component = M.createIconComponent(family)
     return Component(props)
 end
 
--- Get icon char code for custom rendering
+--- Get icon char code for custom rendering.
+-- @param iconSet string Icon set name
+-- @param name string Icon name
+-- @return string|nil Unicode character
 function M.getIconChar(iconSet, name)
     local set = ICON_SETS[iconSet]
     if set then

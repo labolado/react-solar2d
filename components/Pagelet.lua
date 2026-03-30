@@ -1,18 +1,8 @@
--- components/Pagelet.lua
+--- Pagelet component.
 -- React-level scene manager with composer-compatible lifecycle.
 -- Unlike SceneCanvas (imperative scenes in Canvas), Pagelet wraps
 -- React components with create/show/hide/destroy lifecycle callbacks.
---
--- Usage:
---   ce(Pagelet.Container, { current = "game" },
---       ce(Pagelet, { name = "menu", onShow = function(e) ... end },
---           ce("View", {}, ce("Text", {}, "Menu"))
---       ),
---       ce(Pagelet, { name = "game", onShow = function(e) ... end },
---           ce(SceneCanvas, { scene = boardScene }),
---           ce("View", {}, ce("Text", {}, "Score"))
---       ),
---   )
+-- @module components.Pagelet
 
 local React = require("react")
 local ce = React.createElement
@@ -24,6 +14,10 @@ local ReactElement = require("react.ReactElement")
 -- ============================================================
 -- Pagelet: a page with composer-compatible lifecycle
 -- ============================================================
+
+--- Pagelet component.
+-- @param props table {name, params, onCreate, onShow, onHide, onDestroy, style, children}
+-- @return table React element
 local function Pagelet(props)
     local params = props.params
     local mountedRef = useRef(false)
@@ -85,6 +79,10 @@ end
 -- ============================================================
 -- Container: manages which Pagelet is active
 -- ============================================================
+
+--- Pagelet.Container component.
+-- @param props table {current, style, children}
+-- @return table React element
 local function Container(props)
     local current = props.current
     local children = props.children

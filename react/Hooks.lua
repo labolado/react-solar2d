@@ -1,23 +1,33 @@
--- react/Hooks.lua
+--- React hooks implementation.
+-- Provides useState, useEffect, useRef, useMemo, useCallback, useContext, useReducer, useId,
+-- useImperativeHandle, useDebugValue, and useSyncExternalStore.
+-- @module react.Hooks
+
 local M = {}
 
 local currentFiber = nil
 local hookIndex = 0
 local pendingEffects = {}
 
+--- Set the current fiber for hook execution.
+-- @param fiber table Fiber node
 function M._setCurrentFiber(fiber)
     currentFiber = fiber
 end
 
+--- Reset the hook index for a new render.
 function M._resetHookIndex()
     hookIndex = 0
 end
 
+--- Finish hook execution and clear current fiber.
 function M._finishHooks()
     currentFiber = nil
     hookIndex = 0
 end
 
+--- Get and clear pending effect callbacks.
+-- @return table List of pending effects
 function M._getPendingEffects()
     local effects = pendingEffects
     pendingEffects = {}
@@ -33,7 +43,14 @@ local function getHook()
     return hookIndex
 end
 
----@return value, setter
+--- useState hook — manage component state.
+-- @param initialValue any Initial state value
+-- @return any Current state value
+-- @return function Setter function (accepts value or updater function)
+-- @usage
+-- local count, setCount = React.useState(0)
+-- setCount(count + 1)
+-- setCount(function(prev) return prev + 1 end)
 function M.useState(initialValue)
     local idx = getHook()
     local hooks = currentFiber._hooks
@@ -72,6 +89,11 @@ function M.useState(initialValue)
     return hook.state, setState
 end
 
+--- useReducer hook — state management with reducer function.
+-- @param reducer function Reducer function (state, action) -> newState
+-- @param initialState any Initial state value
+-- @return any Current state value
+-- @return function Dispatch function
 function M.useReducer(reducer, initialState)
     local idx = getHook()
     local hooks = currentFiber._hooks
@@ -104,6 +126,11 @@ function M.useReducer(reducer, initialState)
     return hook.state, dispatch
 end
 
+--- useRef hook — mutable reference that persists across renders.
+-- @param initialValue any Initial ref value
+-- @return table Ref object with `current` field
+-- @usage
+-- local inputRef = React.useRef(nil)
 function M.useRef(initialValue)
     local idx = getHook()
     local hooks = currentFiber._hooks
@@ -125,6 +152,10 @@ local function depsChanged(prevDeps, nextDeps)
     return false
 end
 
+--- useMemo hook — cache expensive computation.
+-- @param factory function Computation function
+-- @param deps table Dependency array
+-- @return any Memoized value
 function M.useMemo(factory, deps)
     local idx = getHook()
     local hooks = currentFiber._hooks
@@ -137,10 +168,22 @@ function M.useMemo(factory, deps)
     return hooks[idx].value
 end
 
+--- useCallback hook — cache callback reference.
+-- @param callback function Callback to memoize
+-- @param deps table Dependency array
+-- @return function Memoized callback
 function M.useCallback(callback, deps)
     return M.useMemo(function() return callback end, deps)
 end
 
+--- useEffect hook — run side effects after render.
+-- @param callback function Effect function, may return cleanup function
+-- @param[opt] deps table Dependency array (empty = mount only, nil = every render)
+-- @usage
+-- React.useEffect(function()
+--     print("mounted")
+--     return function() print("cleanup") end
+-- end, {})
 function M.useEffect(callback, deps)
     local idx = getHook()
     local hooks = currentFiber._hooks
@@ -158,6 +201,10 @@ function M.useEffect(callback, deps)
     end
 end
 
+--- useLayoutEffect hook — run side effects synchronously after render.
+-- In Solar2D (single-threaded), same as useEffect but runs synchronously.
+-- @param callback function Effect function
+-- @param[opt] deps table Dependency array
 function M.useLayoutEffect(callback, deps)
     -- In Solar2D (single-threaded), same as useEffect but runs synchronously
     M.useEffect(callback, deps)
@@ -166,6 +213,8 @@ end
 -- useId: generate unique IDs for accessibility and form associations
 local idCounter = 0
 
+--- useId hook — generate stable unique IDs.
+-- @return string Unique ID
 function M.useId()
     local idx = getHook()
     local hooks = currentFiber._hooks
@@ -180,7 +229,10 @@ function M.useId()
     return hooks[idx]
 end
 
--- useImperativeHandle: customize the instance value exposed via ref
+--- useImperativeHandle hook — customize the instance value exposed via ref.
+-- @param ref table Ref object from useRef or forwardRef
+-- @param createHandle function Factory returning the handle
+-- @param[opt] deps table Dependency array
 function M.useImperativeHandle(ref, createHandle, deps)
     local idx = getHook()
     local hooks = currentFiber._hooks
@@ -198,7 +250,9 @@ function M.useImperativeHandle(ref, createHandle, deps)
     end
 end
 
--- useDebugValue: display a label for custom hooks in debugging
+--- useDebugValue hook — display a label for custom hooks in debugging.
+-- @param value any Value to display
+-- @param[opt] formatFn function Optional formatter function
 function M.useDebugValue(value, formatFn)
     -- In Solar2D environment, print for debugging
     -- In production, this could be a no-op
@@ -212,7 +266,11 @@ function M.useDebugValue(value, formatFn)
     end
 end
 
--- useSyncExternalStore: subscribe to an external store
+--- useSyncExternalStore hook — subscribe to an external store.
+-- @param subscribe function Subscribe function returning unsubscribe
+-- @param getSnapshot function Get current snapshot
+-- @param[opt] getServerSnapshot function Server snapshot getter
+-- @return any Current snapshot
 function M.useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
     local idx = getHook()
     local hooks = currentFiber._hooks
@@ -268,6 +326,11 @@ end
 -- Context (basic implementation)
 local contextCounter = 0
 
+--- createContext — create a React context.
+-- @param defaultValue any Default value when no Provider is found
+-- @return table Context object with Provider
+-- @usage
+-- local ThemeContext = React.createContext("light")
 function M.createContext(defaultValue)
     contextCounter = contextCounter + 1
     local id = contextCounter
@@ -282,6 +345,9 @@ function M.createContext(defaultValue)
     return context
 end
 
+--- useContext — read value from nearest Provider.
+-- @param context table Context created by createContext
+-- @return any Current context value
 function M.useContext(context)
     -- Walk up fiber tree to find Provider
     local fiber = currentFiber

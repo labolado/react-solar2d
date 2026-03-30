@@ -1,11 +1,15 @@
--- components/WebView.lua
--- React wrapper for native.newWebView
+--- WebView component.
+-- React wrapper for native.newWebView.
 -- NOTE: native.* objects render above the GL surface and cannot be
 -- clipped, masked, or placed inside ScrollView correctly.
+-- @module components.WebView
 
 local React = require("react")
 local ce = React.createElement
 
+--- WebView component.
+-- @param props table {source={uri|html}, onLoad, onError, onMessage, style, ref}
+-- @return table React element
 local function WebView(props)
     local source = props.source or {}
     local onLoad = props.onLoad

@@ -1,6 +1,8 @@
--- navigation/TabNavigator.lua
+--- TabNavigator module.
 -- Bottom tab navigator: parallel screens with tab bar.
 -- All tabs rendered, only active visible (display="none" for inactive).
+-- @module navigation.TabNavigator
+
 local React = require("react")
 local ce = React.createElement
 local useState = React.useState
@@ -8,6 +10,8 @@ local useMemo = React.useMemo
 local useRef = React.useRef
 local NavState = require("navigation.NavigationState")
 
+--- Create a bottom tab navigator factory.
+-- @return table Factory with Navigator and Screen
 local function createBottomTabNavigator()
 
     local function Navigator(props)

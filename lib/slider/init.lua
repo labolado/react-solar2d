@@ -1,10 +1,13 @@
--- lib/slider/init.lua
--- @react-native-community/slider for Solar2D
+--- Slider module.
+-- @react-native-community/slider for Solar2D.
 -- Uses _onDragHandler stored on overlay instance, which ScrollView detects and forwards touches to.
--- propsRef ensures handlers always see latest values.
+-- @module lib.slider
 
 local M = {}
 
+--- Slider component.
+-- @param props table {value, minimumValue, maximumValue, step, disabled, onValueChange, onSlidingComplete, style, minimumTrackTintColor, maximumTrackTintColor, thumbTintColor, showButtons}
+-- @return table React element
 function M.Slider(props)
     local React = require("react")
     local ce = React.createElement

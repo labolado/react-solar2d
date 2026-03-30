@@ -1,4 +1,7 @@
--- react/init.lua
+--- React core module.
+-- Provides createElement, hooks (useState, useEffect, etc.), context, memo, Fragment, and reconciler access.
+-- @module react
+
 local ReactElement = require("react.ReactElement")
 local Hooks = require("react.Hooks")
 
@@ -27,7 +30,12 @@ React.useSyncExternalStore = Hooks.useSyncExternalStore
 -- Fragment (represented as special type)
 React.Fragment = "$$react.fragment"
 
--- memo: skip re-render if props haven't changed
+--- memo: skip re-render if props haven't changed.
+-- @param component function Component to wrap
+-- @param[opt] areEqual function Optional custom equality comparison
+-- @return table Memoized component descriptor
+-- @usage
+-- local MemoizedButton = React.memo(Button)
 function React.memo(component, areEqual)
     return {
         _isMemo = true,

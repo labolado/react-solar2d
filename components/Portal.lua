@@ -1,6 +1,8 @@
--- components/Portal.lua
--- Portal system for rendering content outside parent tree
--- Used by Modal to render above navigation bars
+--- Portal component.
+-- Portal system for rendering content outside the parent tree.
+-- Used by Modal to render above navigation bars.
+-- @module components.Portal
+
 local React = require("react")
 local useState = React.useState
 local useEffect = React.useEffect
@@ -16,6 +18,11 @@ local function notifyListeners()
     end
 end
 
+--- Portal context.
+-- @field register function(id, content)
+-- @field unregister function(id)
+-- @field getAll function() -> table
+-- @field subscribe function(fn) -> unsubscribe function
 local PortalContext = createContext({
     register = function(id, content)
         portalRegistry[id] = content
@@ -41,7 +48,9 @@ local PortalContext = createContext({
     end
 })
 
--- PortalHost renders all registered portals at root level
+--- PortalHost renders all registered portals at root level.
+-- @param props table
+-- @return table React element
 local function PortalHost(props)
     local portals, setPortals = useState({})
 
@@ -76,7 +85,9 @@ local function PortalHost(props)
     }, children)
 end
 
--- Portal sends content to PortalHost
+--- Portal sends content to PortalHost.
+-- @param props table {id, children}
+-- @return nil
 local function Portal(props)
     local id = props.id or "default"
 
