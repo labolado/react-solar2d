@@ -4,6 +4,8 @@ Pure Lua React framework for Solar2D (Corona SDK). Write UI with React API + Fle
 
 ## Install
 
+### Option A: Plugin (recommended)
+
 Add to your `build.settings`:
 
 ```lua
@@ -35,6 +37,16 @@ settings = {
     },
 }
 ```
+
+### Option B: Local install
+
+```bash
+git clone https://github.com/labolado/react-solar2d.git
+cd react-solar2d
+./scripts/install-local.sh /path/to/your/project
+```
+
+This copies framework files directly into your project. No `build.settings` plugin config needed, but Yoga plugin still requires Option A's `plugin.yoga` entry.
 
 ## Hello World
 
