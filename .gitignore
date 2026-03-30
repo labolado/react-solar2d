@@ -11,6 +11,9 @@ dist/
 **/.test
 .claude/
 CLAUDE.md
+doc/
+tasks/
+test-results/
 session-recall.md
 *-handoff.md
 test_progress*.lua
