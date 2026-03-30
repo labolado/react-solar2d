@@ -408,48 +408,50 @@ function M.createInstance(elementType, props)
     if elementType == "View" then
         local group = display.newGroup()
         group.anchorX, group.anchorY = 0, 0
-        group.anchorChildren = true
 
         local vw = type(style.width) == "number" and style.width or 0
         local vh = type(style.height) == "number" and style.height or 0
 
         -- Background rect: create if has background/border, OR if has explicit size (for hit testing)
         if style.backgroundColor or style.borderWidth or style.borderColor or (vw > 0 and vh > 0) then
-            local bg
             local br = tonumber(style.borderRadius) or 0
-            -- Perfect circle: use roundedRect (same as before, reliable positioning)
-            local isCircle = br > 0 and vw > 0 and vh > 0 and vw == vh and br >= vw / 2
-            if isCircle then
-                bg = display.newRoundedRect(group, 0, 0, vw, vh, br)
-                bg.anchorX, bg.anchorY = 0, 0
-            elseif br > 0 then
-                bg = display.newRoundedRect(group, 0, 0, vw, vh, br)
-                bg.anchorX, bg.anchorY = 0, 0
-            else
-                bg = display.newRect(group, 0, 0, vw, vh)
-                bg.anchorX, bg.anchorY = 0, 0
-            end
+            -- Compute fill/stroke colors for use now or later (pending creation)
+            local fillColor = style.backgroundColor and parseColor(style.backgroundColor) or {0, 0, 0, 0}
+            local strokeColor = style.borderColor and parseColor(style.borderColor) or nil
 
-            if style.backgroundColor then
-                local c = parseColor(style.backgroundColor)
-                bg:setFillColor(c[1], c[2], c[3], c[4])
-            else
-                bg:setFillColor(0, 0, 0, 0)
-            end
-
-            if style.borderWidth then
-                bg.strokeWidth = style.borderWidth
-                if style.borderColor then
-                    local c = parseColor(style.borderColor)
-                    bg:setStrokeColor(c[1], c[2], c[3], c[4])
+            if vw > 0 and vh > 0 then
+                -- Explicit size: create immediately at correct dimensions
+                local bg
+                local isCircle = br > 0 and vw == vh and br >= vw / 2
+                if isCircle or br > 0 then
+                    bg = display.newRoundedRect(group, 0, 0, vw, vh, br)
+                else
+                    bg = display.newRect(group, 0, 0, vw, vh)
                 end
+                bg.anchorX, bg.anchorY = 0, 0
+                bg:setFillColor(fillColor[1], fillColor[2], fillColor[3], fillColor[4])
+                if style.borderWidth then
+                    bg.strokeWidth = style.borderWidth
+                    if strokeColor then
+                        bg:setStrokeColor(strokeColor[1], strokeColor[2], strokeColor[3], strokeColor[4])
+                    end
+                end
+                group._bg = bg
+                group._borderRadius = br
+                group.width = vw
+                group.height = vh
+            else
+                -- No explicit size: defer _bg creation until Yoga computes layout dimensions.
+                -- Creating a 0x0 or 1x1 rect and resizing later is unreliable in Solar2D,
+                -- especially for roundedRect where path.width resize doesn't work correctly.
+                group._pendingBg = {
+                    fillColor   = fillColor,
+                    strokeColor = strokeColor,
+                    strokeWidth = style.borderWidth,
+                    borderRadius = br,
+                }
+                group._borderRadius = br
             end
-
-            group._bg = bg
-            group._borderRadius = tonumber(style.borderRadius) or 0
-            -- Set group dimensions for hit testing (Solar2D groups don't have intrinsic size)
-            group.width = vw
-            group.height = vh
         end
 
         -- Per-side borders
@@ -471,8 +473,8 @@ function M.createInstance(elementType, props)
         -- Store layout info for manual centering (without Yoga layout engine)
         if style.justifyContent or style.alignItems then
             group._centerChildren = true
-            group._viewW = style.width or 0
-            group._viewH = style.height or 0
+            group._viewW = (type(style.width) == "number" and style.width) or 0
+            group._viewH = (type(style.height) == "number" and style.height) or 0
             group._alignItems = style.alignItems
             group._justifyContent = style.justifyContent
         end
@@ -485,7 +487,6 @@ function M.createInstance(elementType, props)
     elseif elementType == "LinearGradient" then
         local group = display.newGroup()
         group.anchorX, group.anchorY = 0, 0
-        group.anchorChildren = true
         group._isLinearGradient = true
 
         local vw = style.width or 1
@@ -869,8 +870,8 @@ function M.appendChild(parent, child)
     if parent._centerChildren and child.contentWidth then
         local pw = parent._viewW or 0
         local ph = parent._viewH or 0
-        local cw = child.contentWidth or child.width or 0
-        local ch = child.contentHeight or child.height or 0
+        local cw = child.contentWidth or (type(child.width) == "number" and child.width) or 0
+        local ch = child.contentHeight or (type(child.height) == "number" and child.height) or 0
         if parent._alignItems == "center" and pw > 0 and cw > 0 then
             child.x = (pw - cw) / 2
         end
@@ -943,7 +944,22 @@ function M.updateInstance(instance, oldProps, newProps)
     local newBr = tonumber(newStyle.borderRadius) or 0
     local brChanged = oldBr ~= newBr
 
-    if needsBg and not instance._bg then
+    if instance._pendingBg then
+        -- _bg creation is deferred until applyLayout runs with Yoga dimensions.
+        -- Update the pending info so the correct colors are used when created.
+        if needsBg then
+            local fillColor = newStyle.backgroundColor and parseColor(newStyle.backgroundColor) or {0, 0, 0, 0}
+            local strokeColor = newStyle.borderColor and parseColor(newStyle.borderColor) or nil
+            instance._pendingBg.fillColor   = fillColor
+            instance._pendingBg.strokeColor = strokeColor
+            instance._pendingBg.strokeWidth = newStyle.borderWidth
+            instance._pendingBg.borderRadius = newBr
+            instance._borderRadius = newBr
+        else
+            -- No longer needs bg: cancel pending creation
+            instance._pendingBg = nil
+        end
+    elseif needsBg and not instance._bg then
         -- Create _bg dynamically (was absent at createInstance time)
         local vw = newStyle.width or instance._layoutW or 0
         local vh = newStyle.height or instance._layoutH or 0

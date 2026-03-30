@@ -1,56 +1,54 @@
 # React-Solar2D
 
-React-like UI framework for Solar2D (Corona SDK), written in pure Lua.
+Pure Lua React framework for Solar2D (Corona SDK). Write UI with React API + Flexbox layout, runs on iOS/Android/Mac/Windows.
 
-## Features
+## Install
 
-- React API (createElement, hooks, reconciler, context)
-- Flexbox layout via Yoga C plugin
-- React Native compatible components (View, Text, ScrollView, TextInput, Modal, etc.)
-- Navigation system (Stack, Tab, Drawer)
-- Animation system (transition.to wrapper)
-- ImperativeCanvas for mixing React UI with imperative Solar2D rendering
-- SceneCanvas for loading existing composer scenes into React layout
-
-## Quick Start
-
-### 1. Run the examples
-
-```bash
-git clone --recursive https://github.com/labolado/react-solar2d-examples.git
-```
-
-Open `main.lua` in the Solar2D Simulator.
-
-See [react-solar2d-examples](https://github.com/labolado/react-solar2d-examples) for demos.
-
-### 2. Use in your own project
-
-Add as a submodule:
-
-```bash
-cd your_project/
-git submodule add https://github.com/labolado/react-solar2d.git react-solar2d
-```
-
-In your `main.lua`:
+Add to your `build.settings`:
 
 ```lua
-local base = system.pathForFile("main.lua"):match("(.+/)") or ""
-package.path = base .. "react-solar2d/?.lua;"
-            .. base .. "react-solar2d/?/init.lua;"
-            .. package.path
+local rs2d_url = "https://github.com/labolado/react-solar2d/releases/download/v1/"
+local yoga_url = "https://github.com/labolado/solar2d-plugin-yoga/releases/download/v5/"
 
+settings = {
+    plugins = {
+        ["plugin.react-solar2d"] = {
+            publisherId = "com.labolado",
+            supportedPlatforms = {
+                ["mac-sim"]    = { url = rs2d_url .. "plugin.react-solar2d-v1.tgz" },
+                android        = { url = rs2d_url .. "plugin.react-solar2d-v1.tgz" },
+                iphone         = { url = rs2d_url .. "plugin.react-solar2d-v1.tgz" },
+                ["iphone-sim"] = { url = rs2d_url .. "plugin.react-solar2d-v1.tgz" },
+                ["win32-sim"]  = { url = rs2d_url .. "plugin.react-solar2d-v1.tgz" },
+            },
+        },
+        ["plugin.yoga"] = {
+            publisherId = "com.labolado",
+            supportedPlatforms = {
+                ["mac-sim"]    = { url = yoga_url .. "plugin.yoga-mac-sim.tgz" },
+                android        = { url = yoga_url .. "plugin.yoga-android.tgz" },
+                iphone         = { url = yoga_url .. "plugin.yoga-iphone.tgz" },
+                ["iphone-sim"] = { url = yoga_url .. "plugin.yoga-iphone-sim.tgz" },
+                ["win32-sim"]  = { url = yoga_url .. "plugin.yoga-win32-sim.tgz" },
+            },
+        },
+    },
+}
+```
+
+## Hello World
+
+```lua
+-- main.lua
 local RN = require("react_solar2d")
-local React = require("react")
-local ce = React.createElement
+local ce = RN.createElement
 
 local function App()
     return ce("View", {
-        style = { width = 320, height = 480, backgroundColor = "#1a1a2e" },
+        style = { flex = 1, backgroundColor = "#1a1a2e", justifyContent = "center", alignItems = "center" },
     },
         ce("Text", {
-            style = { color = "#ffffff", fontSize = 24, textAlign = "center", marginTop = 100 },
+            style = { color = "#ffffff", fontSize = 24 },
         }, "Hello React-Solar2D!")
     )
 end
@@ -60,61 +58,233 @@ RN.render(ce(App), container)
 RN.startAutoFlush()
 ```
 
-### 3. With Yoga layout (optional)
-
-Build the Yoga C plugin for flexbox layout:
-
-```bash
-cd plugins/yoga && make solar2d
-```
-
-Then add to your package.cpath:
-
-```lua
-local YOGA = base .. "react-solar2d/plugins/yoga/build-solar2d/"
-package.cpath = YOGA .. "?.dylib;" .. YOGA .. "?.so;" .. package.cpath
-```
-
 ## Components
 
-| Component | Description |
-|-----------|-------------|
-| View | Container with flexbox layout |
-| Text | Text display |
-| Image | Image display |
-| ScrollView | Scrollable container with touch/mouse wheel |
-| TextInput | Native text input field |
-| Button | Simple button with title |
-| Pressable | Touchable wrapper with press feedback |
-| FlatList | Virtualized list |
-| SectionList | Grouped list with section headers |
-| Modal | Full-screen overlay |
-| Switch | Toggle switch |
-| Slider | Value slider (lib/slider) |
-| ImperativeCanvas | Bridge for imperative Solar2D rendering |
-| SceneCanvas | Load composer scenes into React layout |
+### View
+
+```lua
+ce("View", {
+    style = {
+        flex = 1,
+        flexDirection = "row",       -- "column" (default) | "row"
+        justifyContent = "center",   -- "flex-start" | "center" | "flex-end" | "space-between" | "space-around"
+        alignItems = "center",       -- "stretch" (default) | "center" | "flex-start" | "flex-end"
+        padding = 16,
+        margin = 8,
+        backgroundColor = "#333",
+        borderRadius = 12,
+        borderWidth = 1,
+        borderColor = "#666",
+    },
+}, children)
+```
+
+### Text
+
+```lua
+ce("Text", {
+    style = {
+        fontSize = 18,
+        fontWeight = "bold",         -- "normal" | "bold"
+        color = "#ffffff",
+        textAlign = "center",        -- "left" | "center" | "right"
+    },
+}, "Hello")
+```
+
+### Image
+
+```lua
+-- Network image
+ce("Image", {
+    source = { uri = "https://example.com/photo.jpg" },
+    style = { width = 200, height = 150, borderRadius = 8 },
+    resizeMode = "cover",            -- "stretch" | "contain" | "cover" | "center"
+})
+
+-- Local image
+ce("Image", {
+    source = require("assets/icon.png"),
+    style = { width = 48, height = 48 },
+})
+```
+
+### Button
+
+```lua
+ce(RN.Button, {
+    title = "Press Me",
+    color = "#2196F3",
+    onPress = function() print("pressed!") end,
+})
+```
+
+### Pressable
+
+```lua
+ce(RN.Pressable, {
+    style = { padding = 12, backgroundColor = "#333", borderRadius = 8 },
+    onPress = function() print("pressed!") end,
+},
+    ce("Text", { style = { color = "#fff" } }, "Custom Button")
+)
+```
+
+### ScrollView
+
+```lua
+ce(RN.ScrollView, {
+    style = { flex = 1 },
+    horizontal = false,              -- true for horizontal scroll
+    onScroll = function(e) end,
+    contentInset = { bottom = 50 },  -- extra scroll space
+}, children)
+```
+
+### TextInput
+
+```lua
+ce(RN.TextInput, {
+    style = { height = 40, borderWidth = 1, borderColor = "#ccc", padding = 8 },
+    placeholder = "Type here...",
+    value = text,
+    onChangeText = function(t) setText(t) end,
+})
+```
+
+### FlatList
+
+```lua
+ce(RN.FlatList, {
+    data = items,
+    keyExtractor = function(item) return item.id end,
+    renderItem = function(info)
+        return ce("Text", { style = { padding = 12 } }, info.item.title)
+    end,
+})
+```
+
+### Modal
+
+```lua
+ce(RN.Modal, {
+    visible = showModal,
+    transparent = true,
+    onRequestClose = function() setShowModal(false) end,
+}, modalContent)
+```
+
+### Switch
+
+```lua
+ce(RN.Switch, {
+    value = isOn,
+    onValueChange = function(v) setIsOn(v) end,
+})
+```
 
 ## Hooks
 
 ```lua
-local val, setVal = React.useState(initialValue)
+local RN = require("react_solar2d")
+local React = require("react")
+
+-- State (Lua multiple returns, not array)
+local count, setCount = React.useState(0)
+
+-- Effect
+React.useEffect(function()
+    print("mounted")
+    return function() print("cleanup") end
+end, {})
+
+-- Ref
 local ref = React.useRef(nil)
-React.useEffect(function() ... end, {deps})
-local memoized = React.useMemo(function() ... end, {deps})
-local callback = React.useCallback(function() ... end, {deps})
-local val = React.useContext(MyContext)
+
+-- Memo / Callback
+local doubled = React.useMemo(function() return count * 2 end, {count})
+local onPress = React.useCallback(function() setCount(count + 1) end, {count})
+
+-- Context
+local ThemeCtx = React.createContext("dark")
+local theme = React.useContext(ThemeCtx)
 ```
+
+## Navigation
+
+```lua
+local Navigation = require("navigation")
+
+-- Stack Navigator
+local Stack = Navigation.createStackNavigator()
+
+ce(Navigation.NavigationContainer, {},
+    ce(Stack.Navigator, {},
+        ce(Stack.Screen, { name = "Home", component = HomeScreen }),
+        ce(Stack.Screen, { name = "Detail", component = DetailScreen })
+    )
+)
+
+-- Navigate
+props.navigation.navigate("Detail", { id = 123 })
+props.navigation.goBack()
+
+-- Tab Navigator
+local Tab = Navigation.createBottomTabNavigator()
+
+ce(Tab.Navigator, {},
+    ce(Tab.Screen, { name = "Feed", component = FeedScreen,
+        options = { tabBarLabel = "Feed", tabBarIcon = "F" } }),
+    ce(Tab.Screen, { name = "Profile", component = ProfileScreen,
+        options = { tabBarLabel = "Me", tabBarIcon = "P" } })
+)
+```
+
+## Animation
+
+```lua
+local Animated = require("animated")
+
+local opacity = React.useRef(Animated.Value(0)).current
+
+-- Fade in
+Animated.timing(opacity, { toValue = 1, duration = 300 }).start()
+
+-- Use in element
+ce(Animated.View, {
+    style = { opacity = opacity, translateY = slideY },
+}, children)
+```
+
+## Style
+
+```lua
+local StyleSheet = require("style.StyleSheet")
+
+local styles = StyleSheet.create({
+    container = { flex = 1, padding = 16, backgroundColor = "#fff" },
+    title = { fontSize = 24, fontWeight = "bold", color = "#333" },
+})
+
+ce("View", { style = styles.container },
+    ce("Text", { style = styles.title }, "Hello")
+)
+```
+
+Supports standard Flexbox properties: `flex`, `flexDirection`, `justifyContent`, `alignItems`, `alignSelf`, `flexWrap`, `gap`, `padding*`, `margin*`, `width`, `height`, `minWidth`, `maxWidth`, `position` ("relative" | "absolute"), `top`, `left`, `right`, `bottom`.
+
+Colors: `"#RGB"`, `"#RRGGBB"`, `"#RRGGBBAA"`, `"rgba(r,g,b,a)"`, named colors.
 
 ## ImperativeCanvas
 
-Embed Solar2D imperative rendering (display objects, physics, animations) inside React layout:
+Bridge between React layout and imperative Solar2D rendering (display objects, physics, etc.):
 
 ```lua
 local ImperativeCanvas = require("components.ImperativeCanvas")
 
 ce(ImperativeCanvas, {
     style = { width = 400, height = 300 },
-    clip = true,    -- clip content to bounds
+    clip = true,
     onDraw = function(surface, w, h)
         local bg = display.newRect(surface, w/2, h/2, w, h)
         bg:setFillColor(0.1, 0.1, 0.3)
@@ -125,7 +295,9 @@ ce(ImperativeCanvas, {
 })
 ```
 
-See [docs/ImperativeCanvas.md](docs/ImperativeCanvas.md) for full guide.
+## Examples
+
+See [react-solar2d-examples](https://github.com/labolado/react-solar2d-examples) for complete demo apps (News reader, Quiz, Tetris, KitchenSink component showcase).
 
 ## Tests
 
@@ -133,6 +305,8 @@ See [docs/ImperativeCanvas.md](docs/ImperativeCanvas.md) for full guide.
 lua run_tests.lua              # all tests
 lua run_tests.lua scrollview   # pattern match
 ```
+
+See [docs/TESTING.md](docs/TESTING.md) for UI automation and device testing.
 
 ## License
 

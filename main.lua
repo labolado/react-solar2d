@@ -89,3 +89,25 @@ end
 local container = display.newGroup()
 RN.render(ce(App), container)
 RN.startAutoFlush()
+
+-- Start test server for screenshots and remote control
+timer.performWithDelay(500, function()
+    local ok, testServer = pcall(require, "tests.infra.test_server")
+    if ok then
+        testServer.start(9876)
+        testServer.route("POST", "/navigate", function(params)
+            if params.route then
+                Runtime:dispatchEvent({ name = "kitchensink_navigate", route = params.route })
+                return testServer.ok({success=true})
+            end
+            return testServer.err("Missing route")
+        end)
+        testServer.route("POST", "/tap-category", function(params)
+            if params.category then
+                Runtime:dispatchEvent({ name = "kitchensink_navigate", category = params.category })
+                return testServer.ok({success=true})
+            end
+            return testServer.err("Missing category")
+        end)
+    end
+end)

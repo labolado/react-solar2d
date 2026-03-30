@@ -1,4 +1,12 @@
 -- react_solar2d.lua (root module)
+-- Auto-configure package.path so sub-modules (react/init.lua etc.) are found
+do
+    local info = debug.getinfo(1, "S")
+    local dir = info.source:match("^@(.+/)") or ""
+    if not package.path:find("%?/init%.lua") then
+        package.path = dir .. "?.lua;" .. dir .. "?/init.lua;" .. package.path
+    end
+end
 local React = require("react")
 local ReactSolar2D = require("renderer")
 local StyleSheet = require("style.StyleSheet")

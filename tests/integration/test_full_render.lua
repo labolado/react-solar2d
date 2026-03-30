@@ -44,9 +44,11 @@ T.describe("Integration: simple component render", function()
         T.expect(container.numChildren).toBe(1) -- View
         local view = container[1]
         T.expect(view._type).toBe("group")
-        T.expect(view._bg).toBeTruthy()
-        -- View has bg rect + Text child
-        T.expect(view.numChildren >= 2).toBe(true)
+        -- Without explicit size, _bg creation is deferred to applyLayout.
+        -- Either _bg (if size was known) or _pendingBg (deferred) must be set.
+        T.expect(view._bg or view._pendingBg).toBeTruthy()
+        -- View has Text child (+ bg rect if layout has run)
+        T.expect(view.numChildren >= 1).toBe(true)
     end)
 
     T.it("renders function component", function()

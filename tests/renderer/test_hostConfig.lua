@@ -18,7 +18,9 @@ T.describe("HostConfig.createInstance", function()
         local inst = HostConfig.createInstance("View", {
             style = { backgroundColor = "#FF0000" }
         })
-        T.expect(inst._bg).toBeTruthy()
+        -- Without explicit width/height, _bg creation is deferred until applyLayout.
+        -- Either _bg (explicit size) or _pendingBg (deferred) must be set.
+        T.expect(inst._bg or inst._pendingBg).toBeTruthy()
     end)
 
     T.it("creates text instance for Text type", function()

@@ -251,13 +251,15 @@ local function ToastDemo()
             style = { marginBottom = 12 },
         }, toastViews) or nil,
         ce(Section, { title = "Toast Notifications" },
-            ce(RN.Button, { title = "Success Toast", color = "#2ECC71", onPress = function() addToast("Operation successful!", "#2ECC71") end }),
-            ce("View", { style = { height = 8 } }),
-            ce(RN.Button, { title = "Error Toast", color = "#E74C3C", onPress = function() addToast("Something went wrong!", "#E74C3C") end }),
-            ce("View", { style = { height = 8 } }),
-            ce(RN.Button, { title = "Info Toast", color = T.accent, onPress = function() addToast("New message received", T.accent) end }),
-            ce("View", { style = { height = 8 } }),
-            ce(RN.Button, { title = "Warning Toast", color = "#F39C12", onPress = function() addToast("Low battery warning", "#F39C12") end })
+            ce("View", { style = { marginHorizontal = -T.pad } },
+                ce(RN.Button, { title = "Success Toast", color = "#2ECC71", width = "100%", onPress = function() addToast("Operation successful!", "#2ECC71") end }),
+                ce("View", { style = { height = 8 } }),
+                ce(RN.Button, { title = "Error Toast", color = "#E74C3C", width = "100%", onPress = function() addToast("Something went wrong!", "#E74C3C") end }),
+                ce("View", { style = { height = 8 } }),
+                ce(RN.Button, { title = "Info Toast", color = T.accent, width = "100%", onPress = function() addToast("New message received", T.accent) end }),
+                ce("View", { style = { height = 8 } }),
+                ce(RN.Button, { title = "Warning Toast", color = "#F39C12", width = "100%", onPress = function() addToast("Low battery warning", "#F39C12") end })
+            )
         ),
         ce(Section, { title = "Info" },
             ce("Text", { style = { fontSize = 12, color = T.textSecondary } }, "Toasts auto-dismiss after 2 seconds. Tap multiple buttons to stack them.")

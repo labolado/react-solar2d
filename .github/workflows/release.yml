@@ -1,0 +1,47 @@
+name: Package & Release
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Package plugin
+        run: |
+          STAGING=$(mktemp -d)
+
+          cat > "$STAGING/metadata.lua" << 'EOF'
+          local metadata = { plugin = { format = 'lua' } }
+          return metadata
+          EOF
+
+          cp react_solar2d.lua "$STAGING/"
+          for dir in react renderer components layout style animated navigation hooks lib; do
+            [ -d "$dir" ] && cp -r "$dir" "$STAGING/"
+          done
+
+          # Test server (UI automation)
+          mkdir -p "$STAGING/tests/infra"
+          cp tests/infra/test_server.lua "$STAGING/tests/infra/"
+          cp tests/infra/base64.lua "$STAGING/tests/infra/"
+
+          VERSION="${GITHUB_REF_NAME}"
+          mkdir -p dist
+          tar czf "dist/plugin.react-solar2d-${VERSION}.tgz" -C "$STAGING" .
+
+          FILE_COUNT=$(find "$STAGING" -name '*.lua' | wc -l)
+          SIZE=$(du -h "dist/plugin.react-solar2d-${VERSION}.tgz" | cut -f1)
+          echo "Packaged: plugin.react-solar2d-${VERSION}.tgz ($FILE_COUNT files, $SIZE)"
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Release ${{ github.ref_name }}"
+          generate_release_notes: true
+          files: dist/*.tgz

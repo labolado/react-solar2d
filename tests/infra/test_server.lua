@@ -791,6 +791,16 @@ function M.start(port)
     M._running = true
     M._port = port
 
+    -- Red indicator dot at bottom center
+    local r = 6
+    local dot = display.newCircle(display.contentWidth / 2, display.contentHeight - r - 4, r)
+    dot:setFillColor(1, 0, 0)
+    dot:toFront()
+    M._indicator = dot
+    timer.performWithDelay(500, function()
+        if M._indicator then M._indicator:toFront() end
+    end, 0)
+
     timer.performWithDelay(50, function()
         if not M._running then return end
         local client = server:accept()

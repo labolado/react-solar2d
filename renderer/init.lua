@@ -61,7 +61,7 @@ local function buildLayoutTree(fiber)
         node:setHeight(40)
     end
 
-    -- ScrollView: don't let Yoga constrain children in scroll direction
+    -- ScrollView: use overflow "scroll" so Yoga allows content to grow in scroll direction
     if fiber.type == "ScrollView" then
         local scrollStyle = {}
         for k, v in pairs(style) do scrollStyle[k] = v end
@@ -131,16 +131,74 @@ local function applyLayout(yogaNode, fiber)
             fiber.stateNode.x = l + (fiber.stateNode._translateX or 0)
             fiber.stateNode.y = t + (fiber.stateNode._translateY or 0)
         end
-        -- Update size for bg rect if present (guard against removed objects)
-        -- When style has explicit width/height, skip Yoga's value — updateInstance
-        -- already set the correct size and fiber.props.style may be stale during
-        -- the same commit cycle (e.g. ProgressBar fill width changes per frame).
-        if fiber.stateNode._bg and fiber.stateNode._bg.removeSelf and fiber.stateNode._bg.path then
-            if w > 0 and not style.width then
-                fiber.stateNode._bg.path.width = w
+        -- Pending bg: create _bg now that Yoga has computed the correct dimensions.
+        -- This avoids creating a degenerate 1x1 rect and resizing it, which is
+        -- unreliable in Solar2D (especially for roundedRect).
+        if fiber.stateNode._pendingBg and w > 0 and h > 0 then
+            local p = fiber.stateNode._pendingBg
+            local br = p.borderRadius or 0
+            local bg
+            if br > 0 then
+                bg = display.newRoundedRect(fiber.stateNode, 0, 0, w, h, br)
+            else
+                bg = display.newRect(fiber.stateNode, 0, 0, w, h)
             end
-            if h > 0 and not style.height then
-                fiber.stateNode._bg.path.height = h
+            bg.anchorX, bg.anchorY = 0, 0
+            local fc = p.fillColor or {0, 0, 0, 0}
+            bg:setFillColor(fc[1], fc[2], fc[3], fc[4])
+            if p.strokeWidth and p.strokeWidth > 0 then
+                bg.strokeWidth = p.strokeWidth
+                if p.strokeColor then
+                    local sc = p.strokeColor
+                    bg:setStrokeColor(sc[1], sc[2], sc[3], sc[4])
+                end
+            end
+            bg:toBack()
+            fiber.stateNode._bg = bg
+            fiber.stateNode._pendingBg = nil
+        end
+        -- Update size for bg rect if present (guard against removed objects).
+        -- Only needed when style has explicit size and Yoga may compute different values
+        -- (e.g. ProgressBar fill width changes per frame).
+        if fiber.stateNode._bg and fiber.stateNode._bg.removeSelf and fiber.stateNode._bg.path then
+            local needW = w > 0 and not style.width
+            local needH = h > 0 and not style.height
+            if needW or needH then
+                local oldBg = fiber.stateNode._bg
+                local oldW = oldBg.path.width or 0
+                local oldH = oldBg.path.height or 0
+                local newW = needW and w or oldW
+                local newH = needH and h or oldH
+                local br = fiber.stateNode._borderRadius or 0
+                -- Recreate bg when: roundedRect (path resize unreliable),
+                -- or resizing from degenerate size
+                local needRecreate = br > 0 or oldW <= 0 or oldH <= 0
+                if needRecreate and newW > 0 and newH > 0 then
+                    local bg
+                    if br > 0 then
+                        bg = display.newRoundedRect(fiber.stateNode, 0, 0, newW, newH, br)
+                    else
+                        bg = display.newRect(fiber.stateNode, 0, 0, newW, newH)
+                    end
+                    bg.anchorX, bg.anchorY = 0, 0
+                    if oldBg.fill then
+                        bg:setFillColor(oldBg.fill.r or 0, oldBg.fill.g or 0, oldBg.fill.b or 0, oldBg.fill.a or 1)
+                    else
+                        bg:setFillColor(0, 0, 0, 0)
+                    end
+                    if oldBg.strokeWidth and oldBg.strokeWidth > 0 then
+                        bg.strokeWidth = oldBg.strokeWidth
+                        if oldBg.stroke then
+                            bg:setStrokeColor(oldBg.stroke.r or 0, oldBg.stroke.g or 0, oldBg.stroke.b or 0, oldBg.stroke.a or 1)
+                        end
+                    end
+                    bg:toBack()
+                    oldBg:removeSelf()
+                    fiber.stateNode._bg = bg
+                else
+                    fiber.stateNode._bg.path.width = newW
+                    fiber.stateNode._bg.path.height = newH
+                end
             end
         end
         -- TextInput: position native field using screen coordinates
