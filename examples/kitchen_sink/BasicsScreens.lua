@@ -223,42 +223,29 @@ local function ImageDemo()
             )
         ),
 
-        -- Image button (TouchableOpacity + Image)
+        -- Image button (TouchableOpacity wrapping Image directly)
         ce(Section, { title = "Image Button" },
             ce("Text", {
                 style = { fontSize = 13, color = T.textSecondary, marginBottom = 8 },
-            }, "Tap the image cards:"),
-            ce("View", { style = { flexDirection = "row", gap = 12 } },
+            }, "Tap count: " .. (pressed and "1" or "0")),
+            ce("View", { style = { flexDirection = "row", gap = 16 } },
                 ce(RN.TouchableOpacity, {
                     onPress = function() setPressed(not pressed) end,
-                    style = {
-                        alignItems = "center", padding = 8, borderRadius = 8,
-                        backgroundColor = pressed and T.accent or T.surface,
-                        borderWidth = 1, borderColor = pressed and T.accent or T.border,
-                    },
+                    activeOpacity = 0.6,
                 },
                     ce("Image", {
                         source = { uri = "https://picsum.photos/id/237/200/200" },
-                        style = { width = 64, height = 64, borderRadius = 8, backgroundColor = T.border },
-                    }),
-                    ce("Text", {
-                        style = { fontSize = 12, marginTop = 4, color = pressed and "#FFFFFF" or T.textPrimary },
-                    }, pressed and "Selected!" or "Tap me")
+                        style = { width = 80, height = 80, borderRadius = 12, backgroundColor = T.border },
+                    })
                 ),
                 ce(RN.TouchableOpacity, {
-                    onPress = function() end,
-                    style = {
-                        alignItems = "center", padding = 8, borderRadius = 8,
-                        backgroundColor = T.surface, borderWidth = 1, borderColor = T.border,
-                    },
+                    onPress = function() setPressed(not pressed) end,
+                    activeOpacity = 0.6,
                 },
                     ce("Image", {
-                        source = { uri = "https://picsum.photos/id/65/200/200" },
-                        style = { width = 64, height = 64, borderRadius = 32, backgroundColor = T.border },
-                    }),
-                    ce("Text", {
-                        style = { fontSize = 12, marginTop = 4, color = T.textPrimary },
-                    }, "Profile")
+                        source = { uri = "https://picsum.photos/id/64/200/200" },
+                        style = { width = 80, height = 80, borderRadius = 40, backgroundColor = T.border },
+                    })
                 )
             )
         ),
