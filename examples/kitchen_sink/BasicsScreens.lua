@@ -171,15 +171,15 @@ local function ImageDemo()
     local pressed, setPressed = useState(false)
 
     return ce(DemoPage, {},
-        -- resizeMode comparison using network images
+        -- resizeMode comparison: square image (200x200) in wide container (120x80)
         ce(Section, { title = "resizeMode Comparison" },
             ce("Text", {
                 style = { fontSize = 13, color = T.textSecondary, marginBottom = 8 },
-            }, "Same image in different resize modes (120x80 container):"),
+            }, "Square image in 120x80 container:"),
             ce("View", { style = { flexDirection = "row", gap = 8, flexWrap = "wrap" } },
                 ce("View", { style = { alignItems = "center" } },
                     ce("Image", {
-                        source = { uri = "https://picsum.photos/id/10/300/200" },
+                        source = { uri = "https://picsum.photos/id/64/200/200" },
                         resizeMode = "cover",
                         style = { width = 120, height = 80, borderRadius = 4, backgroundColor = T.border },
                     }),
@@ -187,7 +187,7 @@ local function ImageDemo()
                 ),
                 ce("View", { style = { alignItems = "center" } },
                     ce("Image", {
-                        source = { uri = "https://picsum.photos/id/10/300/200" },
+                        source = { uri = "https://picsum.photos/id/64/200/200" },
                         resizeMode = "contain",
                         style = { width = 120, height = 80, borderRadius = 4, backgroundColor = T.border },
                     }),
@@ -195,7 +195,7 @@ local function ImageDemo()
                 ),
                 ce("View", { style = { alignItems = "center" } },
                     ce("Image", {
-                        source = { uri = "https://picsum.photos/id/10/300/200" },
+                        source = { uri = "https://picsum.photos/id/64/200/200" },
                         resizeMode = "stretch",
                         style = { width = 120, height = 80, borderRadius = 4, backgroundColor = T.border },
                     }),
@@ -223,33 +223,42 @@ local function ImageDemo()
             )
         ),
 
-        -- Image button (Pressable + Image)
+        -- Image button (TouchableOpacity + Image)
         ce(Section, { title = "Image Button" },
             ce("Text", {
                 style = { fontSize = 13, color = T.textSecondary, marginBottom = 8 },
-            }, "Pressable wrapping Image — tap to toggle:"),
-            ce(RN.Pressable, {
-                onPress = function() setPressed(not pressed) end,
-            },
-                ce("View", {
+            }, "Tap the image cards:"),
+            ce("View", { style = { flexDirection = "row", gap = 12 } },
+                ce(RN.TouchableOpacity, {
+                    onPress = function() setPressed(not pressed) end,
                     style = {
-                        flexDirection = "row", alignItems = "center", gap = 12,
-                        padding = 12, borderRadius = 8,
+                        alignItems = "center", padding = 8, borderRadius = 8,
                         backgroundColor = pressed and T.accent or T.surface,
+                        borderWidth = 1, borderColor = pressed and T.accent or T.border,
                     },
                 },
                     ce("Image", {
                         source = { uri = "https://picsum.photos/id/237/200/200" },
-                        style = { width = 48, height = 48, borderRadius = 8, backgroundColor = T.border },
+                        style = { width = 64, height = 64, borderRadius = 8, backgroundColor = T.border },
                     }),
-                    ce("View", {},
-                        ce("Text", {
-                            style = { fontSize = 15, fontWeight = "bold", color = pressed and "#FFFFFF" or T.textPrimary },
-                        }, pressed and "Selected!" or "Tap me"),
-                        ce("Text", {
-                            style = { fontSize = 12, color = pressed and "#FFFFFFAA" or T.textSecondary },
-                        }, "Image + text button")
-                    )
+                    ce("Text", {
+                        style = { fontSize = 12, marginTop = 4, color = pressed and "#FFFFFF" or T.textPrimary },
+                    }, pressed and "Selected!" or "Tap me")
+                ),
+                ce(RN.TouchableOpacity, {
+                    onPress = function() end,
+                    style = {
+                        alignItems = "center", padding = 8, borderRadius = 8,
+                        backgroundColor = T.surface, borderWidth = 1, borderColor = T.border,
+                    },
+                },
+                    ce("Image", {
+                        source = { uri = "https://picsum.photos/id/65/200/200" },
+                        style = { width = 64, height = 64, borderRadius = 32, backgroundColor = T.border },
+                    }),
+                    ce("Text", {
+                        style = { fontSize = 12, marginTop = 4, color = T.textPrimary },
+                    }, "Profile")
                 )
             )
         ),
