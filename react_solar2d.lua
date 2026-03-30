@@ -57,6 +57,7 @@ RN.ActivityIndicator = Components.ActivityIndicator
 RN.RefreshControl = Components.RefreshControl
 RN.KeyboardAvoidingView = Components.KeyboardAvoidingView
 RN.SafeAreaView = Components.SafeAreaView
+RN.ImageBackground = Components.ImageBackground
 
 -- Navigation
 local Navigation = require("navigation")

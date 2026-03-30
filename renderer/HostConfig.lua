@@ -687,52 +687,80 @@ function M.createInstance(elementType, props)
         local h = style.height or 100
         local resizeMode = props.resizeMode or style.resizeMode or "cover"
 
+        -- Apply resizeMode to an image within container bounds
+        local function applyResizeMode(img, natW, natH, cw, ch, mode)
+            if natW <= 0 or natH <= 0 then
+                img.width, img.height = cw, ch
+                img.anchorX, img.anchorY = 0, 0
+                img.x, img.y = 0, 0
+                return
+            end
+            if mode == "stretch" then
+                img.width, img.height = cw, ch
+                img.anchorX, img.anchorY = 0, 0
+                img.x, img.y = 0, 0
+            elseif mode == "contain" then
+                local sc = math.min(cw / natW, ch / natH)
+                img.width = natW * sc
+                img.height = natH * sc
+                img.anchorX, img.anchorY = 0.5, 0.5
+                img.x = cw / 2
+                img.y = ch / 2
+            elseif mode == "center" then
+                img.width, img.height = natW, natH
+                img.anchorX, img.anchorY = 0.5, 0.5
+                img.x = cw / 2
+                img.y = ch / 2
+            else -- "cover" (default)
+                local sc = math.max(cw / natW, ch / natH)
+                img.width = natW * sc
+                img.height = natH * sc
+                img.anchorX, img.anchorY = 0.5, 0.5
+                img.x = cw / 2
+                img.y = ch / 2
+            end
+        end
+
         if uri:match("^https?://") then
             -- Remote image: placeholder + async download
-            local bg = display.newRect(group, 0, 0, w, h)
+            local br = tonumber(style.borderRadius) or 0
+            local bg
+            if br > 0 then
+                bg = display.newRoundedRect(group, 0, 0, w, h, br)
+            else
+                bg = display.newRect(group, 0, 0, w, h)
+            end
             bg.anchorX, bg.anchorY = 0, 0
             bg:setFillColor(0.93, 0.93, 0.95)
-            local br = tonumber(style.borderRadius) or 0
-            if br > 0 then
-                -- Use rounded rect instead
-                bg:removeSelf()
-                bg = display.newRoundedRect(group, 0, 0, w, h, br)
-                bg.anchorX, bg.anchorY = 0, 0
-                bg:setFillColor(0.93, 0.93, 0.95)
-            end
             group._bg = bg
 
             local fname = "rimg_" .. tostring(math.random(100000, 999999)) .. ".jpg"
             network.download(uri, "GET", function(event)
-                if event.isError then return end
+                if event.isError then
+                    if props.onError then props.onError({ nativeEvent = { error = "download failed" } }) end
+                    return
+                end
                 if event.phase == "ended" then
                     if not group or group.removeSelf == nil then return end
-                    -- Load at natural size, then scale to fit (contain mode)
                     local img = display.newImage(group, fname, system.TemporaryDirectory)
                     if img then
                         local natW, natH = img.width, img.height
-                        if natW > 0 and natH > 0 then
-                            local sc = math.min(w / natW, h / natH)
-                            img.width = natW * sc
-                            img.height = natH * sc
-                        else
-                            img.width = w
-                            img.height = h
-                        end
-                        img.anchorX, img.anchorY = 0, 0
-                        img.x, img.y = 0, 0
+                        applyResizeMode(img, natW, natH, w, h, resizeMode)
                         if bg and bg.removeSelf then bg:removeSelf() end
                         group._imageObj = img
+                        group._bg = nil
+                        if props.onLoad then props.onLoad() end
                     end
                 end
             end, {}, fname, system.TemporaryDirectory)
         else
-            -- Local file
-            local img = display.newImageRect(group, uri, w, h)
+            -- Local file: load at natural size, then apply resizeMode
+            local img = display.newImage(group, uri)
             if img then
-                img.anchorX, img.anchorY = 0, 0
+                local natW, natH = img.width, img.height
+                applyResizeMode(img, natW, natH, w, h, resizeMode)
+                group._imageObj = img
             end
-            group._imageObj = img
         end
 
         group._resizeMode = resizeMode

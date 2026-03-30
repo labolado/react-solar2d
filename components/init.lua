@@ -20,5 +20,6 @@ return {
     SceneCanvas = require("components.SceneCanvas"),
     SceneAdapter = require("components.SceneAdapter"),
     Pagelet = require("components.Pagelet"),
+    ImageBackground = require("components.ImageBackground"),
     WebView = require("components.WebView"),
 }
