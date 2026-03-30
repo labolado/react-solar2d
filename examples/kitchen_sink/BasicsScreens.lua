@@ -168,39 +168,133 @@ end
 
 -- 3. ImageDemo
 local function ImageDemo()
+    local pressed, setPressed = useState(false)
+
     return ce(DemoPage, {},
+        -- resizeMode comparison using network images
         ce(Section, { title = "resizeMode Comparison" },
             ce("Text", {
-                style = { fontSize = 14, color = T.textSecondary, marginBottom = 8 },
-            }, "Image uses local file paths in Solar2D. resizeMode: cover / contain / stretch"),
-            ce("View", { style = { flexDirection = "row", gap = 8 } },
+                style = { fontSize = 13, color = T.textSecondary, marginBottom = 8 },
+            }, "Same image in different resize modes (120x80 container):"),
+            ce("View", { style = { flexDirection = "row", gap = 8, flexWrap = "wrap" } },
                 ce("View", { style = { alignItems = "center" } },
-                    ce("View", { style = { width = 80, height = 60, backgroundColor = T.accent, borderRadius = 4 } }),
-                    ce("Text", { style = { fontSize = 10, color = T.textSecondary, marginTop = 4 } }, "cover")
+                    ce("Image", {
+                        source = { uri = "https://picsum.photos/id/10/300/200" },
+                        resizeMode = "cover",
+                        style = { width = 120, height = 80, borderRadius = 4, backgroundColor = T.border },
+                    }),
+                    ce("Text", { style = { fontSize = 11, color = T.textSecondary, marginTop = 4 } }, "cover")
                 ),
                 ce("View", { style = { alignItems = "center" } },
-                    ce("View", { style = { width = 80, height = 60, backgroundColor = T.accent, borderRadius = 4, opacity = 0.7 } }),
-                    ce("Text", { style = { fontSize = 10, color = T.textSecondary, marginTop = 4 } }, "contain")
+                    ce("Image", {
+                        source = { uri = "https://picsum.photos/id/10/300/200" },
+                        resizeMode = "contain",
+                        style = { width = 120, height = 80, borderRadius = 4, backgroundColor = T.border },
+                    }),
+                    ce("Text", { style = { fontSize = 11, color = T.textSecondary, marginTop = 4 } }, "contain")
                 ),
                 ce("View", { style = { alignItems = "center" } },
-                    ce("View", { style = { width = 80, height = 60, backgroundColor = T.accent, borderRadius = 4, opacity = 0.4 } }),
-                    ce("Text", { style = { fontSize = 10, color = T.textSecondary, marginTop = 4 } }, "stretch")
+                    ce("Image", {
+                        source = { uri = "https://picsum.photos/id/10/300/200" },
+                        resizeMode = "stretch",
+                        style = { width = 120, height = 80, borderRadius = 4, backgroundColor = T.border },
+                    }),
+                    ce("Text", { style = { fontSize = 11, color = T.textSecondary, marginTop = 4 } }, "stretch")
                 )
             )
         ),
-        ce(Section, { title = "Different Sizes" },
-            ce("View", { style = { flexDirection = "row", gap = 12, alignItems = "flex-end" } },
-                ce("View", { style = { width = 40, height = 40, backgroundColor = T.accent, borderRadius = 8 } }),
-                ce("View", { style = { width = 80, height = 60, backgroundColor = T.accent, borderRadius = 8 } }),
-                ce("View", { style = { width = 120, height = 80, backgroundColor = T.accent, borderRadius = T.radius } })
+
+        -- Circular avatar
+        ce(Section, { title = "Circular Avatar" },
+            ce("View", { style = { flexDirection = "row", gap = 16, alignItems = "center" } },
+                ce("Image", {
+                    source = { uri = "https://picsum.photos/id/64/200/200" },
+                    style = { width = 60, height = 60, borderRadius = 30, backgroundColor = T.border },
+                }),
+                ce("Image", {
+                    source = { uri = "https://picsum.photos/id/65/200/200" },
+                    style = { width = 50, height = 50, borderRadius = 25, backgroundColor = T.border },
+                }),
+                ce("Image", {
+                    source = { uri = "https://picsum.photos/id/66/200/200" },
+                    style = { width = 40, height = 40, borderRadius = 20, backgroundColor = T.border },
+                }),
+                ce("Text", { style = { fontSize = 13, color = T.textSecondary } }, "borderRadius = w/2")
             )
         ),
-        ce(Section, { title = "Border Radius on Images" },
-            ce("View", { style = { flexDirection = "row", gap = 12 } },
-                ce("View", { style = { width = 60, height = 60, backgroundColor = "coral", borderRadius = 0 } }),
-                ce("View", { style = { width = 60, height = 60, backgroundColor = "coral", borderRadius = 12 } }),
-                ce("View", { style = { width = 60, height = 60, backgroundColor = "coral", borderRadius = 30 } })
+
+        -- Image button (Pressable + Image)
+        ce(Section, { title = "Image Button" },
+            ce("Text", {
+                style = { fontSize = 13, color = T.textSecondary, marginBottom = 8 },
+            }, "Pressable wrapping Image — tap to toggle:"),
+            ce(RN.Pressable, {
+                onPress = function() setPressed(not pressed) end,
+            },
+                ce("View", {
+                    style = {
+                        flexDirection = "row", alignItems = "center", gap = 12,
+                        padding = 12, borderRadius = 8,
+                        backgroundColor = pressed and T.accent or T.surface,
+                    },
+                },
+                    ce("Image", {
+                        source = { uri = "https://picsum.photos/id/237/200/200" },
+                        style = { width = 48, height = 48, borderRadius = 8, backgroundColor = T.border },
+                    }),
+                    ce("View", {},
+                        ce("Text", {
+                            style = { fontSize = 15, fontWeight = "bold", color = pressed and "#FFFFFF" or T.textPrimary },
+                        }, pressed and "Selected!" or "Tap me"),
+                        ce("Text", {
+                            style = { fontSize = 12, color = pressed and "#FFFFFFAA" or T.textSecondary },
+                        }, "Image + text button")
+                    )
+                )
             )
+        ),
+
+        -- ImageBackground
+        ce(Section, { title = "ImageBackground" },
+            ce("Text", {
+                style = { fontSize = 13, color = T.textSecondary, marginBottom = 8 },
+            }, "Image as background with text overlay:"),
+            ce(RN.ImageBackground, {
+                source = { uri = "https://picsum.photos/id/15/400/200" },
+                style = { width = 280, height = 120, borderRadius = 8, justifyContent = "flex-end", padding = 12 },
+            },
+                ce("Text", {
+                    style = { fontSize = 18, fontWeight = "bold", color = "#FFFFFF" },
+                }, "Hello World"),
+                ce("Text", {
+                    style = { fontSize = 12, color = "#FFFFFFCC" },
+                }, "Text rendered on top of image")
+            )
+        ),
+
+        -- Different sizes
+        ce(Section, { title = "Different Sizes" },
+            ce("View", { style = { flexDirection = "row", gap = 12, alignItems = "flex-end" } },
+                ce("Image", {
+                    source = { uri = "https://picsum.photos/id/20/100/100" },
+                    style = { width = 40, height = 40, borderRadius = 4, backgroundColor = T.border },
+                }),
+                ce("Image", {
+                    source = { uri = "https://picsum.photos/id/21/200/150" },
+                    style = { width = 80, height = 60, borderRadius = 4, backgroundColor = T.border },
+                }),
+                ce("Image", {
+                    source = { uri = "https://picsum.photos/id/22/300/200" },
+                    style = { width = 120, height = 80, borderRadius = 8, backgroundColor = T.border },
+                })
+            )
+        ),
+
+        -- Solar2D image suffix info
+        ce(Section, { title = "Solar2D @2x/@3x" },
+            ce("Text", {
+                style = { fontSize = 13, color = T.textSecondary },
+            }, "Solar2D auto-selects @2x/@3x variants via display.imageSuffix in config.lua. Place image.png, image@2x.png, image@3x.png in project root.")
         )
     )
 end
@@ -307,7 +401,7 @@ end
 return {
     { name = "View",      component = ViewDemo,      description = "Layout, radius, opacity, colors", icon = "V" },
     { name = "Text",      component = TextDemo,      description = "Sizes, weight, color, truncation", icon = "T" },
-    { name = "Image",     component = ImageDemo,     description = "Sizes, radius, placeholder",       icon = "I" },
+    { name = "Image",     component = ImageDemo,     description = "resizeMode, avatar, button, bg",   icon = "I" },
     { name = "Button",    component = ButtonDemo,    description = "Colors, onPress counter",           icon = "B" },
     { name = "Pressable", component = PressableDemo, description = "Press and long-press feedback",     icon = "P" },
     { name = "Touchable", component = TouchableOpacityDemo, description = "ActiveOpacity comparison",   icon = "O" },
