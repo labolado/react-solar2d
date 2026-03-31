@@ -235,8 +235,11 @@ local function simulateDrag(x, y, dx, dy, duration)
         local target = findTouchTarget(display.currentStage)
         if not target then return end
 
+        -- Unique touch id (real events have one, simulate it for TrackDot/TouchRegistry)
+        local touchId = "drag_" .. tostring(system.getTimer())
+
         -- Began
-        target:dispatchEvent({name="touch", phase="began", x=x, y=y, target=target})
+        target:dispatchEvent({name="touch", phase="began", x=x, y=y, id=touchId, target=target})
 
         -- Moved (spread across duration)
         for s = 1, steps do
@@ -245,14 +248,14 @@ local function simulateDrag(x, y, dx, dy, duration)
                 target:dispatchEvent({
                     name="touch", phase="moved",
                     x = x + dx * frac, y = y + dy * frac,
-                    target = target
+                    id = touchId, target = target
                 })
             end)
         end
 
         -- Ended
         timer.performWithDelay(duration + 16, function()
-            target:dispatchEvent({name="touch", phase="ended", x=x+dx, y=y+dy, target=target})
+            target:dispatchEvent({name="touch", phase="ended", x=x+dx, y=y+dy, id=touchId, target=target})
         end)
     end)
 end

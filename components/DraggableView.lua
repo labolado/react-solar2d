@@ -157,12 +157,22 @@ local function DraggableView(props)
             return true
         end
 
-        -- Direct touch on the view's _bg rect (began only, TrackDot handles the rest)
+        -- Direct touch on the view's _bg rect.
+        -- Handles began always; moved/ended as fallback when TrackDot focus doesn't
+        -- deliver (programmatic dispatchEvent, some device edge cases).
         local bgListener
         if view._bg then
             bgListener = function(event)
                 if event.phase == "began" then
                     return handleBegan(event)
+                elseif touchIdRef.current and event.id == touchIdRef.current then
+                    if event.phase == "moved" then
+                        handleMove(event)
+                        return true
+                    elseif event.phase == "ended" or event.phase == "cancelled" then
+                        handleEnd(event)
+                        return true
+                    end
                 end
                 return false
             end

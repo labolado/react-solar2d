@@ -87,6 +87,11 @@ local function buildLayoutTree(fiber)
             for _, key in ipairs(mergeKeys) do
                 if ccs[key] ~= nil then scrollStyle[key] = ccs[key] end
             end
+            -- Store bottom padding so recalcContentSize can add it to scroll range
+            if fiber.stateNode then
+                local pb = ccs.paddingBottom or ccs.paddingVertical or ccs.padding or 0
+                fiber.stateNode._contentPaddingBottom = pb
+            end
         end
         node = Layout.newNode(scrollStyle)
     end

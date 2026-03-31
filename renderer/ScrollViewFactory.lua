@@ -85,7 +85,9 @@ local function createScrollView(props, style, applyCommonStyle)
                 if rt > maxW then maxW = rt end
             end
         end
-        if maxH > 0 then clipContainer._contentH = maxH end
+        -- Add contentContainerStyle bottom padding to scroll range
+        local extraBottom = clipContainer._contentPaddingBottom or 0
+        if maxH > 0 then clipContainer._contentH = maxH + extraBottom end
         if maxW > 0 then clipContainer._contentW = maxW end
     end
 

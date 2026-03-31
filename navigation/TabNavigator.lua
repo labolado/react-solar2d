@@ -86,6 +86,12 @@ local function createBottomTabNavigator()
             end
         end
 
+        -- Safe area insets
+        local SafeArea = require("lib.safe-area")
+        local insets = SafeArea.getSafeAreaInsets()
+        local safeTop = insets.top or 0
+        local safeBottom = insets.bottom or 0
+
         -- Tab bar
         local TAB_BAR_H = tabBarOptions.height or 56
         local tabBarBg = tabBarOptions.backgroundColor or "#FFFFFF"
@@ -125,7 +131,8 @@ local function createBottomTabNavigator()
             key = "__tabbar",
             style = {
                 flexDirection = "row",
-                height = TAB_BAR_H,
+                height = TAB_BAR_H + safeBottom,
+                paddingBottom = safeBottom,
                 backgroundColor = tabBarBg,
                 width = contentW,
             },
@@ -140,7 +147,7 @@ local function createBottomTabNavigator()
             },
         }, screenElements)
 
-        return ce("View", { style = { width = contentW, height = contentH } },
+        return ce("View", { style = { width = contentW, height = contentH, paddingTop = safeTop } },
             contentArea,
             tabBar
         )
