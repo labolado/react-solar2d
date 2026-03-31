@@ -5,6 +5,7 @@
 
 local React = require("react")
 local ce = React.createElement
+local TouchRegistry = require("lib.TouchRegistry")
 
 --- DrawingCanvas component.
 -- @param props table
@@ -67,7 +68,10 @@ local function DrawingCanvas(props)
                 local activeCount = 0
                 for _ in pairs(activeRef.current) do activeCount = activeCount + 1 end
                 if activeCount >= maxFingers then return true end
+                -- canFocus: another component may already own this finger
+                if not TouchRegistry.canFocus(id, hitRect) then return true end
 
+                TouchRegistry.claim(id, hitRect)
                 display.getCurrentStage():setFocus(hitRect, id)
 
                 local color = p.brushColor or "#000000"
@@ -122,6 +126,7 @@ local function DrawingCanvas(props)
 
             elseif phase == "ended" or phase == "cancelled" then
                 display.getCurrentStage():setFocus(nil, id)
+                TouchRegistry.release(id, hitRect)
                 if activeRef.current[id] then
                     activeRef.current[id] = nil
                 end
@@ -136,9 +141,10 @@ local function DrawingCanvas(props)
         hitRect:addEventListener("touch", onTouch)
 
         return function()
-            -- Release all active finger focuses to prevent touch leakage
+            -- Cleanup sweep: release all finger focuses + registry
             for fid in pairs(activeRef.current) do
                 display.getCurrentStage():setFocus(nil, fid)
+                TouchRegistry.release(fid, hitRect)
             end
             hitRect:removeEventListener("touch", onTouch)
             if surface and surface.removeSelf then

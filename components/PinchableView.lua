@@ -1,20 +1,21 @@
 --- PinchableView component.
--- Supports 1-finger pan and 2-finger pinch-zoom + rotation.
--- Directly manipulates the display object (x, y, xScale, yScale, rotation) at 60fps.
--- Math adapted from labo_papercut_dinosaur multitouch patterns.
+-- 1-finger pan + 2-finger pinch-zoom + rotation with correct transform math.
+-- Uses TrackDot pattern (one invisible proxy object per finger) for reliable
+-- multi-finger focus. Incremental per-frame deltas avoid snapshot-based jumps.
+-- Scale/rotation applied around the pinch center point, not object center.
+-- Adapted from labo_papercut_dinosaur PinchZoomRotate.
 -- @module components.PinchableView
 
 local React = require("react")
 local ce = React.createElement
+local TouchRegistry = require("lib.TouchRegistry")
 
--- Distance between two points
 local function dist(x1, y1, x2, y2)
     local dx = x2 - x1
     local dy = y2 - y1
     return math.sqrt(dx * dx + dy * dy)
 end
 
--- Angle in degrees between two points
 local function angleDeg(x1, y1, x2, y2)
     return math.deg(math.atan2(y2 - y1, x2 - x1))
 end
@@ -25,15 +26,14 @@ end
 --   children any             Child elements
 --   minScale number          Minimum allowed scale (default 0.2)
 --   maxScale number          Maximum allowed scale (default 5)
---   onTransformStart function  Called with {scale, rotation, x, y} on gesture begin
---   onTransform function       Called with {scale, rotation, x, y} each frame
---   onTransformEnd function    Called with {scale, rotation, x, y} on gesture end
---   disabled boolean           When true, touch is ignored
+--   scaleJitterThreshold number  Max per-frame scale change ratio before filtering (default 0.15)
+--   onTransformStart function  Called with {scale, rotation, x, y}
+--   onTransform function       Called with {scale, rotation, x, y}
+--   onTransformEnd function    Called with {scale, rotation, x, y}
+--   disabled boolean
 -- @return table React element
 local function PinchableView(props)
     local viewRef = React.useRef(nil)
-
-    -- propsRef: always holds latest props, avoids stale closures in touch handler
     local propsRef = React.useRef({})
     propsRef.current = props
 
@@ -47,36 +47,26 @@ local function PinchableView(props)
 
         local minScale = props.minScale or 0.2
         local maxScale = props.maxScale or 5
+        local jitterThreshold = props.scaleJitterThreshold or 0.15
 
-        -- Active touches: hash for O(1) lookup + ordered list for stable t1/t2 pairing
-        local touches = {}      -- [id] = {x, y}
-        local touchOrder = {}   -- ordered array of ids (insertion order)
+        -- TrackDots: one invisible display object per finger.
+        -- Solar2D setFocus routes that finger's events exclusively to the dot.
+        -- This avoids multi-finger focus reliability issues on the same view.
+        local dots = {}        -- [event.id] = {dot, listener}
+        local touches = {}     -- [event.id] = {x, y}  (content/screen coords)
+        local touchOrder = {}  -- ordered array of ids (insertion order, stable pairing)
 
-        local function touchCount()
-            return #touchOrder
-        end
+        -- Previous-frame state for incremental delta computation
+        local prevCX, prevCY = nil, nil  -- previous pinch center (content coords)
+        local prevDist = nil             -- previous finger distance
+        local prevAngle = nil            -- previous finger angle
 
-        -- Gesture base state (snapshot at gesture-change boundaries)
-        local baseScale = 1
-        local baseRotation = 0
-        local baseX = 0
-        local baseY = 0
-        local startDist = nil
-        local startAngle = nil
-        local startCX = nil
-        local startCY = nil
+        local function touchCount() return #touchOrder end
 
-        local function recordBase()
-            baseScale = view.xScale
-            baseRotation = view.rotation
-            baseX = view.x
-            baseY = view.y
-        end
-
-        local function fireCb(cb)
+        local function fireCb(name)
             local p = propsRef.current
-            if p[cb] then
-                p[cb]({
+            if p[name] then
+                p[name]({
                     scale = view.xScale,
                     rotation = view.rotation,
                     x = view.x,
@@ -85,131 +75,203 @@ local function PinchableView(props)
             end
         end
 
-        local function onTouch(event)
-            local p = propsRef.current
-            if p.disabled then return false end
-            local phase = event.phase
-            local id = event.id
-
-            if phase == "began" then
-                -- Guard duplicate began for the same id
-                if touches[id] then return true end
-                -- Ignore fingers beyond 2 (palm rejection for pinch gesture)
-                if touchCount() >= 2 then return true end
-                touches[id] = { x = event.x, y = event.y }
-                touchOrder[#touchOrder + 1] = id
-                display.getCurrentStage():setFocus(view, id)
-
-                if touchCount() == 1 then
-                    -- Record 1-finger pan origin immediately on began (not lazily on moved)
-                    startCX = event.x
-                    startCY = event.y
-                    recordBase()
-                    fireCb("onTransformStart")
-                elseif touchCount() == 2 then
-                    -- Record two-finger start state using stable ordered ids
-                    local t1 = touches[touchOrder[1]]
-                    local t2 = touches[touchOrder[2]]
-                    startDist = dist(t1.x, t1.y, t2.x, t2.y)
-                    startAngle = angleDeg(t1.x, t1.y, t2.x, t2.y)
-                    startCX = (t1.x + t2.x) * 0.5
-                    startCY = (t1.y + t2.y) * 0.5
-                    recordBase()
+        -- Snapshot current finger positions for next frame's delta calculation
+        local function savePrev()
+            if touchCount() >= 2 then
+                local t1 = touches[touchOrder[1]]
+                local t2 = touches[touchOrder[2]]
+                if t1 and t2 then
+                    prevDist = dist(t1.x, t1.y, t2.x, t2.y)
+                    prevAngle = angleDeg(t1.x, t1.y, t2.x, t2.y)
+                    prevCX = (t1.x + t2.x) * 0.5
+                    prevCY = (t1.y + t2.y) * 0.5
                 end
-                return true
+            elseif touchCount() == 1 then
+                local t = touches[touchOrder[1]]
+                if t then
+                    prevCX = t.x
+                    prevCY = t.y
+                end
+                prevDist = nil
+                prevAngle = nil
+            else
+                prevCX, prevCY = nil, nil
+                prevDist, prevAngle = nil, nil
+            end
+        end
 
-            elseif phase == "moved" then
-                if not touches[id] then return true end
-                touches[id] = { x = event.x, y = event.y }
+        -- Convert content-space point to view's parent local space
+        -- so view.x/y manipulation is in the correct coordinate system.
+        local function toLocal(cx, cy)
+            if view.parent and view.parent.contentToLocal then
+                return view.parent:contentToLocal(cx, cy)
+            end
+            return cx, cy
+        end
 
-                if touchCount() == 1 then
-                    -- Single finger: pan relative to startCX/CY recorded in began
-                    local dx = event.x - startCX
-                    local dy = event.y - startCY
-                    view.x = baseX + dx
-                    view.y = baseY + dy
+        -- Core: process a finger event (called by TrackDot listeners)
+        local function handleFinger(id, phase, x, y)
+            if phase == "moved" then
+                if not touches[id] then return end
+                touches[id] = { x = x, y = y }
+
+                if touchCount() == 1 and prevCX then
+                    -- Single finger: incremental pan
+                    local plx, ply = toLocal(prevCX, prevCY)
+                    local clx, cly = toLocal(x, y)
+                    view.x = view.x + (clx - plx)
+                    view.y = view.y + (cly - ply)
+                    savePrev()
                     fireCb("onTransform")
 
-                elseif touchCount() >= 2 then
+                elseif touchCount() >= 2 and prevDist then
                     local t1 = touches[touchOrder[1]]
                     local t2 = touches[touchOrder[2]]
-                    if not t1 or not t2 then return true end
+                    if not t1 or not t2 then return end
 
-                    -- Scale
                     local curDist = dist(t1.x, t1.y, t2.x, t2.y)
-                    local scaleFactor = (startDist and startDist > 0)
-                        and (curDist / startDist) or 1
-                    local newScale = baseScale * scaleFactor
-                    if newScale < minScale then newScale = minScale end
-                    if newScale > maxScale then newScale = maxScale end
-                    view.xScale = newScale
-                    view.yScale = newScale
-
-                    -- Rotation
                     local curAngle = angleDeg(t1.x, t1.y, t2.x, t2.y)
-                    local dAngle = startAngle and (curAngle - startAngle) or 0
-                    view.rotation = baseRotation + dAngle
-
-                    -- Translate: midpoint of two fingers drives position
                     local curCX = (t1.x + t2.x) * 0.5
                     local curCY = (t1.y + t2.y) * 0.5
-                    if startCX then
-                        view.x = baseX + (curCX - startCX)
-                        view.y = baseY + (curCY - startCY)
+
+                    -- Delta scale with jitter filter (labo: filter noisy frames)
+                    local dScale = (prevDist > 1) and (curDist / prevDist) or 1
+                    if math.abs(dScale - 1) > jitterThreshold then dScale = 1 end
+                    -- Clamp to scale limits
+                    local projected = view.xScale * dScale
+                    if projected < minScale then dScale = minScale / view.xScale end
+                    if projected > maxScale then dScale = maxScale / view.xScale end
+
+                    -- Delta rotation with wrap-around handling
+                    local dRot = curAngle - prevAngle
+                    if dRot > 180 then dRot = dRot - 360 end
+                    if dRot < -180 then dRot = dRot + 360 end
+
+                    -- Pinch center in parent-local coords
+                    local lcx, lcy = toLocal(prevCX, prevCY)
+
+                    -- 1) Rotate around pinch center (labo order: rotate first)
+                    if dRot ~= 0 then
+                        local rad = math.rad(dRot)
+                        local cos_r = math.cos(rad)
+                        local sin_r = math.sin(rad)
+                        local ox = view.x - lcx
+                        local oy = view.y - lcy
+                        view.x = lcx + ox * cos_r - oy * sin_r
+                        view.y = lcy + ox * sin_r + oy * cos_r
+                        view.rotation = view.rotation + dRot
                     end
 
+                    -- 2) Scale around pinch center
+                    if dScale ~= 1 then
+                        view.x = lcx + (view.x - lcx) * dScale
+                        view.y = lcy + (view.y - lcy) * dScale
+                        view.xScale = view.xScale * dScale
+                        view.yScale = view.yScale * dScale
+                    end
+
+                    -- 3) Translate by center point movement
+                    local newLcx, newLcy = toLocal(curCX, curCY)
+                    view.x = view.x + (newLcx - lcx)
+                    view.y = view.y + (newLcy - lcy)
+
+                    savePrev()
                     fireCb("onTransform")
                 end
-                return true
 
             elseif phase == "ended" or phase == "cancelled" then
-                if not touches[id] then return true end
+                if not touches[id] then return end
                 touches[id] = nil
-                -- Remove from ordered list
                 for i = #touchOrder, 1, -1 do
                     if touchOrder[i] == id then
                         table.remove(touchOrder, i)
                         break
                     end
                 end
-                display.getCurrentStage():setFocus(nil, id)
+                -- Remove TrackDot
+                local entry = dots[id]
+                if entry then
+                    display.getCurrentStage():setFocus(nil, id)
+                    entry.dot:removeEventListener("touch", entry.listener)
+                    entry.dot:removeSelf()
+                    dots[id] = nil
+                end
+                TouchRegistry.release(id, view)
 
                 if touchCount() == 0 then
-                    startDist = nil
-                    startAngle = nil
-                    startCX = nil
-                    startCY = nil
+                    prevCX, prevCY = nil, nil
+                    prevDist, prevAngle = nil, nil
                     fireCb("onTransformEnd")
-                elseif touchCount() == 1 then
-                    -- Dropped to 1 finger: re-anchor pan from the remaining finger's
-                    -- current position so the next moved event produces zero jump
-                    local remainId = touchOrder[1]
-                    local rem = touches[remainId]
-                    startDist = nil
-                    startAngle = nil
-                    startCX = rem and rem.x or event.x
-                    startCY = rem and rem.y or event.y
-                    recordBase()
+                else
+                    -- Re-anchor for next frame's delta
+                    savePrev()
                 end
-                return true
             end
-            return false
         end
 
-        view:addEventListener("touch", onTouch)
+        -- View's own touch listener: handles "began" events only.
+        -- TrackDot listeners handle moved/ended.
+        local function onViewTouch(event)
+            if event.phase ~= "began" then return false end
+            local p = propsRef.current
+            if p.disabled then return false end
+
+            local id = event.id
+            -- Guard: duplicate began / palm rejection (max 2 fingers)
+            if touches[id] then return true end
+            if touchCount() >= 2 then return true end
+            -- canFocus: another component may already own this finger
+            if not TouchRegistry.canFocus(id, view) then return false end
+
+            -- Register touch
+            touches[id] = { x = event.x, y = event.y }
+            touchOrder[#touchOrder + 1] = id
+            TouchRegistry.claim(id, view)
+
+            -- Create TrackDot: invisible proxy for this finger.
+            -- setFocus routes subsequent events to the dot, not the view.
+            local dot = display.newCircle(event.x, event.y, 1)
+            dot.isVisible = false
+            dot.isHitTestable = true
+
+            local function dotListener(e)
+                -- Update dot position (keeps Solar2D hit-test correct if focus is lost)
+                if e.phase == "moved" then
+                    dot.x = e.x
+                    dot.y = e.y
+                end
+                handleFinger(e.id, e.phase, e.x, e.y)
+                return true
+            end
+
+            dot:addEventListener("touch", dotListener)
+            display.getCurrentStage():setFocus(dot, id)
+            dots[id] = { dot = dot, listener = dotListener }
+
+            -- First finger: begin gesture; second finger: transition to pinch
+            savePrev()
+            if touchCount() == 1 then
+                fireCb("onTransformStart")
+            end
+            return true
+        end
+
+        view:addEventListener("touch", onViewTouch)
 
         return function()
-            -- Cleanup sweep: release all active finger focuses + reset all state
-            for _, tid in ipairs(touchOrder) do
-                display.getCurrentStage():setFocus(nil, tid)
+            -- Cleanup sweep: remove all TrackDots, release all focus, reset state
+            for fid, entry in pairs(dots) do
+                display.getCurrentStage():setFocus(nil, fid)
+                entry.dot:removeEventListener("touch", entry.listener)
+                entry.dot:removeSelf()
             end
+            TouchRegistry.releaseAll(view)
+            dots = {}
             touches = {}
             touchOrder = {}
-            startDist = nil
-            startAngle = nil
-            startCX = nil
-            startCY = nil
-            view:removeEventListener("touch", onTouch)
+            prevCX, prevCY = nil, nil
+            prevDist, prevAngle = nil, nil
+            view:removeEventListener("touch", onViewTouch)
         end
     end, {props.minScale, props.maxScale})
 

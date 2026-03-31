@@ -7,6 +7,7 @@
 
 local React = require("react")
 local ce = React.createElement
+local TouchRegistry = require("lib.TouchRegistry")
 
 --- DraggableView component.
 -- @param props table
@@ -61,7 +62,10 @@ local function DraggableView(props)
             if phase == "began" then
                 -- Only accept one finger at a time
                 if touchIdRef.current ~= nil then return true end
+                -- canFocus: another component may already own this finger
+                if not TouchRegistry.canFocus(event.id, view) then return false end
                 touchIdRef.current = event.id
+                TouchRegistry.claim(event.id, view)
                 startTouchRef.current = { x = event.x, y = event.y }
                 startPosRef.current = { x = view.x, y = view.y }
                 -- Only claim focus when handling touch directly (not via ScrollView)
@@ -102,6 +106,7 @@ local function DraggableView(props)
             elseif phase == "ended" or phase == "cancelled" then
                 if event.id ~= touchIdRef.current then return true end
                 touchIdRef.current = nil
+                TouchRegistry.release(event.id, view)
                 if not delegated then
                     display.getCurrentStage():setFocus(nil, event.id)
                 end
@@ -133,9 +138,10 @@ local function DraggableView(props)
         end
 
         return function()
-            -- Release focus if unmounted during an active drag (direct touch only)
+            -- Cleanup sweep: release focus + registry
             if touchIdRef.current ~= nil then
                 display.getCurrentStage():setFocus(nil, touchIdRef.current)
+                TouchRegistry.release(touchIdRef.current, view)
                 touchIdRef.current = nil
             end
             view:removeEventListener("touch", onTouch)

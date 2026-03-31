@@ -74,6 +74,9 @@ RN.DraggableView = Components.DraggableView
 RN.PinchableView = Components.PinchableView
 RN.DrawingCanvas = Components.DrawingCanvas
 
+-- Touch
+RN.TouchRegistry = require("lib.TouchRegistry")
+
 -- Navigation
 local Navigation = require("navigation")
 RN.NavigationContainer = Navigation.NavigationContainer
