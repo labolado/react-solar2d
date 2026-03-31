@@ -95,6 +95,7 @@ local function createScrollView(props, style, applyCommonStyle)
     local startY, startX, startScrollY, startScrollX
     local isDragging = false
     local DRAG_THRESHOLD = 5
+    local primaryTouchId = nil  -- id of the first finger; extra fingers are ignored
     local activeDragChild = nil  -- child with _onDragHandler that is handling the touch
     local activeScrollChild = nil  -- nested ScrollView that is handling scroll
     local activeScrollChildStartY = nil
@@ -160,6 +161,9 @@ local function createScrollView(props, style, applyCommonStyle)
     -- Touch listener on the overlay rect — NO setFocus needed.
     touchOverlay:addEventListener("touch", function(event)
         if event.phase == "began" then
+            -- Ignore additional fingers; only the first finger drives the scroll
+            if primaryTouchId ~= nil then return true end
+            primaryTouchId = event.id
             recalcContentSize()
             startY = event.y
             startX = event.x
@@ -192,6 +196,7 @@ local function createScrollView(props, style, applyCommonStyle)
             return true
 
         elseif event.phase == "moved" then
+            if event.id ~= primaryTouchId then return true end
             -- If a drag child is active, forward all events to it
             if activeDragChild then
                 activeDragChild._onDragHandler(event)
@@ -272,6 +277,8 @@ local function createScrollView(props, style, applyCommonStyle)
             return true
 
         elseif event.phase == "ended" or event.phase == "cancelled" then
+            if event.id ~= primaryTouchId then return true end
+            primaryTouchId = nil
             -- Forward to drag child if active
             if activeDragChild then
                 activeDragChild._onDragHandler(event)

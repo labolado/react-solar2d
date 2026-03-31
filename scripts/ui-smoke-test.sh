@@ -94,6 +94,11 @@ Interop:DeviceInfo
 Interop:DateTimePicker
 Canvas:Canvas
 Canvas:Tetris
+Touch:Draggable
+Touch:Pinch
+Touch:Drawing
+Touch:Stickers
+Touch:Gamepad
 "
 
 for entry in $DEMOS; do

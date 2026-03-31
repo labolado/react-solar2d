@@ -3,6 +3,9 @@
 -- and handles safe area insets, resize, and auto-flush.
 -- @module renderer
 
+-- Enable multitouch so event.id is available for all touch listeners
+system.activate("multitouch")
+
 local Reconciler = require("react.Reconciler")
 local HostConfig = require("renderer.HostConfig")
 

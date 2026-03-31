@@ -70,6 +70,9 @@ RN.RefreshControl = Components.RefreshControl
 RN.KeyboardAvoidingView = Components.KeyboardAvoidingView
 RN.SafeAreaView = Components.SafeAreaView
 RN.ImageBackground = Components.ImageBackground
+RN.DraggableView = Components.DraggableView
+RN.PinchableView = Components.PinchableView
+RN.DrawingCanvas = Components.DrawingCanvas
 
 -- Navigation
 local Navigation = require("navigation")

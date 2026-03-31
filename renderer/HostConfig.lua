@@ -282,10 +282,11 @@ local function wireEvents(instance, props)
                 isDragging = true
                 dragStartX = globalX
                 dragStartY = globalY
-                display.getCurrentStage():setFocus(event.target)
+                display.getCurrentStage():setFocus(event.target, event.id)
                 if instance._onDragStart then
                     instance._onDragStart({
                         x = globalX, y = globalY,
+                        id = event.id,
                         target = event.target,
                         startX = dragStartX, startY = dragStartY
                     })
@@ -297,6 +298,7 @@ local function wireEvents(instance, props)
                 if instance._onDrag then
                     instance._onDrag({
                         x = globalX, y = globalY,
+                        id = event.id,
                         target = event.target,
                         startX = dragStartX, startY = dragStartY,
                         deltaX = globalX - dragStartX,
@@ -305,10 +307,11 @@ local function wireEvents(instance, props)
                 end
             elseif (phase == "ended" or phase == "cancelled") and isDragging then
                 isDragging = false
-                display.getCurrentStage():setFocus(nil)
+                display.getCurrentStage():setFocus(nil, event.id)
                 if instance._onDragEnd then
                     instance._onDragEnd({
                         x = globalX, y = globalY,
+                        id = event.id,
                         target = event.target,
                         startX = dragStartX, startY = dragStartY
                     })

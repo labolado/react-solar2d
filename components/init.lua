@@ -25,4 +25,7 @@ return {
     Pagelet = require("components.Pagelet"),
     ImageBackground = require("components.ImageBackground"),
     WebView = require("components.WebView"),
+    DraggableView = require("components.DraggableView"),
+    PinchableView = require("components.PinchableView"),
+    DrawingCanvas = require("components.DrawingCanvas"),
 }
