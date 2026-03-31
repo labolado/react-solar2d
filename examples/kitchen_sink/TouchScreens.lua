@@ -142,7 +142,7 @@ end
 local function DrawingDemo()
     local brushColor, setBrushColor = useState("#58A6FF")
     local brushSize, setBrushSize = useState(4)
-    local canvasRef = useRef(nil)
+    local canvasApi, setCanvasApi = useState(nil)
 
     local PALETTE = { "#E74C3C", "#E67E22", "#F1C40F", "#2ECC71", "#58A6FF", "#9B59B6", "#FFFFFF", "#000000" }
     local SIZES   = { { label = "S", size = 2 }, { label = "M", size = 6 }, { label = "L", size = 12 } }
@@ -192,7 +192,7 @@ local function DrawingDemo()
             },
         },
             ce(RN.DrawingCanvas, {
-                ref = canvasRef,
+                onReady = setCanvasApi,
                 brushColor = brushColor,
                 brushSize = brushSize,
                 style = { width = W, height = CANVAS_H },
@@ -220,9 +220,8 @@ local function DrawingDemo()
             ce("View", { style = { flex = 1 } }),
             ce(RN.Pressable, {
                 onPress = function()
-                    -- Access clearStrokes via the canvas view instance
-                    if canvasRef.current and canvasRef.current.clearStrokes then
-                        canvasRef.current.clearStrokes()
+                    if canvasApi and canvasApi.clear then
+                        canvasApi.clear()
                     end
                 end,
                 style = {

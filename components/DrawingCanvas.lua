@@ -18,7 +18,9 @@ local TouchRegistry = require("lib.TouchRegistry")
 --   maxStrokes number   Maximum strokes to keep (oldest removed, default 200)
 --   maxFingers number   Maximum simultaneous fingers (palm rejection, default 5)
 -- @return table React element
-local DrawingCanvas = React.forwardRef(function(props, ref)
+--- @param props table
+--   onReady function    Called with API handle {clear=function} on mount
+local function DrawingCanvas(props)
     local viewRef = React.useRef(nil)
     local surfaceRef = React.useRef(nil)    -- display group holding all strokes
     local activeRef = React.useRef({})      -- activeRef.current[id] = {line, dot, dotListener}
@@ -26,14 +28,6 @@ local DrawingCanvas = React.forwardRef(function(props, ref)
 
     local onRef = React.useCallback(function(instance)
         viewRef.current = instance
-        -- Forward to external ref so parent can access clearStrokes
-        if ref then
-            if type(ref) == "function" then
-                ref(instance)
-            elseif type(ref) == "table" then
-                ref.current = instance
-            end
-        end
     end, {})
 
     -- propsRef avoids stale closures in event handlers
@@ -208,35 +202,36 @@ local DrawingCanvas = React.forwardRef(function(props, ref)
         end
     end, {})
 
-    -- Expose clear() via imperative handle pattern on the view ref
+    -- Expose clear API via onReady callback
     React.useEffect(function()
-        local view = viewRef.current
-        if not view then return end
-        view.clearStrokes = function()
-            local strokes = strokesRef.current
-            for i = #strokes, 1, -1 do
-                local s = strokes[i]
-                if s and s.removeSelf then s:removeSelf() end
-            end
-            strokesRef.current = {}
-            -- Also clean up any active dots
-            for fid in pairs(activeRef.current) do
-                local state = activeRef.current[fid]
-                if state and state.dot then
-                    display.getCurrentStage():setFocus(nil, fid)
-                    TouchRegistry.release(fid, viewRef.current)
-                    state.dot:removeEventListener("touch", state.dotListener)
-                    state.dot:removeSelf()
+        if not props.onReady then return end
+        props.onReady({
+            clear = function()
+                local strokes = strokesRef.current
+                for i = #strokes, 1, -1 do
+                    local s = strokes[i]
+                    if s and s.removeSelf then s:removeSelf() end
                 end
-            end
-            activeRef.current = {}
-        end
+                strokesRef.current = {}
+                -- Also clean up any active dots
+                for fid in pairs(activeRef.current) do
+                    local state = activeRef.current[fid]
+                    if state and state.dot then
+                        display.getCurrentStage():setFocus(nil, fid)
+                        TouchRegistry.release(fid, viewRef.current)
+                        state.dot:removeEventListener("touch", state.dotListener)
+                        state.dot:removeSelf()
+                    end
+                end
+                activeRef.current = {}
+            end,
+        })
     end, {})
 
     return ce("View", {
         ref = onRef,
         style = props.style,
     }, props.children)
-end)
+end
 
 return DrawingCanvas
