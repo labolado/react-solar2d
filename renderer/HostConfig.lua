@@ -225,10 +225,32 @@ local function wireEvents(instance, props)
 
     if props.onPress then
         instance._onPress = props.onPress
-        -- Use 'tap' event — independent of 'touch', doesn't interfere with ScrollView
-        -- Reference instance._onPress (not props.onPress) so updateInstance can refresh it
         instance.isHitTestable = true
+
+        -- Instant press feedback on touch-down (before tap fires)
+        -- Makes buttons feel responsive — user sees feedback immediately on touch
+        local pressedAlpha = nil
+        instance:addEventListener("touch", function(event)
+            if not instance._onPress then return false end
+            if event.phase == "began" then
+                pressedAlpha = instance.alpha
+                instance.alpha = (pressedAlpha or 1) * 0.6
+            elseif event.phase == "ended" or event.phase == "cancelled" then
+                if pressedAlpha then
+                    instance.alpha = pressedAlpha
+                    pressedAlpha = nil
+                end
+            end
+            return false  -- don't consume — let tap event fire too
+        end)
+
+        -- Actual action on tap (touch-up at same location)
         instance:addEventListener("tap", function(event)
+            -- Restore alpha in case touch listener missed the "ended"
+            if pressedAlpha then
+                instance.alpha = pressedAlpha
+                pressedAlpha = nil
+            end
             flashFeedback()
             if instance._onPress then instance._onPress(event) end
             return true
