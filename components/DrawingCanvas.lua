@@ -1,6 +1,7 @@
 --- DrawingCanvas component.
 -- Multi-finger drawing surface. Each finger draws an independent stroke.
--- Uses display.newLine + :append() for real-time rendering at 60fps.
+-- Uses TrackDot pattern (one invisible proxy per finger) for reliable
+-- multi-finger focus, and display.newLine + :append() for 60fps rendering.
 -- @module components.DrawingCanvas
 
 local React = require("react")
@@ -16,12 +17,11 @@ local TouchRegistry = require("lib.TouchRegistry")
 --   onStrokeEnd function    Called with {id} when a finger lifts
 --   maxStrokes number   Maximum strokes to keep (oldest removed, default 200)
 --   maxFingers number   Maximum simultaneous fingers (palm rejection, default 5)
---   clip boolean        Clip drawing to bounds via Container (default false)
 -- @return table React element
 local function DrawingCanvas(props)
     local viewRef = React.useRef(nil)
     local surfaceRef = React.useRef(nil)    -- display group holding all strokes
-    local activeRef = React.useRef({})      -- activeRef.current[id] = {line, lastX, lastY}
+    local activeRef = React.useRef({})      -- activeRef.current[id] = {line, dot, dotListener}
     local strokesRef = React.useRef({})     -- ordered list of all stroke display objects
 
     local onRef = React.useCallback(function(instance)
@@ -47,106 +47,137 @@ local function DrawingCanvas(props)
         if view._bg then view._bg:toBack() end
         surfaceRef.current = surface
 
-        -- Transparent hit rect the size of the canvas
+        -- Transparent hit rect for initial touch detection (began only).
+        -- After began, a TrackDot per finger handles moved/ended.
         local hitRect = display.newRect(surface, w / 2, h / 2, w, h)
         hitRect.anchorX, hitRect.anchorY = 0.5, 0.5
         hitRect:setFillColor(0, 0, 0, 0.001)
         hitRect.isHitTestable = true
 
-        local function onTouch(event)
-            local p = propsRef.current
-            local phase = event.phase
+        -- Remove a TrackDot and release its focus
+        local function removeDot(id)
+            local state = activeRef.current[id]
+            if not state then return end
+            display.getCurrentStage():setFocus(nil, id)
+            TouchRegistry.release(id, view)
+            if state.dot then
+                state.dot:removeEventListener("touch", state.dotListener)
+                state.dot:removeSelf()
+            end
+        end
+
+        -- Handle moved/ended events from a TrackDot
+        local function handleDotEvent(event)
             local id = event.id
-            local ex, ey = event.x, event.y
+            local phase = event.phase
+            local state = activeRef.current[id]
+            if not state then return true end
 
-            -- Convert screen coords to surface-local coords
-            local lx, ly = surface:contentToLocal(ex, ey)
+            local lx, ly = surface:contentToLocal(event.x, event.y)
 
-            if phase == "began" then
-                -- Palm rejection: ignore additional fingers beyond maxFingers
-                local maxFingers = p.maxFingers or 5
-                local activeCount = 0
-                for _ in pairs(activeRef.current) do activeCount = activeCount + 1 end
-                if activeCount >= maxFingers then return true end
-                -- canFocus: another component may already own this finger
-                if not TouchRegistry.canFocus(id, hitRect) then return true end
-
-                TouchRegistry.claim(id, hitRect)
-                display.getCurrentStage():setFocus(hitRect, id)
-
-                local color = p.brushColor or "#000000"
-                local size = p.brushSize or 4
-
-                -- Parse color string into r,g,b,a
-                local r, g, b, a = 0, 0, 0, 1
-                if type(color) == "string" and color:sub(1, 1) == "#" then
-                    local hex = color:sub(2)
-                    r = (tonumber(hex:sub(1, 2), 16) or 0) / 255
-                    g = (tonumber(hex:sub(3, 4), 16) or 0) / 255
-                    b = (tonumber(hex:sub(5, 6), 16) or 0) / 255
-                    a = #hex >= 8 and ((tonumber(hex:sub(7, 8), 16) or 255) / 255) or 1
-                elseif type(color) == "table" then
-                    r, g, b, a = color[1] or 0, color[2] or 0, color[3] or 0, color[4] or 1
-                end
-
-                -- lx + 0.1: Solar2D requires two distinct points to create a line object;
-                -- without this offset a single-tap produces no visible object.
-                local line = display.newLine(surface, lx, ly, lx + 0.1, ly)
-                line:setStrokeColor(r, g, b, a)
-                line.strokeWidth = size
-
-                activeRef.current[id] = { line = line, lastX = lx, lastY = ly }
-
-                -- Track strokes; enforce maxStrokes limit
-                local strokes = strokesRef.current
-                strokes[#strokes + 1] = line
-                local maxStrokes = p.maxStrokes or 200
-                while #strokes > maxStrokes do
-                    local old = table.remove(strokes, 1)
-                    -- Only remove if the stroke is not still being drawn by an active finger
-                    local inUse = false
-                    for _, state in pairs(activeRef.current) do
-                        if state.line == old then inUse = true; break end
-                    end
-                    if not inUse and old and old.removeSelf then old:removeSelf() end
-                end
-
-                if p.onStrokeStart then
-                    p.onStrokeStart({ id = id, x = lx, y = ly })
-                end
-                return true
-
-            elseif phase == "moved" then
-                local state = activeRef.current[id]
-                if not state then return true end
+            if phase == "moved" then
                 state.line:append(lx, ly)
                 state.lastX = lx
                 state.lastY = ly
-                return true
+                -- Keep dot position in sync
+                if state.dot then
+                    state.dot.x = event.x
+                    state.dot.y = event.y
+                end
 
             elseif phase == "ended" or phase == "cancelled" then
-                display.getCurrentStage():setFocus(nil, id)
-                TouchRegistry.release(id, hitRect)
-                if activeRef.current[id] then
-                    activeRef.current[id] = nil
-                end
+                removeDot(id)
+                activeRef.current[id] = nil
                 if propsRef.current.onStrokeEnd then
                     propsRef.current.onStrokeEnd({ id = id })
                 end
-                return true
             end
-            return false
+            return true
         end
 
-        hitRect:addEventListener("touch", onTouch)
+        -- hitRect only handles "began": creates a TrackDot per finger
+        local function onHitTouch(event)
+            if event.phase ~= "began" then return false end
+
+            local p = propsRef.current
+            local id = event.id
+
+            -- Palm rejection
+            local maxFingers = p.maxFingers or 5
+            local activeCount = 0
+            for _ in pairs(activeRef.current) do activeCount = activeCount + 1 end
+            if activeCount >= maxFingers then return true end
+            -- canFocus check
+            if not TouchRegistry.canFocus(id, view) then return true end
+
+            TouchRegistry.claim(id, view)
+
+            local lx, ly = surface:contentToLocal(event.x, event.y)
+
+            -- Parse brush color
+            local color = p.brushColor or "#000000"
+            local size = p.brushSize or 4
+            local r, g, b, a = 0, 0, 0, 1
+            if type(color) == "string" and color:sub(1, 1) == "#" then
+                local hex = color:sub(2)
+                r = (tonumber(hex:sub(1, 2), 16) or 0) / 255
+                g = (tonumber(hex:sub(3, 4), 16) or 0) / 255
+                b = (tonumber(hex:sub(5, 6), 16) or 0) / 255
+                a = #hex >= 8 and ((tonumber(hex:sub(7, 8), 16) or 255) / 255) or 1
+            elseif type(color) == "table" then
+                r, g, b, a = color[1] or 0, color[2] or 0, color[3] or 0, color[4] or 1
+            end
+
+            -- lx + 0.1: Solar2D requires two distinct points to create a line;
+            -- without this offset a single-tap produces no visible object.
+            local line = display.newLine(surface, lx, ly, lx + 0.1, ly)
+            line:setStrokeColor(r, g, b, a)
+            line.strokeWidth = size
+
+            -- TrackDot: invisible proxy so setFocus is per-dot (not shared hitRect).
+            -- This is critical for multi-finger: setFocus(hitRect, id) for multiple
+            -- ids on the same object is unreliable in Solar2D.
+            local dot = display.newCircle(event.x, event.y, 1)
+            dot.isVisible = false
+            dot.isHitTestable = true
+            dot:addEventListener("touch", handleDotEvent)
+            display.getCurrentStage():setFocus(dot, id)
+
+            activeRef.current[id] = {
+                line = line,
+                lastX = lx,
+                lastY = ly,
+                dot = dot,
+                dotListener = handleDotEvent,
+            }
+
+            -- Enforce maxStrokes limit
+            local strokes = strokesRef.current
+            strokes[#strokes + 1] = line
+            local maxStrokes = p.maxStrokes or 200
+            while #strokes > maxStrokes do
+                local old = table.remove(strokes, 1)
+                local inUse = false
+                for _, state in pairs(activeRef.current) do
+                    if state.line == old then inUse = true; break end
+                end
+                if not inUse and old and old.removeSelf then old:removeSelf() end
+            end
+
+            if p.onStrokeStart then
+                p.onStrokeStart({ id = id, x = lx, y = ly })
+            end
+            return true
+        end
+
+        hitRect:addEventListener("touch", onHitTouch)
 
         return function()
-            -- Cleanup sweep: release all finger focuses + registry
+            -- Cleanup sweep: remove all TrackDots + release focus + registry
             for fid in pairs(activeRef.current) do
-                display.getCurrentStage():setFocus(nil, fid)
-                TouchRegistry.release(fid, hitRect)
+                removeDot(fid)
             end
-            hitRect:removeEventListener("touch", onTouch)
+            hitRect:removeEventListener("touch", onHitTouch)
             if surface and surface.removeSelf then
                 surface:removeSelf()
             end
@@ -167,6 +198,16 @@ local function DrawingCanvas(props)
                 if s and s.removeSelf then s:removeSelf() end
             end
             strokesRef.current = {}
+            -- Also clean up any active dots
+            for fid in pairs(activeRef.current) do
+                local state = activeRef.current[fid]
+                if state and state.dot then
+                    display.getCurrentStage():setFocus(nil, fid)
+                    TouchRegistry.release(fid, viewRef.current)
+                    state.dot:removeEventListener("touch", state.dotListener)
+                    state.dot:removeSelf()
+                end
+            end
             activeRef.current = {}
         end
     end, {})
