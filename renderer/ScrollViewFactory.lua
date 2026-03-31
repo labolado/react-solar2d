@@ -40,10 +40,15 @@ local function createScrollView(props, style, applyCommonStyle)
 
     -- takeFocus: called by child components to steal touch focus for dragging
     clipContainer.takeFocus = function(self, event)
-        -- Stop scrolling when a child takes focus (e.g., Slider thumb)
+        -- Release overlay's per-finger focus so the child can claim it cleanly
+        if event and event.id then
+            display.getCurrentStage():setFocus(nil, event.id)
+        end
+        -- Reset scroll state so primaryTouchId is freed for the next touch
         isDragging = false
         startY = nil
         startX = nil
+        primaryTouchId = nil
     end
 
     local function fireOnScroll()

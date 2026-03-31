@@ -332,9 +332,12 @@ local function GamepadDemo()
                     yMax = (STICK_AREA - THUMB) / 2,
                 },
                 onDrag = function(info)
+                    -- info.dx/dy are deltas from drag start (local units), not screen coords
                     local range = (STICK_AREA - THUMB) / 2
-                    setJoyX(math.floor((info.x / range) * 100) / 100)
-                    setJoyY(math.floor((info.y / range) * 100) / 100)
+                    local nx = math.max(-1, math.min(1, info.dx / range))
+                    local ny = math.max(-1, math.min(1, info.dy / range))
+                    setJoyX(math.floor(nx * 100) / 100)
+                    setJoyY(math.floor(ny * 100) / 100)
                 end,
                 onDragEnd = function()
                     setJoyX(0)

@@ -78,6 +78,8 @@ local function DrawingCanvas(props)
                     r, g, b, a = color[1] or 0, color[2] or 0, color[3] or 0, color[4] or 1
                 end
 
+                -- lx + 0.1: Solar2D requires two distinct points to create a line object;
+                -- without this offset a single-tap produces no visible object.
                 local line = display.newLine(surface, lx, ly, lx + 0.1, ly)
                 line:setStrokeColor(r, g, b, a)
                 line.strokeWidth = size
@@ -90,7 +92,12 @@ local function DrawingCanvas(props)
                 local maxStrokes = p.maxStrokes or 200
                 while #strokes > maxStrokes do
                     local old = table.remove(strokes, 1)
-                    if old and old.removeSelf then old:removeSelf() end
+                    -- Only remove if the stroke is not still being drawn by an active finger
+                    local inUse = false
+                    for _, state in pairs(activeRef.current) do
+                        if state.line == old then inUse = true; break end
+                    end
+                    if not inUse and old and old.removeSelf then old:removeSelf() end
                 end
 
                 if p.onStrokeStart then

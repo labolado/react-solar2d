@@ -24,6 +24,10 @@ local function DraggableView(props)
     local startTouchRef = React.useRef(nil) -- {x, y} of touch began
     local startPosRef = React.useRef(nil)   -- {x, y} of object when drag began
 
+    -- propsRef: always holds latest props, avoids stale closures in touch handler
+    local propsRef = React.useRef({})
+    propsRef.current = props
+
     local onRef = React.useCallback(function(instance)
         viewRef.current = instance
     end, {})
@@ -44,7 +48,8 @@ local function DraggableView(props)
         end
 
         local function onTouch(event)
-            if props.disabled then return false end
+            local p = propsRef.current
+            if p.disabled then return false end
             local phase = event.phase
 
             if phase == "began" then
@@ -55,8 +60,8 @@ local function DraggableView(props)
                 startPosRef.current = { x = view.x, y = view.y }
                 -- Lock this finger to the view
                 display.getCurrentStage():setFocus(view, event.id)
-                if props.onDragStart then
-                    props.onDragStart({ x = event.x, y = event.y, id = event.id })
+                if p.onDragStart then
+                    p.onDragStart({ x = event.x, y = event.y, id = event.id })
                 end
                 return true
 
@@ -72,8 +77,8 @@ local function DraggableView(props)
                 local newY = sp.y + dy
 
                 -- Apply bounds clamping
-                if props.bounds then
-                    local b = props.bounds
+                if p.bounds then
+                    local b = p.bounds
                     newX = clamp(newX, b.xMin, b.xMax)
                     newY = clamp(newY, b.yMin, b.yMax)
                 end
@@ -81,8 +86,8 @@ local function DraggableView(props)
                 view.x = newX
                 view.y = newY
 
-                if props.onDrag then
-                    props.onDrag({ x = event.x, y = event.y, dx = dx, dy = dy, id = event.id })
+                if p.onDrag then
+                    p.onDrag({ x = event.x, y = event.y, dx = dx, dy = dy, id = event.id })
                 end
                 return true
 
@@ -92,13 +97,13 @@ local function DraggableView(props)
                 display.getCurrentStage():setFocus(nil, event.id)
 
                 -- Snap on release
-                if props.snapToGrid then
-                    view.x = snapVal(view.x, props.snapToGrid)
-                    view.y = snapVal(view.y, props.snapToGrid)
+                if p.snapToGrid then
+                    view.x = snapVal(view.x, p.snapToGrid)
+                    view.y = snapVal(view.y, p.snapToGrid)
                 end
 
-                if props.onDragEnd then
-                    props.onDragEnd({ x = event.x, y = event.y, id = event.id })
+                if p.onDragEnd then
+                    p.onDragEnd({ x = event.x, y = event.y, id = event.id })
                 end
                 return true
             end
@@ -111,11 +116,16 @@ local function DraggableView(props)
         view._onDragHandler = function(ev) return onTouch(ev) end
 
         return function()
+            -- Release focus if unmounted during an active drag
+            if touchIdRef.current ~= nil then
+                display.getCurrentStage():setFocus(nil, touchIdRef.current)
+                touchIdRef.current = nil
+            end
             view:removeEventListener("touch", onTouch)
             view._isDraggable = nil
             view._onDragHandler = nil
         end
-    end, {props.disabled})
+    end, {})
 
     return ce("View", {
         ref = onRef,
