@@ -325,6 +325,7 @@ local function GamepadDemo()
         },
             -- Left: joystick
             ce(RN.DraggableView, {
+                snapBack = true,
                 bounds = {
                     xMin = -(STICK_AREA - THUMB) / 2,
                     yMin = -(STICK_AREA - THUMB) / 2,

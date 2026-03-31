@@ -18,7 +18,7 @@ local TouchRegistry = require("lib.TouchRegistry")
 --   maxStrokes number   Maximum strokes to keep (oldest removed, default 200)
 --   maxFingers number   Maximum simultaneous fingers (palm rejection, default 5)
 -- @return table React element
-local function DrawingCanvas(props)
+local DrawingCanvas = React.forwardRef(function(props, ref)
     local viewRef = React.useRef(nil)
     local surfaceRef = React.useRef(nil)    -- display group holding all strokes
     local activeRef = React.useRef({})      -- activeRef.current[id] = {line, dot, dotListener}
@@ -27,11 +27,11 @@ local function DrawingCanvas(props)
     local onRef = React.useCallback(function(instance)
         viewRef.current = instance
         -- Forward to external ref so parent can access clearStrokes
-        if props.ref then
-            if type(props.ref) == "function" then
-                props.ref(instance)
-            elseif type(props.ref) == "table" then
-                props.ref.current = instance
+        if ref then
+            if type(ref) == "function" then
+                ref(instance)
+            elseif type(ref) == "table" then
+                ref.current = instance
             end
         end
     end, {})
@@ -237,6 +237,6 @@ local function DrawingCanvas(props)
         ref = onRef,
         style = props.style,
     }, props.children)
-end
+end)
 
 return DrawingCanvas

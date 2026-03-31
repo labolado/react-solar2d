@@ -17,7 +17,8 @@ local TouchRegistry = require("lib.TouchRegistry")
 --   onDrag function       Called with {x, y, dx, dy, id} each moved event
 --   onDragEnd function    Called with {x, y, id} when drag ends
 --   snapToGrid number     If set, snaps position to this grid size on release
---   bounds table          {xMin, yMin, xMax, yMax} content bounds to clamp position
+--   snapBack boolean      If true, returns to rest position on release (joystick mode)
+--   bounds table          {xMin, yMin, xMax, yMax} offset limits from rest position
 --   disabled boolean      When true, touch is ignored
 -- @return table React element
 local function DraggableView(props)
@@ -85,15 +86,18 @@ local function DraggableView(props)
 
                 local dx = event.x - st.x
                 local dy = event.y - st.y
-                local newX = sp.x + dx
-                local newY = sp.y + dy
 
-                -- Apply bounds clamping
+                -- Bounds are relative offsets from the drag start position:
+                -- {xMin=-40, xMax=40} means the view can move ±40 from its rest position.
+                -- Clamp the delta, then add to start position.
                 if p.bounds then
                     local b = p.bounds
-                    newX = clamp(newX, b.xMin, b.xMax)
-                    newY = clamp(newY, b.yMin, b.yMax)
+                    dx = clamp(dx, b.xMin, b.xMax)
+                    dy = clamp(dy, b.yMin, b.yMax)
                 end
+
+                local newX = sp.x + dx
+                local newY = sp.y + dy
 
                 view.x = newX
                 view.y = newY
@@ -112,7 +116,14 @@ local function DraggableView(props)
                 end
 
                 -- Snap on release
-                if p.snapToGrid then
+                if p.snapBack then
+                    -- Return to rest position (useful for joysticks)
+                    local sp = startPosRef.current
+                    if sp then
+                        view.x = sp.x
+                        view.y = sp.y
+                    end
+                elseif p.snapToGrid then
                     view.x = snapVal(view.x, p.snapToGrid)
                     view.y = snapVal(view.y, p.snapToGrid)
                 end
