@@ -14,6 +14,7 @@ local ce = React.createElement
 --   onStrokeStart function  Called with {id, x, y} when a finger begins a stroke
 --   onStrokeEnd function    Called with {id} when a finger lifts
 --   maxStrokes number   Maximum strokes to keep (oldest removed, default 200)
+--   maxFingers number   Maximum simultaneous fingers (palm rejection, default 5)
 --   clip boolean        Clip drawing to bounds via Container (default false)
 -- @return table React element
 local function DrawingCanvas(props)
@@ -61,6 +62,12 @@ local function DrawingCanvas(props)
             local lx, ly = surface:contentToLocal(ex, ey)
 
             if phase == "began" then
+                -- Palm rejection: ignore additional fingers beyond maxFingers
+                local maxFingers = p.maxFingers or 5
+                local activeCount = 0
+                for _ in pairs(activeRef.current) do activeCount = activeCount + 1 end
+                if activeCount >= maxFingers then return true end
+
                 display.getCurrentStage():setFocus(hitRect, id)
 
                 local color = p.brushColor or "#000000"
@@ -129,6 +136,10 @@ local function DrawingCanvas(props)
         hitRect:addEventListener("touch", onTouch)
 
         return function()
+            -- Release all active finger focuses to prevent touch leakage
+            for fid in pairs(activeRef.current) do
+                display.getCurrentStage():setFocus(nil, fid)
+            end
             hitRect:removeEventListener("touch", onTouch)
             if surface and surface.removeSelf then
                 surface:removeSelf()

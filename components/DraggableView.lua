@@ -2,6 +2,7 @@
 -- A View that can be dragged by a single finger at 60fps.
 -- Directly manipulates the display object position (no React state) for performance.
 -- A second finger touching while dragging is ignored.
+-- Works both standalone and inside a ScrollView (ScrollView delegates via _onDragHandler).
 -- @module components.DraggableView
 
 local React = require("react")
@@ -36,6 +37,11 @@ local function DraggableView(props)
         local view = viewRef.current
         if not view then return end
 
+        -- When true, the touch came through ScrollView's _onDragHandler delegation.
+        -- In that mode, the ScrollView overlay owns the touch lifecycle (setFocus),
+        -- so we must NOT call setFocus ourselves to avoid stealing the touch.
+        local delegated = false
+
         local function clamp(val, lo, hi)
             if lo and val < lo then return lo end
             if hi and val > hi then return hi end
@@ -58,8 +64,10 @@ local function DraggableView(props)
                 touchIdRef.current = event.id
                 startTouchRef.current = { x = event.x, y = event.y }
                 startPosRef.current = { x = view.x, y = view.y }
-                -- Lock this finger to the view
-                display.getCurrentStage():setFocus(view, event.id)
+                -- Only claim focus when handling touch directly (not via ScrollView)
+                if not delegated then
+                    display.getCurrentStage():setFocus(view, event.id)
+                end
                 if p.onDragStart then
                     p.onDragStart({ x = event.x, y = event.y, id = event.id })
                 end
@@ -94,7 +102,9 @@ local function DraggableView(props)
             elseif phase == "ended" or phase == "cancelled" then
                 if event.id ~= touchIdRef.current then return true end
                 touchIdRef.current = nil
-                display.getCurrentStage():setFocus(nil, event.id)
+                if not delegated then
+                    display.getCurrentStage():setFocus(nil, event.id)
+                end
 
                 -- Snap on release
                 if p.snapToGrid then
@@ -111,12 +121,19 @@ local function DraggableView(props)
         end
 
         view:addEventListener("touch", onTouch)
-        -- Mark as draggable so ScrollView's findDragChild can delegate to us
+        -- Mark as draggable so ScrollView's findDragChild can delegate to us.
+        -- _onDragHandler wraps onTouch with delegated=true so we don't steal
+        -- the overlay's setFocus — the ScrollView manages the touch lifecycle.
         view._isDraggable = true
-        view._onDragHandler = function(ev) return onTouch(ev) end
+        view._onDragHandler = function(ev)
+            delegated = true
+            local r = onTouch(ev)
+            delegated = false
+            return r
+        end
 
         return function()
-            -- Release focus if unmounted during an active drag
+            -- Release focus if unmounted during an active drag (direct touch only)
             if touchIdRef.current ~= nil then
                 display.getCurrentStage():setFocus(nil, touchIdRef.current)
                 touchIdRef.current = nil

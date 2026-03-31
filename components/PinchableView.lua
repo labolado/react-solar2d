@@ -94,6 +94,8 @@ local function PinchableView(props)
             if phase == "began" then
                 -- Guard duplicate began for the same id
                 if touches[id] then return true end
+                -- Ignore fingers beyond 2 (palm rejection for pinch gesture)
+                if touchCount() >= 2 then return true end
                 touches[id] = { x = event.x, y = event.y }
                 touchOrder[#touchOrder + 1] = id
                 display.getCurrentStage():setFocus(view, id)
@@ -197,10 +199,16 @@ local function PinchableView(props)
         view:addEventListener("touch", onTouch)
 
         return function()
-            -- Release all active finger focuses on unmount
+            -- Cleanup sweep: release all active finger focuses + reset all state
             for _, tid in ipairs(touchOrder) do
                 display.getCurrentStage():setFocus(nil, tid)
             end
+            touches = {}
+            touchOrder = {}
+            startDist = nil
+            startAngle = nil
+            startCX = nil
+            startCY = nil
             view:removeEventListener("touch", onTouch)
         end
     end, {props.minScale, props.maxScale})
