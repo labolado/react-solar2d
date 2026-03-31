@@ -82,6 +82,11 @@ local function DrawingCanvas(props)
             if not state then return true end
 
             local lx, ly = surface:contentToLocal(event.x, event.y)
+            -- Clamp to canvas bounds so strokes don't escape the drawing area
+            if lx < 0 then lx = 0 end
+            if ly < 0 then ly = 0 end
+            if lx > w then lx = w end
+            if ly > h then ly = h end
 
             if phase == "moved" then
                 state.line:append(lx, ly)
