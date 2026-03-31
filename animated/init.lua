@@ -246,6 +246,75 @@ function Animated.loop(animation, config)
     return anim
 end
 
+-- ─── Composite animated values ──────────────────────────────────────────
+
+--- Create a derived animated value: result = a * b.
+-- @param a AnimatedValue or number
+-- @param b AnimatedValue or number
+-- @return table Composite animated value (supports getValue, addListener, removeListener)
+function Animated.multiply(a, b)
+    local node = { _listeners = {} }
+
+    function node:getValue()
+        local va = type(a) == "table" and a.getValue and a:getValue() or a
+        local vb = type(b) == "table" and b.getValue and b:getValue() or b
+        return va * vb
+    end
+
+    function node:addListener(cb)
+        node._listeners[#node._listeners + 1] = cb
+        return #node._listeners
+    end
+
+    function node:removeListener(id)
+        if id and id <= #node._listeners then
+            table.remove(node._listeners, id)
+        end
+    end
+
+    local function notify()
+        local v = node:getValue()
+        for _, cb in ipairs(node._listeners) do cb({ value = v }) end
+    end
+    if type(a) == "table" and a.addListener then a:addListener(notify) end
+    if type(b) == "table" and b.addListener then b:addListener(notify) end
+
+    return node
+end
+
+--- Create a derived animated value: result = a + b.
+-- @param a AnimatedValue or number
+-- @param b AnimatedValue or number
+function Animated.add(a, b)
+    local node = { _listeners = {} }
+
+    function node:getValue()
+        local va = type(a) == "table" and a.getValue and a:getValue() or a
+        local vb = type(b) == "table" and b.getValue and b:getValue() or b
+        return va + vb
+    end
+
+    function node:addListener(cb)
+        node._listeners[#node._listeners + 1] = cb
+        return #node._listeners
+    end
+
+    function node:removeListener(id)
+        if id and id <= #node._listeners then
+            table.remove(node._listeners, id)
+        end
+    end
+
+    local function notify()
+        local v = node:getValue()
+        for _, cb in ipairs(node._listeners) do cb({ value = v }) end
+    end
+    if type(a) == "table" and a.addListener then a:addListener(notify) end
+    if type(b) == "table" and b.addListener then b:addListener(notify) end
+
+    return node
+end
+
 -- Animated component markers (HostConfig recognizes these)
 Animated.View = "Animated.View"
 Animated.Text = "Animated.Text"

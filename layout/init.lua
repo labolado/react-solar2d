@@ -69,21 +69,29 @@ local function parsePercent(v)
     return nil
 end
 
+-- Resolve AnimatedValue or composite (Animated.multiply etc.) to a plain number
+local function resolveAnimated(v)
+    if type(v) == "table" and v.getValue then return v:getValue() end
+    return v
+end
+
 local dimensionSetters = {
     width = function(n, v)
+        v = resolveAnimated(v)
         if v == "auto" then n:setWidthAuto()
         elseif parsePercent(v) then n:setWidthPercent(parsePercent(v))
-        else n:setWidth(v) end
+        elseif type(v) == "number" then n:setWidth(v) end
     end,
     height = function(n, v)
+        v = resolveAnimated(v)
         if v == "auto" then n:setHeightAuto()
         elseif parsePercent(v) then n:setHeightPercent(parsePercent(v))
-        else n:setHeight(v) end
+        elseif type(v) == "number" then n:setHeight(v) end
     end,
-    minWidth    = function(n, v) n:setMinWidth(v) end,
-    minHeight   = function(n, v) n:setMinHeight(v) end,
-    maxWidth    = function(n, v) n:setMaxWidth(v) end,
-    maxHeight   = function(n, v) n:setMaxHeight(v) end,
+    minWidth    = function(n, v) v = resolveAnimated(v); if type(v) == "number" then n:setMinWidth(v) end end,
+    minHeight   = function(n, v) v = resolveAnimated(v); if type(v) == "number" then n:setMinHeight(v) end end,
+    maxWidth    = function(n, v) v = resolveAnimated(v); if type(v) == "number" then n:setMaxWidth(v) end end,
+    maxHeight   = function(n, v) v = resolveAnimated(v); if type(v) == "number" then n:setMaxHeight(v) end end,
 }
 
 local flexDirectionMap = {

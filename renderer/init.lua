@@ -74,6 +74,20 @@ local function buildLayoutTree(fiber)
         local scrollStyle = {}
         for k, v in pairs(style) do scrollStyle[k] = v end
         scrollStyle.overflow = "scroll"
+        -- Merge contentContainerStyle padding/margin/gap into the Yoga node
+        -- so children are correctly inset (RN creates a wrapper View; we merge instead)
+        local ccs = fiber.props and fiber.props.contentContainerStyle
+        if ccs then
+            local mergeKeys = {
+                "padding","paddingTop","paddingBottom","paddingLeft","paddingRight",
+                "paddingHorizontal","paddingVertical",
+                "margin","marginTop","marginBottom","marginLeft","marginRight",
+                "marginHorizontal","marginVertical","gap","rowGap","columnGap",
+            }
+            for _, key in ipairs(mergeKeys) do
+                if ccs[key] ~= nil then scrollStyle[key] = ccs[key] end
+            end
+        end
         node = Layout.newNode(scrollStyle)
     end
 
@@ -92,8 +106,11 @@ local function buildLayoutTree(fiber)
 end
 
 -- Apply computed layout positions to Solar2D display objects
-local function applyLayout(yogaNode, fiber)
+-- parentW/parentH: parent's computed dimensions (for absolute right/bottom positioning)
+local function applyLayout(yogaNode, fiber, parentW, parentH)
     if not yogaNode or not fiber then return end
+    parentW = parentW or display.contentWidth
+    parentH = parentH or display.contentHeight
 
     if fiber.stateNode then
         local l, t, w, h = yogaNode:getLayout()
@@ -101,30 +118,16 @@ local function applyLayout(yogaNode, fiber)
 
         -- Check for absolute positioning with explicit coordinates
         if style.position == "absolute" then
-            -- For absolute positioning, use specified top/left/right/bottom directly
-            -- This allows Modal to position itself at screen origin
             if style.left ~= nil then l = style.left end
             if style.top ~= nil then t = style.top end
-            -- Use explicit pixel dimensions from style (Yoga may compute differently)
             if type(style.width) == "number" then w = style.width end
             if type(style.height) == "number" then h = style.height end
-            -- If right is specified but not left, calculate left from right
+            -- right/bottom: use parent dimensions (not screen) for correct nesting
             if style.right ~= nil and style.left == nil then
-                if style.width then
-                    l = display.contentWidth - style.width - style.right
-                else
-                    -- Stretch to right edge (not supported in this simple fix)
-                    l = 0
-                end
+                l = parentW - w - style.right
             end
-            -- If bottom is specified but not top, calculate top from bottom
             if style.bottom ~= nil and style.top == nil then
-                if style.height then
-                    t = display.contentHeight - style.height - style.bottom
-                else
-                    -- Stretch to bottom edge (not supported in this simple fix)
-                    t = 0
-                end
+                t = parentH - h - style.bottom
             end
         end
         -- Store layout dimensions for child text wrapping and position offsets
@@ -190,8 +193,10 @@ local function applyLayout(yogaNode, fiber)
         -- Only needed when style has explicit size and Yoga may compute different values
         -- (e.g. ProgressBar fill width changes per frame).
         if fiber.stateNode._bg and fiber.stateNode._bg.removeSelf and fiber.stateNode._bg.path then
-            local needW = w > 0 and not style.width
-            local needH = h > 0 and not style.height
+            -- Skip resize when style has a fixed numeric width/height (Yoga uses that directly).
+            -- AnimatedValue tables (truthy but not number) should NOT block resize.
+            local needW = w > 0 and type(style.width) ~= "number"
+            local needH = h > 0 and type(style.height) ~= "number"
             if needW or needH then
                 local oldBg = fiber.stateNode._bg
                 local oldW = oldBg.path.width or 0
@@ -328,7 +333,7 @@ local function applyLayout(yogaNode, fiber)
         if child.tag == "host" or child.tag == "text" then
             local yogaChild = yogaNode:getChild(childIndex)
             if yogaChild then
-                applyLayout(yogaChild, child)
+                applyLayout(yogaChild, child, w, h)
                 -- Track content extent for ScrollView
                 local cl, ct, cw, ch = yogaChild:getLayout()
                 if ct + ch > maxBottom then maxBottom = ct + ch end
@@ -344,7 +349,7 @@ local function applyLayout(yogaNode, fiber)
             if hostChild then
                 local yogaChild = yogaNode:getChild(childIndex)
                 if yogaChild then
-                    applyLayout(yogaChild, hostChild)
+                    applyLayout(yogaChild, hostChild, w, h)
                     local cl, ct, cw, ch = yogaChild:getLayout()
                     if ct + ch > maxBottom then maxBottom = ct + ch end
                     if cl + cw > maxRight then maxRight = cl + cw end

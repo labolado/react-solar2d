@@ -173,6 +173,7 @@ local function createStackNavigator()
                     for k, v in pairs(options) do mergedOptions[k] = v end
 
                     local screenStyle = {
+                        flex = 1,
                         display = isActive and "flex" or "none",
                     }
 
@@ -204,7 +205,11 @@ local function createStackNavigator()
             end
         end
 
-        return ce("View", { style = props.style or {} }, screenElements)
+        local navStyle = { flex = 1 }
+        if props.style then
+            for k, v in pairs(props.style) do navStyle[k] = v end
+        end
+        return ce("View", { style = navStyle }, screenElements)
     end
 
     local function Screen(props)

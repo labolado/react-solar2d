@@ -143,13 +143,18 @@ local function applyTransform(instance, transforms)
         for key, rawValue in pairs(t) do
             local value = resolveValue(rawValue)
             if key == "rotate" then
-                local deg = tostring(value):match("^(.-)deg$")
-                if deg then
-                    instance.rotation = tonumber(deg) or 0
+                if type(value) == "number" then
+                    -- Bare number: treat as degrees (RN compat)
+                    instance.rotation = value
                 else
-                    local rad = tostring(value):match("^(.-)rad$")
-                    if rad then
-                        instance.rotation = (tonumber(rad) or 0) * 180 / math.pi
+                    local deg = tostring(value):match("^(.-)deg$")
+                    if deg then
+                        instance.rotation = tonumber(deg) or 0
+                    else
+                        local rad = tostring(value):match("^(.-)rad$")
+                        if rad then
+                            instance.rotation = (tonumber(rad) or 0) * 180 / math.pi
+                        end
                     end
                 end
             elseif key == "scale" then
@@ -379,6 +384,24 @@ local function subscribeAnimatedValues(instance, style)
     if type(style.rotation) == "table" and style.rotation.getValue then
         sub(style.rotation, function(v) instance.rotation = v end)
     end
+    if type(style.width) == "table" and style.width.getValue then
+        sub(style.width, function(v)
+            if instance._bg and instance._bg.path then
+                instance._bg.path.width = v
+            end
+            instance.layoutWidth = v
+            instance._layoutW = v
+        end)
+    end
+    if type(style.height) == "table" and style.height.getValue then
+        sub(style.height, function(v)
+            if instance._bg and instance._bg.path then
+                instance._bg.path.height = v
+            end
+            instance.layoutHeight = v
+            instance._layoutH = v
+        end)
+    end
 
     if #subs > 0 then
         instance._animSubscriptions = subs
@@ -412,8 +435,10 @@ function M.createInstance(elementType, props)
         local group = display.newGroup()
         group.anchorX, group.anchorY = 0, 0
 
-        local vw = type(style.width) == "number" and style.width or 0
-        local vh = type(style.height) == "number" and style.height or 0
+        local rawW = resolveValue(style.width)
+        local rawH = resolveValue(style.height)
+        local vw = type(rawW) == "number" and rawW or 0
+        local vh = type(rawH) == "number" and rawH or 0
 
         -- Background rect: create if has background/border, OR if has explicit size (for hit testing)
         if style.backgroundColor or style.borderWidth or style.borderColor or (vw > 0 and vh > 0) then
@@ -454,6 +479,16 @@ function M.createInstance(elementType, props)
                     borderRadius = br,
                 }
                 group._borderRadius = br
+            end
+        end
+
+        -- Auto-create transparent hit rect for touchable Views without bg
+        if not group._bg and not group._pendingBg then
+            if props.onPress or props.onLongPress then
+                group._pendingBg = {
+                    fillColor = {0, 0, 0, 0},
+                    borderRadius = tonumber(style.borderRadius) or 0,
+                }
             end
         end
 

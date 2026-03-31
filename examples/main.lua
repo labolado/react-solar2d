@@ -41,6 +41,13 @@ end
 local NewsApp = require("NewsApp")
 local QuizApp = require("QuizApp")
 local TetrisApp = require("TetrisApp")
+local ok_sc, ShowcaseApp = pcall(require, "ShowcaseApp")
+if not ok_sc then
+    print("[main] ERROR loading ShowcaseApp: " .. tostring(ShowcaseApp))
+    ShowcaseApp = function() return ce("View", { style = { flex = 1 } },
+        ce("Text", { style = { fontSize = 16, color = "#FF0000" } }, "Showcase failed to load"))
+    end
+end
 local ok_ks, KitchenSinkApp = pcall(require, "KitchenSinkApp")
 if not ok_ks then
     print("[main] ERROR loading KitchenSinkApp: " .. tostring(KitchenSinkApp))
@@ -51,7 +58,7 @@ end
 
 -- Route: read .route file to jump directly to a specific demo
 -- Usage: echo "quiz" > .route   then launch simulator
-local ROUTE_MAP = { news = "News", quiz = "Quiz", tetris = "Game", sink = "Showcase" }
+local ROUTE_MAP = { news = "News", quiz = "Quiz", tetris = "Game", sink = "Kitchen", showcase = "Showcase" }
 local initialRoute = "News"
 
 -- Test mode: read .test file to auto-run tests on startup
@@ -144,9 +151,14 @@ local function App()
                 options = { tabBarLabel = "游戏", tabBarIcon = "T" },
             }),
             ce(Tab.Screen, {
-                name = "Showcase",
+                name = "Kitchen",
                 component = KitchenSinkApp,
-                options = { tabBarLabel = "展示", tabBarIcon = "K" },
+                options = { tabBarLabel = "组件", tabBarIcon = "K" },
+            }),
+            ce(Tab.Screen, {
+                name = "Showcase",
+                component = ShowcaseApp,
+                options = { tabBarLabel = "炫酷", tabBarIcon = "★" },
             })
         )
     )
