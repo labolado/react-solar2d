@@ -242,21 +242,34 @@ local function simulateDrag(x, y, dx, dy, duration)
         -- Began
         target:dispatchEvent({name="touch", phase="began", x=x, y=y, id=touchId, target=target})
 
-        -- Moved (spread across duration)
+        -- Moved (spread across duration) — re-find target each step since React
+        -- updates may recreate display objects between frames
         for s = 1, steps do
             local frac = s / steps
             timer.performWithDelay(s * (duration / steps), function()
-                target:dispatchEvent({
-                    name="touch", phase="moved",
-                    x = x + dx * frac, y = y + dy * frac,
-                    id = touchId, target = target
-                })
+                local t = target
+                if not t or not t.dispatchEvent then
+                    t = findTouchTarget(display.currentStage)
+                end
+                if t and t.dispatchEvent then
+                    t:dispatchEvent({
+                        name="touch", phase="moved",
+                        x = x + dx * frac, y = y + dy * frac,
+                        id = touchId, target = t
+                    })
+                end
             end)
         end
 
         -- Ended
         timer.performWithDelay(duration + 16, function()
-            target:dispatchEvent({name="touch", phase="ended", x=x+dx, y=y+dy, id=touchId, target=target})
+            local t = target
+            if not t or not t.dispatchEvent then
+                t = findTouchTarget(display.currentStage)
+            end
+            if t and t.dispatchEvent then
+                t:dispatchEvent({name="touch", phase="ended", x=x+dx, y=y+dy, id=touchId, target=t})
+            end
         end)
     end)
 end
