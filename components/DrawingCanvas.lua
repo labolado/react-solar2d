@@ -26,6 +26,14 @@ local function DrawingCanvas(props)
 
     local onRef = React.useCallback(function(instance)
         viewRef.current = instance
+        -- Forward to external ref so parent can access clearStrokes
+        if props.ref then
+            if type(props.ref) == "function" then
+                props.ref(instance)
+            elseif type(props.ref) == "table" then
+                props.ref.current = instance
+            end
+        end
     end, {})
 
     -- propsRef avoids stale closures in event handlers
