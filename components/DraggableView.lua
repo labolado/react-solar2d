@@ -177,6 +177,7 @@ local function DraggableView(props)
                 return false
             end
             view._bg:addEventListener("touch", bgListener)
+            view._bg._hasTouchListener = true
         end
 
         -- Mark as draggable so ScrollView's findDragChild can delegate to us.

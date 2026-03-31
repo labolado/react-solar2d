@@ -226,6 +226,7 @@ local function wireEvents(instance, props)
     if props.onPress then
         instance._onPress = props.onPress
         instance.isHitTestable = true
+        instance._hasTouchListener = true
 
         -- Instant press feedback on touch-down (before tap fires)
         -- Makes buttons feel responsive — user sees feedback immediately on touch

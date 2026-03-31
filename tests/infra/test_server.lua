@@ -222,8 +222,9 @@ local function simulateDrag(x, y, dx, dy, duration)
                             local found = findTouchTarget(child)
                             if found then return found end
                         end
-                        -- Touch overlay or any touch listener
-                        if child._isTouchOverlay or (child._tableListeners and child._tableListeners.touch) then
+                        -- Touch overlay, function listener, or table listener
+                        if child._isTouchOverlay or child._hasTouchListener
+                            or (child._tableListeners and child._tableListeners.touch) then
                             return child
                         end
                     end
