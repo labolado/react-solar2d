@@ -80,15 +80,19 @@ Overlay:Popover
 Layout:Flexbox
 Layout:Responsive
 Layout:SafeArea
+Layout:SafeAreaView
 Layout:Spacing
 Advanced:Badge
 Advanced:Progress
 Advanced:Accordion
 Advanced:Dropdown
 Advanced:Card
+Advanced:useId
+Advanced:useImperativeHandle
+Advanced:useSyncExternalStore
 Interop:ReactInSolar
+Interop:Solar2DInReact
 Interop:AsyncStorage
-Interop:VectorIcons
 Interop:Slider
 Interop:DeviceInfo
 Interop:DateTimePicker
@@ -99,6 +103,9 @@ Touch:Pinch
 Touch:Drawing
 Touch:Stickers
 Touch:Gamepad
+Touch:Pager
+Buttons:Confirm
+Buttons:SwitchBtn
 "
 
 for entry in $DEMOS; do

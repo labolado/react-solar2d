@@ -17,9 +17,8 @@ local TouchRegistry = require("lib.TouchRegistry")
 --   onStrokeEnd function    Called with {id} when a finger lifts
 --   maxStrokes number   Maximum strokes to keep (oldest removed, default 200)
 --   maxFingers number   Maximum simultaneous fingers (palm rejection, default 5)
--- @return table React element
---- @param props table
 --   onReady function    Called with API handle {clear=function} on mount
+-- @return table React element
 local function DrawingCanvas(props)
     local viewRef = React.useRef(nil)
     local surfaceRef = React.useRef(nil)    -- display group holding all strokes

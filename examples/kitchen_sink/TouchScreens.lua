@@ -288,15 +288,12 @@ local function StickersDemo()
 end
 
 -- ═══════════════════════════════════════════════════════════════════════════
--- 5. GamepadDemo — virtual joystick (left) + fire button (right)
+-- 5. GamepadDemo — Joystick component + fire button
 -- ═══════════════════════════════════════════════════════════════════════════
 local function GamepadDemo()
     local joyX, setJoyX = useState(0)
     local joyY, setJoyY = useState(0)
     local firing, setFiring = useState(false)
-
-    local STICK_AREA = 120
-    local THUMB = 40
 
     return ce("View", { style = { flex = 1, backgroundColor = "#0D0D1A" } },
         -- Status bar
@@ -322,41 +319,19 @@ local function GamepadDemo()
                 paddingHorizontal = 40,
             },
         },
-            -- Left: joystick
-            ce(RN.DraggableView, {
-                snapBack = true,
-                bounds = {
-                    xMin = -(STICK_AREA - THUMB) / 2,
-                    yMin = -(STICK_AREA - THUMB) / 2,
-                    xMax = (STICK_AREA - THUMB) / 2,
-                    yMax = (STICK_AREA - THUMB) / 2,
-                },
-                onDrag = function(info)
-                    -- info.dx/dy are deltas from drag start (local units), not screen coords
-                    local range = (STICK_AREA - THUMB) / 2
-                    local nx = math.max(-1, math.min(1, info.dx / range))
-                    local ny = math.max(-1, math.min(1, info.dy / range))
-                    setJoyX(math.floor(nx * 100) / 100)
-                    setJoyY(math.floor(ny * 100) / 100)
+            -- Left: Joystick component (circular bounds, snap-back, normalized output)
+            ce(RN.Joystick, {
+                size = 120,
+                thumbSize = 40,
+                onMove = function(info)
+                    setJoyX(math.floor(info.x * 100) / 100)
+                    setJoyY(math.floor(info.y * 100) / 100)
                 end,
-                onDragEnd = function()
+                onRelease = function()
                     setJoyX(0)
                     setJoyY(0)
                 end,
-                style = {
-                    width = THUMB, height = THUMB, borderRadius = THUMB / 2,
-                    backgroundColor = T.accent,
-                    borderWidth = 2, borderColor = "#FFF",
-                    justifyContent = "center", alignItems = "center",
-                },
-            },
-                ce("View", {
-                    style = {
-                        width = 8, height = 8, borderRadius = 4,
-                        backgroundColor = "#FFF",
-                    },
-                })
-            ),
+            }),
             -- Spacer
             ce("View", { style = { flex = 1 } }),
             -- Right: fire button
@@ -392,6 +367,79 @@ local function GamepadDemo()
     )
 end
 
+-- ═══════════════════════════════════════════════════════════════════════════
+-- 6. PagerDemo — paginated swipe view with dot indicators
+-- ═══════════════════════════════════════════════════════════════════════════
+local function PagerDemo()
+    local pageIndex, setPageIndex = useState(1)
+
+    local PAGE_W = W
+    local PAGE_COLORS = { "#1A1A2E", "#16213E", "#0F3460", "#533483", "#2C3333" }
+    local PAGE_TITLES = {
+        "Welcome",
+        "Swipe to navigate",
+        "Virtualized pages",
+        "Only 3 mounted",
+        "Last page!",
+    }
+
+    -- Data mode: 5 pages, only current ± 1 mounted
+    local data = {}
+    for i = 1, #PAGE_COLORS do
+        data[i] = { color = PAGE_COLORS[i], title = PAGE_TITLES[i], index = i }
+    end
+
+    local function renderPage(item, index)
+        return ce("View", {
+            style = {
+                flex = 1,
+                backgroundColor = item.color,
+                justifyContent = "center",
+                alignItems = "center",
+            },
+        },
+            ce("Text", {
+                style = {
+                    color = "#FFF",
+                    fontSize = 28,
+                    fontWeight = "bold",
+                },
+            }, item.title),
+            ce("Text", {
+                style = {
+                    color = T.textSecondary,
+                    fontSize = 16,
+                    marginTop = 12,
+                },
+            }, "Page " .. item.index .. " of " .. #data)
+        )
+    end
+
+    return ce("View", { style = { flex = 1, backgroundColor = T.bg } },
+        -- Info bar
+        ce("View", {
+            style = {
+                padding = T.pad,
+                backgroundColor = T.surface,
+                borderBottomWidth = 1,
+                borderColor = T.border,
+            },
+        },
+            ce("Text", { style = { color = T.textSecondary, textAlign = "center" } },
+                "Page " .. pageIndex .. " / " .. #data .. " — swipe left/right")
+        ),
+        -- Pager
+        ce(RN.PagerSlideView, {
+            data = data,
+            renderPage = renderPage,
+            pageWidth = PAGE_W,
+            onPageChange = setPageIndex,
+            activeDotColor = T.accent,
+            style = { flex = 1 },
+        })
+    )
+end
+
 -- ─── Exports ───────────────────────────────────────────────────────────────
 return {
     { name = "Draggable", title = "Draggable Tiles",  icon = "✋", component = DraggableDemo },
@@ -399,4 +447,5 @@ return {
     { name = "Drawing",   title = "Multi-finger Draw", icon = "✏️", component = DrawingDemo },
     { name = "Stickers",  title = "Sticker Board",    icon = "⭐", component = StickersDemo },
     { name = "Gamepad",   title = "Virtual Gamepad",  icon = "🕹️", component = GamepadDemo },
+    { name = "Pager",     title = "Pager View",       icon = "📄", component = PagerDemo },
 }

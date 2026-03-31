@@ -33,6 +33,7 @@ react-solar2d/
 - Anchor default: center (0.5, 0.5) — framework sets to top-left (0, 0)
 - `native.*` objects render on top of everything, ignore display hierarchy
 - `display.newRoundedRect` path.width resize unreliable — use key-based recreation
+- **`group.contentWidth` is NOT layout size** — Solar2D Group's `contentWidth` returns child bounding box, which is 0 for flex-only containers. Use `instance.layoutWidth / layoutHeight` (Yoga-computed, set by `applyLayout` each frame) instead.
 
 ## Framework Constraints
 

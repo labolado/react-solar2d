@@ -73,6 +73,10 @@ RN.ImageBackground = Components.ImageBackground
 RN.DraggableView = Components.DraggableView
 RN.PinchableView = Components.PinchableView
 RN.DrawingCanvas = Components.DrawingCanvas
+RN.Joystick = Components.Joystick
+RN.PagerSlideView = Components.PagerSlideView
+RN.ConfirmButton = Components.ConfirmButton
+RN.SwitchButton = Components.SwitchButton
 
 -- Touch
 RN.TouchRegistry = require("lib.TouchRegistry")

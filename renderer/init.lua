@@ -132,6 +132,11 @@ local function applyLayout(yogaNode, fiber)
         fiber.stateNode._layoutY = t
         fiber.stateNode._layoutW = w
         fiber.stateNode._layoutH = h
+        -- Public API: Yoga-computed size for component authors.
+        -- Do NOT use Solar2D's group.contentWidth — it returns the child bounding
+        -- box, which is 0 for flex-only containers with no sized children.
+        fiber.stateNode.layoutWidth = w
+        fiber.stateNode.layoutHeight = h
         -- For the root fiber (tag == "root"), preserve the container's original
         -- position set by the caller (e.g. screenOriginY offset). Yoga computes
         -- (0,0) for the root, which would overwrite the caller's positioning.

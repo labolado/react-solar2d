@@ -28,4 +28,8 @@ return {
     DraggableView = require("components.DraggableView"),
     PinchableView = require("components.PinchableView"),
     DrawingCanvas = require("components.DrawingCanvas"),
+    Joystick = require("components.Joystick"),
+    PagerSlideView = require("components.PagerSlideView"),
+    ConfirmButton = require("components.ConfirmButton"),
+    SwitchButton = require("components.SwitchButton"),
 }

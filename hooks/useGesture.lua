@@ -76,7 +76,9 @@ function M.simultaneous(...)
     }
 end
 
--- Utility: average center of an arbitrary set of active touches
+--- Utility: average center of an arbitrary set of active touches.
+-- @param touches table Table of touch objects with x, y properties
+-- @return number, number Center x, y coordinates
 function M.avgCenter(touches)
     local sx, sy, n = 0, 0, 0
     for _, t in pairs(touches) do
@@ -88,7 +90,11 @@ function M.avgCenter(touches)
     return sx / n, sy / n
 end
 
--- Utility: average distance from center (scale proxy)
+--- Utility: average distance from center (scale proxy).
+-- @param touches table Table of touch objects with x, y properties
+-- @param cx number Center x coordinate
+-- @param cy number Center y coordinate
+-- @return number Average distance from center
 function M.avgDist(touches, cx, cy)
     local sum, n = 0, 0
     for _, t in pairs(touches) do
