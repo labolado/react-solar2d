@@ -136,8 +136,20 @@ local function applyLayout(yogaNode, fiber)
         -- position set by the caller (e.g. screenOriginY offset). Yoga computes
         -- (0,0) for the root, which would overwrite the caller's positioning.
         if fiber.tag ~= "root" then
-            -- Skip position override for objects under direct manipulation
-            -- (DraggableView/PinchableView set _directManipulation = true while active)
+            -- Position channels (3 mutually exclusive modes):
+            --
+            -- 1. Yoga layout (default): x = layoutLeft + _translateX
+            --    Used by all static elements. Yoga computes position each frame.
+            --
+            -- 2. Animated offset: _translateX/_translateY added on top of Yoga position.
+            --    Used by Animated.Value driving translateX/translateY style props.
+            --    Coexists with Yoga — layout provides base, animation provides offset.
+            --
+            -- 3. Direct manipulation: _directManipulation = true
+            --    Component takes full control of x/y (e.g. DraggableView during drag,
+            --    PinchableView during pinch). Yoga is skipped entirely until the flag
+            --    is cleared. Set this on the display object instance if you need to
+            --    bypass layout temporarily (remember to clear it when done).
             if not fiber.stateNode._directManipulation then
                 fiber.stateNode.x = l + (fiber.stateNode._translateX or 0)
                 fiber.stateNode.y = t + (fiber.stateNode._translateY or 0)
