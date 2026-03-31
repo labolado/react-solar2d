@@ -72,6 +72,9 @@ local function DraggableView(props)
                 cleanupDot()
             end
 
+            -- Re-enable layout override now that drag is done
+            view._directManipulation = false
+
             -- Snap on release
             if p.snapBack then
                 local sp = startPosRef.current
@@ -134,6 +137,8 @@ local function DraggableView(props)
             TouchRegistry.claim(event.id, view)
             startTouchRef.current = { x = event.x, y = event.y }
             startPosRef.current = { x = view.x, y = view.y }
+            -- Prevent applyLayout from overriding our position during drag
+            view._directManipulation = true
 
             if not delegated then
                 -- TrackDot: invisible proxy for reliable per-finger focus

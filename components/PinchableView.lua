@@ -201,6 +201,7 @@ local function PinchableView(props)
                 if touchCount() == 0 then
                     prevCX, prevCY = nil, nil
                     prevDist, prevAngle = nil, nil
+                    view._directManipulation = false
                     fireCb("onTransformEnd")
                 else
                     -- Re-anchor for next frame's delta
@@ -251,6 +252,8 @@ local function PinchableView(props)
             -- First finger: begin gesture; second finger: transition to pinch
             savePrev()
             if touchCount() == 1 then
+                -- Prevent applyLayout from overriding position during gesture
+                view._directManipulation = true
                 fireCb("onTransformStart")
             end
             return true

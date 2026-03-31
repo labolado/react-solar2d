@@ -136,8 +136,12 @@ local function applyLayout(yogaNode, fiber)
         -- position set by the caller (e.g. screenOriginY offset). Yoga computes
         -- (0,0) for the root, which would overwrite the caller's positioning.
         if fiber.tag ~= "root" then
-            fiber.stateNode.x = l + (fiber.stateNode._translateX or 0)
-            fiber.stateNode.y = t + (fiber.stateNode._translateY or 0)
+            -- Skip position override for objects under direct manipulation
+            -- (DraggableView/PinchableView set _directManipulation = true while active)
+            if not fiber.stateNode._directManipulation then
+                fiber.stateNode.x = l + (fiber.stateNode._translateX or 0)
+                fiber.stateNode.y = t + (fiber.stateNode._translateY or 0)
+            end
         end
         -- Pending bg: create _bg now that Yoga has computed the correct dimensions.
         -- This avoids creating a degenerate 1x1 rect and resizing it, which is
