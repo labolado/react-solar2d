@@ -195,7 +195,7 @@ local function DrawingDemo()
                 ref = canvasRef,
                 brushColor = brushColor,
                 brushSize = brushSize,
-                style = { flex = 1 },
+                style = { width = W, height = CANVAS_H },
             })
         ),
         -- Palette row

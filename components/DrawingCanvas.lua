@@ -36,9 +36,16 @@ local function DrawingCanvas(props)
         local view = viewRef.current
         if not view then return end
 
+        -- Use the view's actual layout size (from Yoga) rather than style props,
+        -- because flex=1 etc. won't have width/height in the style table.
         local style = propsRef.current.style or {}
-        local w = style.width or display.contentWidth
-        local h = style.height or display.contentHeight
+        local w = view.contentWidth or style.width or display.contentWidth
+        local h = view.contentHeight or style.height or display.contentHeight
+        -- Fallback: if view has a _bg rect (created by HostConfig), use its size
+        if (w <= 0 or h <= 0) and view._bg then
+            w = view._bg.contentWidth or w
+            h = view._bg.contentHeight or h
+        end
 
         -- Drawing surface group (inserted below any React children)
         local surface = display.newGroup()
@@ -49,8 +56,9 @@ local function DrawingCanvas(props)
 
         -- Transparent hit rect for initial touch detection (began only).
         -- After began, a TrackDot per finger handles moved/ended.
-        local hitRect = display.newRect(surface, w / 2, h / 2, w, h)
-        hitRect.anchorX, hitRect.anchorY = 0.5, 0.5
+        -- Position at (0,0) with top-left anchor to match the view's coordinate system.
+        local hitRect = display.newRect(surface, 0, 0, w, h)
+        hitRect.anchorX, hitRect.anchorY = 0, 0
         hitRect:setFillColor(0, 0, 0, 0.001)
         hitRect.isHitTestable = true
 
