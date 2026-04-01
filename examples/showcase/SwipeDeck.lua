@@ -10,7 +10,8 @@ local StyleSheet = RN.StyleSheet
 local W = display.contentWidth or 375
 local H = display.contentHeight or 667
 local CARD_W = W * 0.82
-local CARD_H = CARD_W * 1.3
+-- Card height: fit within available space (screen - nav bar - tab bar - header - footer)
+local CARD_H = math.min(CARD_W * 1.3, H * 0.38)
 local SWIPE_OUT = W * 1.5
 
 local PROFILES = {
@@ -24,16 +25,27 @@ local PROFILES = {
     { name = "Blaze",   age = 29, bio = "Fitness coach & dancer",   color = "#F7DC6F", emoji = "💃" },
 }
 
+-- Compute layout manually to avoid flex height constraint issues in Stack nav
+local NAV_H = 88       -- Stack nav header height (approx)
+local TAB_H = 100      -- Tab bar height (approx)
+local AVAIL_H = H - NAV_H - TAB_H
+local HEADER_H = 100
+local FOOTER_H = 88
+local CARD_AREA_H = AVAIL_H - HEADER_H - FOOTER_H - 40  -- 40 for stats+margins
+-- Clamp card to fit
+CARD_H = math.min(CARD_H, CARD_AREA_H)
+
 local styles = StyleSheet.create({
-    container = { flex = 1, backgroundColor = "#0A0A1A" },
+    container = { flex = 1, backgroundColor = "#0A0A1A", alignItems = "center" },
     header = {
-        paddingTop = 40, paddingBottom = 12,
+        paddingTop = 20, paddingBottom = 8,
         alignItems = "center",
     },
     title = { color = "#FFF", fontSize = 22, fontWeight = "bold", letterSpacing = 1 },
     subtitle = { color = "rgba(255,255,255,0.4)", fontSize = 13, marginTop = 4 },
     cardArea = {
-        flex = 1, alignItems = "center", justifyContent = "center",
+        height = CARD_AREA_H,
+        alignItems = "center", justifyContent = "center",
     },
     card = {
         width = CARD_W, height = CARD_H,
@@ -55,8 +67,8 @@ local styles = StyleSheet.create({
     },
     badgeText = { fontSize = 18, fontWeight = "bold" },
     footer = {
-        flexDirection = "row", justifyContent = "center",
-        gap = 32, paddingBottom = 36, paddingTop = 16,
+        flexDirection = "row", justifyContent = "center", alignItems = "center",
+        gap = 32, marginTop = 24,
     },
     footerBtn = {
         width = 56, height = 56, borderRadius = 28,
@@ -114,66 +126,9 @@ local function SwipeDeck()
         })
     end
 
-    -- Active card with drag
-    local function ActiveCard()
-        return ce(RN.DraggableView, {
-            key = "card_" .. index,
-            onDrag = function(info)
-                if info.dx > 30 then
-                    setSwipeDir("right")
-                elseif info.dx < -30 then
-                    setSwipeDir("left")
-                else
-                    setSwipeDir(nil)
-                end
-            end,
-            onDragEnd = function(info)
-                if info.dx > 80 then
-                    advance("right")
-                elseif info.dx < -80 then
-                    advance("left")
-                else
-                    setSwipeDir(nil)
-                end
-            end,
-            snapBack = true,
-            style = styles.card,
-        },
-            -- Background color via inline
-            ce("View", {
-                style = {
-                    position = "absolute", top = 0, left = 0, right = 0, bottom = 0,
-                    borderRadius = 24, backgroundColor = current.color,
-                },
-            }),
-            -- Like/Nope badge
-            swipeDir == "right" and ce("View", {
-                style = {
-                    position = "absolute", top = 24, left = 24,
-                    paddingHorizontal = 14, paddingVertical = 6,
-                    borderRadius = 20, borderWidth = 3, borderColor = "#2ECC71",
-                    transform = { { rotate = -15 } },
-                },
-            },
-                ce("Text", { style = { color = "#2ECC71", fontSize = 20, fontWeight = "bold" } }, "LIKE")
-            ) or nil,
-            swipeDir == "left" and ce("View", {
-                style = {
-                    position = "absolute", top = 24, right = 24,
-                    paddingHorizontal = 14, paddingVertical = 6,
-                    borderRadius = 20, borderWidth = 3, borderColor = "#E74C3C",
-                    transform = { { rotate = 15 } },
-                },
-            },
-                ce("Text", { style = { color = "#E74C3C", fontSize = 20, fontWeight = "bold" } }, "NOPE")
-            ) or nil,
-            -- Content
-            ce("Text", { style = styles.cardEmoji }, current.emoji),
-            ce("Text", { style = styles.cardName }, current.name),
-            ce("Text", { style = styles.cardAge }, current.age .. " years old"),
-            ce("Text", { style = styles.cardBio }, current.bio)
-        )
-    end
+    -- Active card (inline, not a sub-component — sub-components defined inside
+    -- the render function get a new function reference each render, causing
+    -- the reconciler to unmount/remount and destroy active touch state)
 
     return ce("View", { style = styles.container },
         -- Header
@@ -191,42 +146,63 @@ local function SwipeDeck()
         ce("View", { style = styles.cardArea },
             ce(BackCard, { profile = next2, depth = 2 }),
             ce(BackCard, { profile = next1, depth = 1 }),
-            ce(ActiveCard, {})
-        ),
-        -- Footer buttons
-        ce("View", { style = styles.footer },
+            ce(RN.DraggableView, {
+                key = "card_" .. index,
+                onDragEnd = function(info)
+                    if info.dx > 80 then
+                        advance("right")
+                    elseif info.dx < -80 then
+                        advance("left")
+                    end
+                end,
+                snapBack = true,
+                style = {
+                    width = CARD_W, height = CARD_H,
+                    borderRadius = 24, padding = 28,
+                    justifyContent = "flex-end",
+                    backgroundColor = current.color,
+                },
+            },
+                ce("Text", { style = styles.cardEmoji }, current.emoji),
+                ce("Text", { style = styles.cardName }, current.name),
+                ce("Text", { style = styles.cardAge }, current.age .. " years old"),
+                ce("Text", { style = styles.cardBio }, current.bio)
+            ),
+            -- Action buttons below card
+            ce("View", { style = { flexDirection = "row", justifyContent = "center", alignItems = "center", gap = 40, marginTop = 24, width = W } },
             ce("View", {
                 style = {
-                    width = 56, height = 56, borderRadius = 28,
+                    width = 60, height = 60, borderRadius = 30,
                     justifyContent = "center", alignItems = "center",
-                    borderWidth = 2, borderColor = "#E74C3C",
+                    backgroundColor = "rgba(231,76,60,0.3)", borderWidth = 2, borderColor = "#E74C3C",
                 },
                 onPress = function() advance("left") end,
             },
-                ce("Text", { style = { fontSize = 24 } }, "✗")
+                ce("Text", { style = { fontSize = 26, color = "#E74C3C" } }, "✗")
             ),
             ce("View", {
                 style = {
-                    width = 56, height = 56, borderRadius = 28,
+                    width = 60, height = 60, borderRadius = 30,
                     justifyContent = "center", alignItems = "center",
-                    borderWidth = 2, borderColor = "#58A6FF",
+                    backgroundColor = "rgba(88,166,255,0.3)", borderWidth = 2, borderColor = "#58A6FF",
                 },
                 onPress = function() setIndex(function(i) return i + 1 end) end,
             },
-                ce("Text", { style = { fontSize = 24 } }, "↻")
+                ce("Text", { style = { fontSize = 26, color = "#58A6FF" } }, "↻")
             ),
             ce("View", {
                 style = {
-                    width = 56, height = 56, borderRadius = 28,
+                    width = 60, height = 60, borderRadius = 30,
                     justifyContent = "center", alignItems = "center",
-                    borderWidth = 2, borderColor = "#2ECC71",
+                    backgroundColor = "rgba(46,204,113,0.3)", borderWidth = 2, borderColor = "#2ECC71",
                 },
                 onPress = function() advance("right") end,
             },
-                ce("Text", { style = { fontSize = 24 } }, "♥")
+                ce("Text", { style = { fontSize = 26, color = "#2ECC71" } }, "♥")
             )
-        )
-    )
+        )  -- close button row
+        )  -- close cardArea
+    )  -- close container
 end
 
 return SwipeDeck

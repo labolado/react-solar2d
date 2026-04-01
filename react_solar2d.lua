@@ -90,4 +90,8 @@ RN.createDrawerNavigator = Navigation.createDrawerNavigator
 RN.Header = Navigation.Header
 RN.NavigationTestUtils = Navigation.NavigationTestUtils
 
+-- SDF Shapes: anti-aliased vector shapes via GLSL (optional)
+local sdfOk, SDFShapes = pcall(require, "lib.sdf-shapes")
+if sdfOk then RN.SDFShapes = SDFShapes end
+
 return RN

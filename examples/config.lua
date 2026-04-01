@@ -4,6 +4,7 @@ application = {
         height = 2048,
         scale = "adaptive",
         fps = 60,
+        multisample = true,
     },
     showRuntimeErrors = true,
 }

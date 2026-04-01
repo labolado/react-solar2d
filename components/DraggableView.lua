@@ -88,7 +88,10 @@ local function DraggableView(props)
             end
 
             if p.onDragEnd then
-                p.onDragEnd({ x = event.x, y = event.y, id = event.id })
+                local st = startTouchRef.current
+                local dx = st and (event.x - st.x) or 0
+                local dy = st and (event.y - st.y) or 0
+                p.onDragEnd({ x = event.x, y = event.y, dx = dx, dy = dy, id = event.id })
             end
         end
 
@@ -162,6 +165,7 @@ local function DraggableView(props)
         -- deliver (programmatic dispatchEvent, some device edge cases).
         local bgListener
         if view._bg then
+            view._bg.isHitTestable = true
             bgListener = function(event)
                 if event.phase == "began" then
                     return handleBegan(event)
