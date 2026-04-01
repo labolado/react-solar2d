@@ -4,45 +4,21 @@
 
 local RN = require("react_solar2d")
 local ce, useState, useEffect, useRef = RN.createElement, RN.useState, RN.useEffect, RN.useRef
-local Animated = RN.Animated
+local React = require("react")
 local StyleSheet = RN.StyleSheet
 
 local W = display.contentWidth or 375
 local ART_SIZE = W * 0.65
 
--- ─── Equalizer Bar ───────────────────────────────────────────────────────
-local function EqBar(props)
-    local minH = props.minH or 4
-    local animRef = useRef(nil)
-    if not animRef.current then animRef.current = Animated.Value(minH) end
-    local h = animRef.current
-
-    useEffect(function()
-        Animated.loop(
-            Animated.sequence({
-                Animated.timing(h, { toValue = props.maxH, duration = props.speed }),
-                Animated.timing(h, { toValue = minH, duration = props.speed * 0.8 }),
-            })
-        ).start()
-        return function() h:stopAnimation() end
-    end, {})
-
-    return ce(Animated.View, {
-        style = {
-            width = props.width or 3,
-            height = h,
-            backgroundColor = props.color or "#1DB954",
-            borderRadius = 2,
-        },
-    })
-end
-
 -- ─── Equalizer ───────────────────────────────────────────────────────────
+-- Uses a single enterFrame listener to animate all bars imperatively.
+-- Much faster than 12 individual Animated.loop chains.
 local function Equalizer(props)
     local playing = props.playing
     local color = props.color or "#1DB954"
+    local containerRef = useRef(nil)
+    local barsRef = useRef(nil)
 
-    local bars = {}
     local configs = {
         { maxH = 20, speed = 300 },
         { maxH = 32, speed = 250 },
@@ -57,28 +33,70 @@ local function Equalizer(props)
         { maxH = 20, speed = 300 },
         { maxH = 34, speed = 190 },
     }
+    local minH = 3
+    local barW = 4
+    local gap = 3
+    local totalH = 40
 
-    for i, cfg in ipairs(configs) do
-        if playing then
-            bars[i] = ce(EqBar, {
-                key = "eq" .. i,
+    local onRef = React.useCallback(function(instance)
+        containerRef.current = instance
+    end, {})
+
+    useEffect(function()
+        local container = containerRef.current
+        if not container then return end
+
+        -- Create bar rects imperatively (plain rects, no borderRadius for performance)
+        local bars = {}
+        for i, cfg in ipairs(configs) do
+            local x = (i - 1) * (barW + gap)
+            local rect = display.newRect(container, x, totalH - minH, barW, minH)
+            rect.anchorX, rect.anchorY = 0, 1  -- anchor bottom-left
+            local r, g, b = 29/255, 185/255, 84/255  -- #1DB954
+            rect:setFillColor(r, g, b)
+            bars[i] = {
+                rect = rect,
                 maxH = cfg.maxH,
                 speed = cfg.speed,
-                color = color,
-                width = 4,
-                minH = 3,
-            })
-        else
-            bars[i] = ce("View", {
-                key = "eq" .. i,
-                style = { width = 4, height = 3, backgroundColor = color, borderRadius = 2, opacity = 0.3 },
-            })
+                phase = math.random() * math.pi * 2,  -- random start phase
+            }
         end
-    end
+        barsRef.current = bars
 
+        -- Single enterFrame drives all bars via sine wave
+        local function onFrame()
+            local t = system.getTimer() / 1000  -- seconds
+            for i, bar in ipairs(bars) do
+                if playing then
+                    -- Sine oscillation: speed controls frequency
+                    local freq = 1000 / bar.speed  -- higher speed value = slower frequency
+                    local wave = (math.sin(t * freq * math.pi * 2 + bar.phase) + 1) / 2
+                    local h = minH + wave * (bar.maxH - minH)
+                    bar.rect.height = h
+                    bar.rect.alpha = 1
+                else
+                    bar.rect.height = minH
+                    bar.rect.alpha = 0.3
+                end
+            end
+        end
+        Runtime:addEventListener("enterFrame", onFrame)
+
+        return function()
+            Runtime:removeEventListener("enterFrame", onFrame)
+            for _, bar in ipairs(bars) do
+                bar.rect:removeSelf()
+            end
+            barsRef.current = nil
+        end
+    end, { playing })
+
+    -- Total width: 12 bars * 4px + 11 gaps * 3px = 81px
+    local totalW = #configs * barW + (#configs - 1) * gap
     return ce("View", {
-        style = { flexDirection = "row", alignItems = "flex-end", gap = 3, height = 40 },
-    }, unpack(bars))
+        ref = onRef,
+        style = { width = totalW, height = totalH },
+    })
 end
 
 -- ─── Progress Bar ────────────────────────────────────────────────────────
@@ -133,17 +151,6 @@ local function MusicPlayer()
         return string.format("%d:%02d", math.floor(s / 60), s % 60)
     end
 
-    local spinRef = useRef(nil)
-    if not spinRef.current then spinRef.current = Animated.Value(0) end
-    local spin = spinRef.current
-    useEffect(function()
-        if not playing then return end
-        Animated.loop(
-            Animated.timing(spin, { toValue = 360, duration = 8000 })
-        ).start()
-        return function() spin:setValue(0) end
-    end, { playing })
-
     return ce("View", {
         style = {
             flex = 1,
@@ -159,7 +166,7 @@ local function MusicPlayer()
             },
         },
             -- Outer glow ring
-            ce(Animated.View, {
+            ce("View", {
                 style = {
                     width = ART_SIZE + 8, height = ART_SIZE + 8,
                     borderRadius = (ART_SIZE + 8) / 2,
@@ -167,8 +174,6 @@ local function MusicPlayer()
                     borderColor = "#1DB954",
                     justifyContent = "center", alignItems = "center",
                     opacity = playing and 0.6 or 0.2,
-                    -- Note: rotation disabled — framework rotates around anchor (0,0),
-                    -- not center, which displaces the circle. Needs framework-level fix.
                 },
             },
                 -- Album art (simulated with gradient colors)

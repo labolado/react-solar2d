@@ -265,10 +265,15 @@ local function applyLayout(yogaNode, fiber, parentW, parentH)
             wv.width = w
             wv.height = h
         end
-        -- ScrollView: update scroll dimensions and touch overlay size
+        -- ScrollView: update scroll dimensions, Container clip region, and touch overlay
         if fiber.type == "ScrollView" and fiber.stateNode._contentGroup then
             fiber.stateNode._scrollW = w
             fiber.stateNode._scrollH = h
+            -- Resize Container clip region (ScrollView uses Container for viewport clipping)
+            if fiber.stateNode.anchorChildren ~= nil then
+                fiber.stateNode.width = w
+                fiber.stateNode.height = h
+            end
             -- Update touch overlay rect to match new size
             local overlay = fiber.stateNode._touchOverlay
             if overlay and overlay.path then

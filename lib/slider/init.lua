@@ -30,8 +30,8 @@ function M.Slider(props)
     local thumbTintColor        = props.thumbTintColor or "#FFFFFF"
 
     -- Dimensions
-    local trackHeight = 4
-    local thumbSize   = 20
+    local trackHeight = props.trackHeight or 4
+    local thumbSize   = props.thumbSize or ((style.height or 30) - 6)
     local trackWidth  = style.width or 200
 
     -- Computed from current value

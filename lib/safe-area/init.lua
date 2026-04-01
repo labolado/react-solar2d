@@ -1,8 +1,14 @@
--- lib/safe-area/init.lua
--- react-native-safe-area-context implementation for Solar2D
+--- Safe area insets for Solar2D.
+-- Drop-in replacement for react-native-safe-area-context.
+-- Reads Solar2D's `display.safeScreenOriginY` / `display.safeActualContentHeight`
+-- to compute insets for notches, status bars, and home indicators.
+-- @module lib.safe-area
 
 local M = {}
 
+--- Get current safe area insets in content coordinates.
+-- Returns zero insets when running outside Solar2D (e.g. headless tests).
+-- @return table {top=number, bottom=number, left=number, right=number}
 function M.getSafeAreaInsets()
     local insets = { top = 0, bottom = 0, left = 0, right = 0 }
 
@@ -25,6 +31,10 @@ function M.getSafeAreaInsets()
     return insets
 end
 
+--- Hook-style accessor for safe area insets.
+-- Currently returns the same as `getSafeAreaInsets()` (no reactive updates).
+-- Provided for API compatibility with react-native-safe-area-context.
+-- @return table {top, bottom, left, right}
 function M.useSafeAreaInsets()
     return M.getSafeAreaInsets()
 end

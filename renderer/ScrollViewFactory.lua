@@ -14,8 +14,12 @@ local function createScrollView(props, style, applyCommonStyle)
     local insetBottom = contentInset.bottom or 0
     local insetRight = contentInset.right or 0
 
-    local clipContainer = display.newGroup()
+    -- Use Container for viewport clipping (content outside scroll bounds is hidden).
+    -- anchorChildren=false makes children position from top-left, same as Group.
+    -- Note: Container uses 1 mask level (Solar2D limit is 3 nested masks).
+    local clipContainer = display.newContainer(w, h)
     clipContainer.anchorX, clipContainer.anchorY = 0, 0
+    clipContainer.anchorChildren = false
 
     local contentGroup = display.newGroup()
     clipContainer:insert(contentGroup)
@@ -79,8 +83,13 @@ local function createScrollView(props, style, applyCommonStyle)
         for i = 1, contentGroup.numChildren do
             local c = contentGroup[i]
             if c then
-                local bot = (c.y or 0) + (c.contentHeight or c.height or 0)
-                local rt  = (c.x or 0) + (c.contentWidth or c.width or 0)
+                -- Prefer Yoga-computed layoutHeight/layoutWidth over Solar2D's
+                -- contentHeight/contentWidth — group.contentHeight returns the child
+                -- bounding box which is 0 for flex-only containers.
+                local ch = c.layoutHeight or c.contentHeight or c.height or 0
+                local cw = c.layoutWidth or c.contentWidth or c.width or 0
+                local bot = (c.y or 0) + ch
+                local rt  = (c.x or 0) + cw
                 if bot > maxH then maxH = bot end
                 if rt > maxW then maxW = rt end
             end

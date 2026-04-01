@@ -1,6 +1,11 @@
--- renderer/HostConfig.lua
+--- Solar2D host renderer — creates, updates, and destroys display objects for the React reconciler.
+-- @module renderer.HostConfig
 local M = {}
 
+--- Parse a CSS color string or table into a Solar2D {r, g, b, a} table (0.0–1.0 range).
+-- Supports #RGB, #RGBA, #RRGGBB, #RRGGBBAA, rgba(), and named colors.
+-- @param color string|table  CSS color string or already-parsed {r,g,b,a} table.
+-- @return table  {r, g, b, a} values in 0.0–1.0 range.
 local function parseColor(color)
     if type(color) == "table" then return color end
     if type(color) ~= "string" then return {1, 1, 1, 1} end
@@ -37,6 +42,11 @@ local function parseColor(color)
     return named[color:lower()] or {1, 1, 1, 1}
 end
 
+--- Normalize a point value (table or positional) into x, y coordinates.
+-- @param value table|any  {x,y}, {[1],[2]}, or non-table (returns defaults).
+-- @param defaultX number  Fallback x value.
+-- @param defaultY number  Fallback y value.
+-- @return number, number  Resolved x and y.
 local function normalizePoint(value, defaultX, defaultY)
     if type(value) == "table" then
         if value.x or value.y then
@@ -52,6 +62,10 @@ local function normalizePoint(value, defaultX, defaultY)
     return defaultX, defaultY
 end
 
+--- Build a Solar2D gradient paint table from LinearGradient props.
+-- Solar2D only supports 2-color gradients; additional colors are ignored.
+-- @param props table  Props with `colors`, `start`, and `end` fields.
+-- @return table  Solar2D paint table with type="gradient", color1, color2, rotation.
 local function buildGradientPaint(props)
     local colors = {}
     if props and type(props.colors) == "table" then
@@ -99,6 +113,10 @@ local function buildGradientPaint(props)
     return paint
 end
 
+--- Apply a linear gradient fill to an instance's background rect.
+-- Stores gradient props on the instance for future re-application.
+-- @param instance table  Display group with a `_bg` rect.
+-- @param props table  Gradient props (colors, start, end).
 local function applyLinearGradientFill(instance, props)
     if not instance or not instance._bg then return end
     instance._bg.fill = buildGradientPaint(props or instance._gradientProps or {})
@@ -109,7 +127,9 @@ local function applyLinearGradientFill(instance, props)
     }
 end
 
--- Resolve font from style properties
+--- Resolve a Solar2D font name from style `fontFamily` and `fontWeight`.
+-- @param style table  Style table with optional `fontFamily` and `fontWeight` fields.
+-- @return string  Solar2D font name or system font constant.
 local function resolveFont(style)
     if style.fontFamily then
         if style.fontWeight == "bold" then
@@ -123,7 +143,9 @@ local function resolveFont(style)
     return native and native.systemFont or "systemFont"
 end
 
--- Resolve AnimatedValue to plain number (or pass through plain values)
+--- Resolve an AnimatedValue to its current plain number, or pass through non-animated values.
+-- @param v any  AnimatedValue (has `getValue`) or plain value.
+-- @return any  Resolved numeric value, or the original value unchanged.
 local function resolveValue(v)
     if type(v) == "table" and v.getValue then
         return v:getValue()
@@ -131,7 +153,11 @@ local function resolveValue(v)
     return v
 end
 
--- Apply RN transform array to Solar2D display object
+--- Apply a React Native transform array to a Solar2D display object.
+-- Handles rotate (degrees or "Xdeg"/"Xrad"), scale, scaleX, scaleY, translateX, translateY.
+-- Pass nil to reset rotation and scale to defaults.
+-- @param instance table  Solar2D display object.
+-- @param transforms table|nil  Array of transform objects, e.g. `{{rotate="15deg"}}`.
 local function applyTransform(instance, transforms)
     if not transforms then
         instance.rotation = 0
@@ -173,7 +199,14 @@ local function applyTransform(instance, transforms)
     end
 end
 
--- Create per-side border line
+--- Create a single-side border rect inside a group.
+-- @param group table  Solar2D display group to insert the border rect into.
+-- @param side string  One of "top", "bottom", "left", "right".
+-- @param width number  Border thickness in points.
+-- @param color string|table  Border color (CSS string or {r,g,b,a} table).
+-- @param viewW number  Container width.
+-- @param viewH number  Container height.
+-- @return table|nil  The created rect display object, or nil if width <= 0.
 local function addBorderSide(group, side, width, color, viewW, viewH)
     if not width or width <= 0 then return nil end
     local c = parseColor(color or "#000000")
@@ -194,6 +227,10 @@ local function addBorderSide(group, side, width, color, viewW, viewH)
     return line
 end
 
+--- Attach touch/tap/drag/longPress event listeners to an instance from its props.
+-- Handles onPress (with opacity feedback), onLongPress, onTouchStart/Move/End, and onDrag*.
+-- @param instance table  Solar2D display object to attach listeners to.
+-- @param props table  Component props containing event handler callbacks.
 local function wireEvents(instance, props)
     -- Note: ref callbacks are handled by the reconciler (commitWork), not here
     -- Determine feedback style
@@ -350,7 +387,11 @@ local function wireEvents(instance, props)
     end
 end
 
--- Apply common style properties to any instance (resolves AnimatedValue objects)
+--- Apply common visual style properties to a Solar2D display object.
+-- Handles opacity, translateX/Y, scaleX/Y, rotation, display, zIndex, and transform.
+-- AnimatedValue objects are resolved to their current numeric value.
+-- @param instance table  Solar2D display object.
+-- @param style table  Flattened style table.
 local function applyCommonStyle(instance, style)
     if style.opacity ~= nil then instance.alpha = resolveValue(style.opacity) end
     if style.translateX ~= nil then
@@ -373,7 +414,11 @@ local function applyCommonStyle(instance, style)
     if style.transform then applyTransform(instance, style.transform) end
 end
 
--- Subscribe AnimatedValue listeners that directly update display object properties
+--- Subscribe Animated.Value listeners to drive display object properties in real time.
+-- Registers listeners for opacity, translateX/Y, scaleX/Y, rotation, width, height.
+-- Subscriptions are stored in `instance._animSubscriptions` for later cleanup.
+-- @param instance table  Solar2D display object to animate.
+-- @param style table  Style table that may contain Animated.Value fields.
 local function subscribeAnimatedValues(instance, style)
     local subs = {}
     local function sub(animVal, updater)
@@ -431,7 +476,9 @@ local function subscribeAnimatedValues(instance, style)
     end
 end
 
--- Unsubscribe all animated value listeners from an instance
+--- Remove all Animated.Value listeners previously registered on an instance.
+-- Clears `instance._animSubscriptions` after removing each listener.
+-- @param instance table  Solar2D display object with optional `_animSubscriptions`.
 local function unsubscribeAnimatedValues(instance)
     if instance._animSubscriptions then
         for _, s in ipairs(instance._animSubscriptions) do
@@ -441,6 +488,12 @@ local function unsubscribeAnimatedValues(instance)
     end
 end
 
+--- Create a new Solar2D display object for the given React element type.
+-- Handles View, Text, Image, TextInput, ScrollView, LinearGradient, and Animated.* variants.
+-- Returns a display group with framework-private fields (_bg, _textObj, etc.) attached.
+-- @param elementType string  React element type string, e.g. "View", "Text", "Image".
+-- @param props table  Component props including `style`, `children`, event handlers.
+-- @return table  Solar2D display group representing the element.
 function M.createInstance(elementType, props)
     local style = props.style or {}
 
@@ -892,6 +945,9 @@ function M.createInstance(elementType, props)
     return group
 end
 
+--- Create a bare text display group for a React text node (non-element text child).
+-- @param text string  Plain text content.
+-- @return table  Solar2D display group with `_textObj` set.
 function M.createTextInstance(text)
     local group = display.newGroup()
     local textObj = display.newText({
@@ -906,6 +962,11 @@ function M.createTextInstance(text)
     return group
 end
 
+--- Insert a child display object into a parent.
+-- Routes into `_contentGroup` for ScrollView parents and propagates `_parentScrollView`.
+-- Applies zIndex ordering and manual centering if the parent has centering styles.
+-- @param parent table  Parent Solar2D display group.
+-- @param child table  Child Solar2D display object to append.
 function M.appendChild(parent, child)
     if parent._contentGroup then
         -- ScrollView: insert into content group
@@ -942,9 +1003,9 @@ function M.appendChild(parent, child)
     end
 end
 
--- Recursively clean up native fields in a display group tree
--- native.* objects are NOT in the GL group hierarchy, so removeSelf() on a
--- parent group won't remove them. We must walk the tree and removeSelf each one.
+--- Recursively remove native (non-GL) objects from a display group subtree.
+-- `native.*` objects are outside the GL hierarchy and must be removed explicitly.
+-- @param node table  Root of the subtree to clean up.
 local function cleanupNativeFields(node)
     if node._inputField and node._inputField.removeSelf then
         node._inputField:removeSelf()
@@ -963,6 +1024,10 @@ local function cleanupNativeFields(node)
     end
 end
 
+--- Remove a child display object from its parent and clean up all resources.
+-- Unsubscribes animated values, removes native fields, then calls `removeSelf`.
+-- @param parent table  Parent Solar2D display group.
+-- @param child table  Child display object to remove.
 function M.removeChild(parent, child)
     if parent._invalidateContentSize then parent._invalidateContentSize() end
     unsubscribeAnimatedValues(child)
@@ -970,6 +1035,12 @@ function M.removeChild(parent, child)
     child:removeSelf()
 end
 
+--- Insert a child at a specific position — before an existing sibling.
+-- Falls back to appending if `beforeChild` is not found.
+-- Propagates `_parentScrollView` reference the same way `appendChild` does.
+-- @param parent table  Parent Solar2D display group.
+-- @param child table  Child to insert.
+-- @param beforeChild table  Sibling that the child should be placed before.
 function M.insertBefore(parent, child, beforeChild)
     local target = parent._contentGroup or parent
     for i = 1, target.numChildren do
@@ -995,6 +1066,12 @@ function M.insertBefore(parent, child, beforeChild)
     if parent._invalidateContentSize then parent._invalidateContentSize() end
 end
 
+--- Update a Solar2D display object when its React props change.
+-- Handles background rect creation/recreation, text content, style properties,
+-- gradient fills, animated value re-subscription, and event callback refresh.
+-- @param instance table  Existing Solar2D display group to update.
+-- @param oldProps table  Previous component props.
+-- @param newProps table  New component props.
 function M.updateInstance(instance, oldProps, newProps)
     local oldStyle = oldProps.style or {}
     local newStyle = newProps.style or {}
@@ -1188,12 +1265,18 @@ function M.updateInstance(instance, oldProps, newProps)
     end
 end
 
+--- Update the text content of a bare text instance (non-element text node).
+-- @param instance table  Display group with `_textObj` created by `createTextInstance`.
+-- @param oldText string  Previous text content (unused, kept for reconciler API parity).
+-- @param newText string  New text content to display.
 function M.updateTextInstance(instance, oldText, newText)
     if instance._textObj then
         instance._textObj.text = tostring(newText)
     end
 end
 
+--- Expose parseColor for use by other renderer modules (e.g. ScrollViewFactory).
+-- @see parseColor
 M._parseColor = parseColor
 
 return M

@@ -16,7 +16,7 @@ T.describe("ScrollView: creation", function()
         local inst = HostConfig.createInstance("ScrollView", {
             style = { width = 300, height = 400 },
         })
-        T.expect(inst._type).toBe("group")
+        T.expect(inst._type).toBe("container")
         T.expect(inst._contentGroup).toBeTruthy()
         T.expect(inst._scrollH).toBe(400)
         T.expect(inst._scrollW).toBe(300)
