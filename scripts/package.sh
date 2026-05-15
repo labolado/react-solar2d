@@ -14,12 +14,7 @@ rm -rf "$STAGING" "$DIST"
 mkdir -p "$STAGING" "$DIST"
 
 # metadata
-cat > "$STAGING/metadata.lua" << 'EOF'
-local metadata = {
-  plugin = { format = 'lua' },
-}
-return metadata
-EOF
+cp "$ROOT/metadata.lua" "$STAGING/"
 
 # Entry point
 cp "$ROOT/react_solar2d.lua" "$STAGING/"

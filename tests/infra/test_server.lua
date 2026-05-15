@@ -53,6 +53,14 @@ local function jsonEncode(obj)
 end
 M.jsonEncode = jsonEncode
 
+local function jsonDecode(text)
+    local fn, err = load("return " .. tostring(text), "=json", "t", {})
+    if not fn then
+        error(err)
+    end
+    return fn()
+end
+
 local function httpResponse(body, status, contentType)
     status = status or "200 OK"
     contentType = contentType or "application/json"
@@ -623,6 +631,23 @@ local function handleClient(client)
             response = err("Missing text")
         end
 
+    elseif method == "POST" and path == "/input" then
+        local text = params.text
+        if text == nil then
+            response = err("Missing text")
+        else
+            timer.performWithDelay(1, function()
+                local focus = native and native.getKeyboardFocus and native.getKeyboardFocus() or nil
+                if focus and focus.text ~= nil then
+                    focus.text = tostring(focus.text or "") .. tostring(text)
+                    pcall(function()
+                        focus:dispatchEvent({name="userInput", phase="editing", target=focus})
+                    end)
+                end
+            end)
+            response = ok({success=true, text=text})
+        end
+
     elseif method == "POST" and path == "/longpress" then
         local x = tonumber(params.x)
         local y = tonumber(params.y)
@@ -742,6 +767,61 @@ local function handleClient(client)
             response = ok({success=true, message="Code scheduled"})
         else
             response = err("Missing code")
+        end
+
+    elseif method == "GET" and path == "/creator-result" then
+        local creator = rawget(_G, "__creator")
+        if creator and creator.getClassResultJSON then
+            local okResult, result = pcall(creator.getClassResultJSON)
+            if okResult then
+                response = httpResponse(result or "null", "200 OK", "application/json")
+            else
+                response = err("Failed to read creator result: " .. tostring(result))
+            end
+        else
+            response = err("Creator debug API unavailable")
+        end
+
+    elseif method == "POST" and path == "/creator-import" then
+        local creator = rawget(_G, "__creator")
+        local text = params.text
+        local filePath = params.path
+        if not creator or not creator.importJSON or not creator.classify then
+            response = err("Creator debug API unavailable")
+        else
+            if (not text or text == "") and filePath and filePath ~= "" then
+                local f = io.open(filePath, "r")
+                if f then
+                    text = f:read("*a")
+                    f:close()
+                end
+            end
+            if not text or text == "" then
+                response = err("Missing text")
+            else
+            timer.performWithDelay(0, function()
+                local importFn = creator.importAndClassify or creator.importJSON
+                local okImport, importRes = pcall(importFn, text)
+                if not okImport or not importRes then
+                  local resp = ok({ ok = false, stage = "import", error = tostring(importRes) })
+                  pcall(function() client:send(resp) end)
+                    pcall(function() client:close() end)
+                    return
+                end
+                timer.performWithDelay(1200, function()
+                    local okState, state = pcall(creator.state)
+                    local okClass, classJson = pcall(creator.getClassResultJSON)
+                    local resp = ok({
+                        ok = true,
+                        state = okState and state or nil,
+                        classResultJSON = okClass and classJson or nil,
+                    })
+                    pcall(function() client:send(resp) end)
+                    pcall(function() client:close() end)
+                end)
+            end)
+            return -- async
+            end
         end
 
     elseif method == "POST" and path == "/wait" then

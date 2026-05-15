@@ -1,16 +1,8 @@
 --- React-Solar2D root module.
--- Entry point that auto-configures package.path and re-exports React core,
--- renderer, components, style, animated, and navigation APIs.
+-- Re-exports React core, renderer, components, style, animated, and navigation APIs.
+-- Loaded via plugin.react-solar2d (requires plugin system) or symlinked for dev.
 -- @module react_solar2d
 
--- Auto-configure package.path so sub-modules (react/init.lua etc.) are found
-do
-    local info = debug.getinfo(1, "S")
-    local dir = info.source:match("^@(.+/)")
-    if dir and not package.path:find(dir, 1, true) then
-        package.path = dir .. "?.lua;" .. dir .. "?/init.lua;" .. package.path
-    end
-end
 local React = require("react")
 local ReactSolar2D = require("renderer")
 local StyleSheet = require("style.StyleSheet")

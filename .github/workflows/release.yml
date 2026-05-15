@@ -16,11 +16,7 @@ jobs:
         run: |
           STAGING=$(mktemp -d)
 
-          cat > "$STAGING/metadata.lua" << 'EOF'
-          local metadata = { plugin = { format = 'lua' } }
-          return metadata
-          EOF
-
+          cp metadata.lua "$STAGING/"
           cp react_solar2d.lua "$STAGING/"
           for dir in react renderer components layout style animated navigation hooks lib; do
             [ -d "$dir" ] && cp -r "$dir" "$STAGING/"
