@@ -31,6 +31,20 @@ for dir in react renderer components layout style animated navigation hooks lib;
     fi
 done
 
+# Platform init files (required by Solar2D plugin system)
+for platform in mac-sim android iphone iphone-sim win32-sim; do
+    mkdir -p "$STAGING/$platform"
+    cat > "$STAGING/$platform/plugin.init.lua" << 'PLUGINEOF'
+do
+    local info = debug.getinfo(1, "S")
+    local dir = info.source:match("^@(.+/)") or ""
+    local root = dir:gsub("/[^/]+/$", "/")
+    package.path = root .. "?.lua;" .. root .. "?/init.lua;" .. package.path
+end
+return require("react_solar2d")
+PLUGINEOF
+done
+
 # Test server (UI automation)
 mkdir -p "$STAGING/tests/infra"
 cp "$ROOT/tests/infra/test_server.lua" "$STAGING/tests/infra/"
