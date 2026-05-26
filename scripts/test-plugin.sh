@@ -69,12 +69,19 @@ local function L(msg) log[#log+1] = msg end
 
 L("START")
 
--- Test 1: require react_solar2d
-local ok1, RN = pcall(require, "react_solar2d")
-L("react_solar2d: " .. tostring(ok1))
+-- Test 1: require the plugin entry. This is the real user-facing path:
+-- Solar2D's plugin loader maps require("plugin.react-solar2d") to
+-- plugin_react-solar2d.lua, which installs a require-override (see
+-- commit ff21651) before returning react_solar2d. Sub-module require
+-- ("react", "components", ...) only works AFTER this bootstrap fires —
+-- requiring "react_solar2d" directly skips it and every sub-module
+-- lookup then fails because Corona's native require does not search
+-- ?/init.lua.
+local ok1, RN = pcall(require, "plugin.react-solar2d")
+L("plugin.react-solar2d: " .. tostring(ok1))
 if not ok1 then L("ERR: " .. tostring(RN)) end
 
--- Test 2: require react separately
+-- Test 2: sub-module require now works thanks to the bootstrap override.
 local ok2, React = pcall(require, "react")
 L("react: " .. tostring(ok2))
 
