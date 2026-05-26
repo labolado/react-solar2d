@@ -213,9 +213,20 @@ local function createScrollView(props, style, applyCommonStyle)
 
         elseif event.phase == "moved" then
             if event.id ~= primaryTouchId then return true end
-            -- If a drag child is active, forward all events to it
+            -- If a drag child is active, forward all events to it.
+            -- Re-validate the cached reference first: React may have reconciled the
+            -- child sub-tree between "began" and "moved" (e.g. consumer triggered
+            -- setState from onValueChange), destroying the overlay instance we
+            -- captured at "began". A dead instance has no contentBounds and its
+            -- _onDragHandler silently returns, freezing the drag mid-gesture.
+            -- Re-lookup using the original began position to find the replacement.
             if activeDragChild then
-                activeDragChild._onDragHandler(event)
+                if not activeDragChild.contentBounds then
+                    activeDragChild = findDragChild(contentGroup, startX, startY)
+                end
+                if activeDragChild then
+                    activeDragChild._onDragHandler(event)
+                end
                 return true
             end
             -- Forward scroll to nested ScrollView
@@ -295,9 +306,13 @@ local function createScrollView(props, style, applyCommonStyle)
         elseif event.phase == "ended" or event.phase == "cancelled" then
             if event.id ~= primaryTouchId then return true end
             primaryTouchId = nil
-            -- Forward to drag child if active
+            -- Forward to drag child if active. Same reconciliation race as "moved":
+            -- the cached instance may be dead. Skip the call (no point firing a
+            -- terminal event into a ghost), just clear the reference.
             if activeDragChild then
-                activeDragChild._onDragHandler(event)
+                if activeDragChild.contentBounds then
+                    activeDragChild._onDragHandler(event)
+                end
                 activeDragChild = nil
                 isDragging = false
                 return true

@@ -45,6 +45,7 @@ local testFiles = {
     "tests/integration/test_full_render.lua",
     "tests/infra/test_test_server.lua",
     "tests/components/test_nested_scrollview.lua",
+    "tests/components/test_scrollview_drag_reconcile.lua",
     "tests/lib/test_datetime_picker.lua",
     "tests/react/test_nil_children.lua",
     "tests/components/test_imperative_canvas.lua",
