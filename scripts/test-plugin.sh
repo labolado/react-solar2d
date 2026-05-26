@@ -6,7 +6,27 @@ set -e
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 TEST_DIR="/tmp/test-react-solar2d-plugin"
 LOG="/tmp/solar2d_plugin_test.log"
-SIMULATOR="/Applications/Corona-b3/Corona Simulator.app/Contents/MacOS/Corona Simulator"
+
+# Resolve Solar2D Simulator. Override with SOLAR2D_SIMULATOR=... if your
+# install lives elsewhere; otherwise probe the common /Applications paths.
+SIMULATOR="${SOLAR2D_SIMULATOR:-}"
+if [ -z "$SIMULATOR" ]; then
+    for candidate in \
+        "/Applications/Corona/Corona Simulator.app/Contents/MacOS/Corona Simulator" \
+        "/Applications/Corona-3730.b3.v1/Corona Simulator.app/Contents/MacOS/Corona Simulator" \
+        "/Applications/Corona-3730.bgfx/Corona Simulator.app/Contents/MacOS/Corona Simulator" \
+        "/Applications/Corona-b3/Corona Simulator.app/Contents/MacOS/Corona Simulator" \
+        "/Applications/CoronaSDK/Corona Simulator.app/Contents/MacOS/Corona Simulator" \
+        "/Applications/Solar2D/Corona Simulator.app/Contents/MacOS/Corona Simulator"
+    do
+        if [ -x "$candidate" ]; then SIMULATOR="$candidate"; break; fi
+    done
+fi
+if [ -z "$SIMULATOR" ] || [ ! -x "$SIMULATOR" ]; then
+    echo "ERROR: Solar2D Simulator not found. Set SOLAR2D_SIMULATOR=/path/to/Corona Simulator" >&2
+    exit 1
+fi
+echo "Using simulator: $SIMULATOR"
 
 # 1. Package
 echo "=== Packaging plugin ==="
