@@ -22,6 +22,7 @@ local testFiles = {
     "tests/renderer/test_hostConfig.lua",
     "tests/renderer/test_hostConfig_styles.lua",
     "tests/renderer/test_hostConfig_new.lua",
+    "tests/renderer/test_hostconfig_touch_focus.lua",
     "tests/components/test_view.lua",
     "tests/components/test_text.lua",
     "tests/components/test_scrollview.lua",

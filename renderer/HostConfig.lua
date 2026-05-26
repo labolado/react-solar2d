@@ -298,12 +298,25 @@ local function wireEvents(instance, props)
         instance._onLongPress = props.onLongPress
         instance.isHitTestable = true
         local longPressTimer = nil
+        local activeId = nil
+        -- Pin stage focus across the press window so a mid-press React reconcile
+        -- cannot steal the ended/cancelled dispatch and leak the 500ms timer
+        -- (which would otherwise fire onLongPress after the user already lifted).
         instance:addEventListener("touch", function(event)
             if event.phase == "began" then
+                if activeId ~= nil then return true end
+                activeId = event.id
+                local stage = display.getCurrentStage()
+                if stage and stage.setFocus then stage:setFocus(instance, event.id) end
                 longPressTimer = timer.performWithDelay(500, function()
-                    props.onLongPress(event)
+                    longPressTimer = nil
+                    if instance._onLongPress then instance._onLongPress(event) end
                 end)
             elseif event.phase == "ended" or event.phase == "cancelled" then
+                if event.id ~= activeId then return true end
+                activeId = nil
+                local stage = display.getCurrentStage()
+                if stage and stage.setFocus then stage:setFocus(nil, event.id) end
                 if longPressTimer then timer.cancel(longPressTimer); longPressTimer = nil end
             end
             return true
@@ -311,19 +324,46 @@ local function wireEvents(instance, props)
     end
 
     -- Touch event handlers for drag functionality (Slider, etc.)
+    -- When the user declares onTouchMove we MUST pin stage focus at "began" and
+    -- release it at "ended"/"cancelled": without focus Solar2D re-runs hit-test
+    -- on every touch frame, so any mid-gesture React reconcile that replaces
+    -- the underlying display object lets the moved/ended frames hit a fresh
+    -- sibling and the listener silently freezes — same root cause as the
+    -- ScrollView drag-reconcile race (commit 2f9edf3). Consumers like
+    -- PanGestureHandler usually setState inside onGestureEvent, which triggers
+    -- exactly this race. Users that only set onTouchStart/onTouchEnd keep the
+    -- old "finger drifts off the element → auto-release" semantics.
     if props.onTouchStart or props.onTouchMove or props.onTouchEnd then
         instance.isHitTestable = true
+        local pinFocus = props.onTouchMove ~= nil
+        local activeId = nil
         instance:addEventListener("touch", function(event)
             local phase = event.phase
-            if phase == "began" and props.onTouchStart then
-                props.onTouchStart(event)
-                if instance._parentScrollView then
-                    instance._parentScrollView:takeFocus(event)
+            if phase == "began" then
+                if pinFocus then
+                    -- Another finger is already driving the gesture — ignore.
+                    if activeId ~= nil then return true end
+                    activeId = event.id
+                    local stage = display.getCurrentStage()
+                    if stage and stage.setFocus then stage:setFocus(instance, event.id) end
                 end
-            elseif phase == "moved" and props.onTouchMove then
-                props.onTouchMove(event)
-            elseif (phase == "ended" or phase == "cancelled") and props.onTouchEnd then
-                props.onTouchEnd(event)
+                if props.onTouchStart then
+                    props.onTouchStart(event)
+                    if instance._parentScrollView then
+                        instance._parentScrollView:takeFocus(event)
+                    end
+                end
+            elseif phase == "moved" then
+                if pinFocus and event.id ~= activeId then return true end
+                if props.onTouchMove then props.onTouchMove(event) end
+            elseif phase == "ended" or phase == "cancelled" then
+                if pinFocus then
+                    if event.id ~= activeId then return true end
+                    activeId = nil
+                    local stage = display.getCurrentStage()
+                    if stage and stage.setFocus then stage:setFocus(nil, event.id) end
+                end
+                if props.onTouchEnd then props.onTouchEnd(event) end
             end
             return true
         end)
