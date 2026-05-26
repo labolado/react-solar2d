@@ -24,7 +24,9 @@ local function createScrollView(props, style, applyCommonStyle)
     local contentGroup = display.newGroup()
     clipContainer:insert(contentGroup)
 
-    -- Touch overlay ON TOP of content. Uses touch listener directly (no setFocus).
+    -- Touch overlay ON TOP of content. The touch listener claims stage focus
+    -- at "began" (see below) so subsequent phases survive mid-gesture
+    -- React reconciliation of children.
     local touchOverlay = display.newRect(clipContainer, 0, 0, w, h)
     touchOverlay.anchorX, touchOverlay.anchorY = 0, 0
     touchOverlay:setFillColor(0, 0, 0, 0.001)
@@ -174,12 +176,27 @@ local function createScrollView(props, style, applyCommonStyle)
         return nil
     end
 
-    -- Touch listener on the overlay rect — NO setFocus needed.
+    -- Touch listener on the overlay rect. We MUST claim stage focus at "began"
+    -- and release it at "ended"/"cancelled": without focus, Solar2D re-runs the
+    -- hit-test on every subsequent touch event and may deliver "moved" frames
+    -- to whichever object happens to be under the finger at that moment. Once
+    -- React reconciles the slider sub-tree mid-gesture (onSlidingComplete
+    -- causes a re-render that re-creates the overlay's _bg rect), the topmost
+    -- hit at the finger position can flip away from this touchOverlay and the
+    -- drag silently freezes — exactly the user-reported "after a few drags"
+    -- symptom, because each completed drag triggers a setState that primes the
+    -- next reconcile-during-finger-down. Pinning the touch to touchOverlay via
+    -- setFocus removes that race entirely.
     touchOverlay:addEventListener("touch", function(event)
         if event.phase == "began" then
             -- Ignore additional fingers; only the first finger drives the scroll
             if primaryTouchId ~= nil then return true end
             primaryTouchId = event.id
+            -- Pin all subsequent touch phases for this finger to touchOverlay.
+            -- Without focus, Solar2D re-hit-tests every frame and a re-render
+            -- of a drag-capable child mid-gesture can steal the dispatch.
+            local stage = display.getCurrentStage()
+            if stage and stage.setFocus then stage:setFocus(touchOverlay, event.id) end
             recalcContentSize()
             startY = event.y
             startX = event.x
@@ -306,6 +323,10 @@ local function createScrollView(props, style, applyCommonStyle)
         elseif event.phase == "ended" or event.phase == "cancelled" then
             if event.id ~= primaryTouchId then return true end
             primaryTouchId = nil
+            -- Release the per-touch focus we claimed at "began" so the next
+            -- finger can hit-test against the live display tree.
+            local stage = display.getCurrentStage()
+            if stage and stage.setFocus then stage:setFocus(nil, event.id) end
             -- Forward to drag child if active. Same reconciliation race as "moved":
             -- the cached instance may be dead. Skip the call (no point firing a
             -- terminal event into a ghost), just clear the reference.

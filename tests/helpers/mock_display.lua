@@ -170,6 +170,13 @@ M.currentStage = {
     setFocus = function(self, obj) end
 }
 
+-- ScrollViewFactory's touch handler calls display.getCurrentStage() to claim
+-- and release per-touch focus. Provide a default getter so every test that
+-- pulls in this mock gets a working stage without needing its own shim.
+function M.getCurrentStage()
+    return M.currentStage
+end
+
 function M.resetIdCounter()
     nextId = 0
 end

@@ -19,9 +19,14 @@ local mockDisplay = require("tests.helpers.mock_display")
 display = mockDisplay
 display.contentWidth = 1536
 display.contentHeight = 2048
--- ScrollViewFactory.takeFocus calls display.getCurrentStage():setFocus(); the
--- mock only exports currentStage, so add a getter shim for the test environment.
-display.getCurrentStage = function() return mockDisplay.currentStage end
+-- ScrollViewFactory.takeFocus and the touchOverlay began/ended handler call
+-- display.getCurrentStage():setFocus(...). mock_display provides
+-- getCurrentStage() by default; override setFocus to record calls so the
+-- focus-pinning tests below can inspect what happened.
+local focusLog = {}
+mockDisplay.currentStage.setFocus = function(self, obj, id)
+    table.insert(focusLog, { obj = obj, id = id })
+end
 
 native = { systemFont = "systemFont", systemFontBold = "systemFontBold" }
 timer = { performWithDelay = function() return {} end, cancel = function() end }
@@ -149,6 +154,100 @@ T.describe("ScrollView: drag child reconciliation race", function()
         T.expect(dragLog[2].phase).toBe("moved")
         T.expect(dragLog[3].phase).toBe("moved")
         T.expect(dragLog[4].phase).toBe("ended")
+    end)
+end)
+
+T.describe("ScrollView: pins touch focus to touchOverlay across phases", function()
+    -- The "freezes after a few drags" bug: Solar2D without setFocus re-runs
+    -- hit-tests on every touch frame. When a Slider rerenders mid-drag (because
+    -- the previous drag's onSlidingComplete triggered a setState, and reconcile
+    -- recreates the overlay's _bg rect), the topmost hit at the finger position
+    -- can flip away from the touchOverlay and the drag silently stops getting
+    -- "moved" events. The v6 reconcile-repair only handled the case where the
+    -- cached drag child instance was destroyed; this test covers the actual
+    -- root cause — Solar2D dropping subsequent dispatches without focus.
+    T.it("setFocus claimed at began, released at ended", function()
+        focusLog = {}
+        local scrollView = HostConfig.createInstance("ScrollView", {
+            style = { width = 300, height = 400 },
+        })
+        scrollView._contentH = 400
+
+        local dragLog = {}
+        local overlay = makeDragOverlay(50, 50, 250, 100, dragLog, "speed")
+        HostConfig.appendChild(scrollView, overlay)
+
+        local touchOverlay = scrollView._touchOverlay
+        local touchListener = touchOverlay._listeners["touch"][1]
+
+        touchListener({ phase = "began", x = 150, y = 75, id = "f1", target = touchOverlay })
+        T.expect(#focusLog).toBe(1)
+        T.expect(focusLog[1].obj).toBe(touchOverlay)
+        T.expect(focusLog[1].id).toBe("f1")
+
+        touchListener({ phase = "moved", x = 160, y = 75, id = "f1", target = touchOverlay })
+        -- moved must not re-claim focus
+        T.expect(#focusLog).toBe(1)
+
+        touchListener({ phase = "ended", x = 170, y = 75, id = "f1", target = touchOverlay })
+        T.expect(#focusLog).toBe(2)
+        T.expect(focusLog[2].obj).toBe(nil)
+        T.expect(focusLog[2].id).toBe("f1")
+    end)
+
+    T.it("setFocus released on cancelled phase too", function()
+        focusLog = {}
+        local scrollView = HostConfig.createInstance("ScrollView", {
+            style = { width = 300, height = 400 },
+        })
+        scrollView._contentH = 400
+
+        local dragLog = {}
+        local overlay = makeDragOverlay(50, 50, 250, 100, dragLog, "speed")
+        HostConfig.appendChild(scrollView, overlay)
+
+        local touchOverlay = scrollView._touchOverlay
+        local touchListener = touchOverlay._listeners["touch"][1]
+
+        touchListener({ phase = "began", x = 150, y = 75, id = "f2", target = touchOverlay })
+        T.expect(#focusLog).toBe(1)
+        touchListener({ phase = "cancelled", x = 150, y = 75, id = "f2", target = touchOverlay })
+        T.expect(#focusLog).toBe(2)
+        T.expect(focusLog[2].obj).toBe(nil)
+        T.expect(focusLog[2].id).toBe("f2")
+    end)
+
+    T.it("subsequent fingers do not double-claim focus while one is active", function()
+        focusLog = {}
+        local scrollView = HostConfig.createInstance("ScrollView", {
+            style = { width = 300, height = 400 },
+        })
+        scrollView._contentH = 400
+
+        local dragLog = {}
+        local overlay = makeDragOverlay(50, 50, 250, 100, dragLog, "speed")
+        HostConfig.appendChild(scrollView, overlay)
+
+        local touchOverlay = scrollView._touchOverlay
+        local touchListener = touchOverlay._listeners["touch"][1]
+
+        touchListener({ phase = "began", x = 150, y = 75, id = "fA", target = touchOverlay })
+        -- Second finger lands while first is still down — must be ignored (and
+        -- must not re-claim focus, which would steal the first finger's
+        -- subsequent events).
+        touchListener({ phase = "began", x = 160, y = 75, id = "fB", target = touchOverlay })
+        T.expect(#focusLog).toBe(1)
+        T.expect(focusLog[1].id).toBe("fA")
+
+        -- And a wrong-id ended must not release focus held for fA.
+        touchListener({ phase = "ended", x = 160, y = 75, id = "fB", target = touchOverlay })
+        T.expect(#focusLog).toBe(1)
+
+        -- fA's ended releases.
+        touchListener({ phase = "ended", x = 170, y = 75, id = "fA", target = touchOverlay })
+        T.expect(#focusLog).toBe(2)
+        T.expect(focusLog[2].obj).toBe(nil)
+        T.expect(focusLog[2].id).toBe("fA")
     end)
 end)
 
