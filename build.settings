@@ -26,11 +26,5 @@ settings = {
                 ["win32-sim"]  = { url = yoga_base .. "plugin.yoga-win32-sim.tgz" },
             },
         },
-        ["plugin.onnxruntime"] = {
-            publisherId = "com.coronalabs",
-            supportedPlatforms = {
-                ["mac-sim"] = { url = "http://127.0.0.1:10980/plugins/mac-sim/plugin.onnxruntime/plugin.onnxruntime-mac-sim.tgz" },
-            },
-        },
     },
 }

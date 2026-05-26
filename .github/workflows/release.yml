@@ -13,28 +13,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Package plugin
-        run: |
-          STAGING=$(mktemp -d)
-
-          cp metadata.lua "$STAGING/"
-          cp plugin_react-solar2d.lua "$STAGING/"
-          cp react_solar2d.lua "$STAGING/"
-          for dir in react renderer components layout style animated navigation hooks lib; do
-            [ -d "$dir" ] && cp -r "$dir" "$STAGING/"
-          done
-
-          # Test server (UI automation)
-          mkdir -p "$STAGING/tests/infra"
-          cp tests/infra/test_server.lua "$STAGING/tests/infra/"
-          cp tests/infra/base64.lua "$STAGING/tests/infra/"
-
-          VERSION="${GITHUB_REF_NAME}"
-          mkdir -p dist
-          tar czf "dist/plugin.react-solar2d.tgz" -C "$STAGING" .
-
-          FILE_COUNT=$(find "$STAGING" -name '*.lua' | wc -l)
-          SIZE=$(du -h "dist/plugin.react-solar2d.tgz" | cut -f1)
-          echo "Packaged: plugin.react-solar2d.tgz ($FILE_COUNT files, $SIZE)"
+        run: bash scripts/package.sh "${GITHUB_REF_NAME}"
 
       - name: Create Release
         uses: softprops/action-gh-release@v2

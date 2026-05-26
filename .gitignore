@@ -4,6 +4,10 @@ dist/
 .CoronaLiveBuild
 **/.CoronaLiveBuild
 
+# Solar2D simulator plugin-download caches
+download_cache.json
+plugins.txt
+
 # Runtime route files (test artifacts)
 .route
 **/.route

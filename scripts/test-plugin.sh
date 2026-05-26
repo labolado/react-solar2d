@@ -21,8 +21,26 @@ cat > "$TEST_DIR/config.lua" << 'EOF'
 application = { content = { width = 320, height = 480, scale = "adaptive", fps = 60 } }
 EOF
 
+# Mirror the framework's own build.settings: yoga is a native C plugin that
+# any non-trivial layout pulls in, so the standalone tarball test must
+# request it too or anything that triggers layout will silently fail to load.
 cat > "$TEST_DIR/build.settings" << 'EOF'
-settings = { orientation = { default = "portrait", supported = { "portrait" } } }
+local yoga_base = "https://github.com/labolado/solar2d-plugin-yoga/releases/download/v5/"
+settings = {
+    orientation = { default = "portrait", supported = { "portrait" } },
+    plugins = {
+        ["plugin.yoga"] = {
+            publisherId = "com.labolado",
+            supportedPlatforms = {
+                ["mac-sim"]    = { url = yoga_base .. "plugin.yoga-mac-sim.tgz" },
+                android        = { url = yoga_base .. "plugin.yoga-android.tgz" },
+                iphone         = { url = yoga_base .. "plugin.yoga-iphone.tgz" },
+                ["iphone-sim"] = { url = yoga_base .. "plugin.yoga-iphone-sim.tgz" },
+                ["win32-sim"]  = { url = yoga_base .. "plugin.yoga-win32-sim.tgz" },
+            },
+        },
+    },
+}
 EOF
 
 cat > "$TEST_DIR/main.lua" << 'LUAEOF'
