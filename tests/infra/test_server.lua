@@ -808,7 +808,7 @@ local function handleClient(client)
                     pcall(function() client:close() end)
                     return
                 end
-                timer.performWithDelay(1200, function()
+                timer.performWithDelay(2500, function()
                     local okState, state = pcall(creator.state)
                     local okClass, classJson = pcall(creator.getClassResultJSON)
                     local resp = ok({
